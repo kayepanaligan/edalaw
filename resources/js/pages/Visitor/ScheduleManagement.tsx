@@ -67,7 +67,6 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
         notes: '',
     });
 
-    // Update booked slots when props change
     useEffect(() => {
         if (props.bookedTimeSlots !== undefined) {
             setBookedSlots(props.bookedTimeSlots);
@@ -75,7 +74,6 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
         }
     }, [props.bookedTimeSlots]);
 
-    // Fetch booked time slots when date changes
     useEffect(() => {
         if (selectedDate) {
             setLoadingSlots(true);

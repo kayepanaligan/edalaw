@@ -30,9 +30,7 @@ export default function AuthSimpleLayout({
                             </p>
                         </div>
                     </div>
-                    <div className="rounded-xl border border-border bg-card p-6 shadow-lg md:p-8">
-                        {children}
-                    </div>
+                    {children}
                 </div>
             </div>
         </div>

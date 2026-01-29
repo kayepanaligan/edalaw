@@ -2,7 +2,6 @@
 
 namespace Database\Factories;
 
-use App\Models\Role;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -24,27 +23,12 @@ class UserFactory extends Factory
      */
     public function definition(): array
     {
-        $firstName = fake()->firstName();
-        $lastName = fake()->lastName();
-        $middleName = fake()->optional()->firstName();
-
         return [
-            'name' => trim("{$firstName} {$middleName} {$lastName}"),
-            'first_name' => $firstName,
-            'middle_name' => $middleName,
-            'last_name' => $lastName,
+            'name' => fake()->name(),
             'email' => fake()->unique()->safeEmail(),
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
             'remember_token' => Str::random(10),
-            'dob' => fake()->date('Y-m-d', '-18 years'),
-            'gender' => fake()->randomElement(['male', 'female', 'other']),
-            'street' => fake()->streetAddress(),
-            'brgy' => fake()->city(),
-            'municipality' => fake()->city(),
-            'province' => fake()->state(),
-            'postal_code' => fake()->postcode(),
-            'role_id' => Role::where('slug', 'visitor')->first()?->id ?? 3,
             'two_factor_secret' => null,
             'two_factor_recovery_codes' => null,
             'two_factor_confirmed_at' => null,
@@ -70,36 +54,6 @@ class UserFactory extends Factory
             'two_factor_secret' => encrypt('secret'),
             'two_factor_recovery_codes' => encrypt(json_encode(['recovery-code-1'])),
             'two_factor_confirmed_at' => now(),
-        ]);
-    }
-
-    /**
-     * Indicate that the user is a super admin.
-     */
-    public function superAdmin(): static
-    {
-        return $this->state(fn (array $attributes) => [
-            'role_id' => Role::where('slug', 'super_admin')->first()?->id ?? 1,
-        ]);
-    }
-
-    /**
-     * Indicate that the user is a BJMP officer.
-     */
-    public function bjmpOfficer(): static
-    {
-        return $this->state(fn (array $attributes) => [
-            'role_id' => Role::where('slug', 'bjmp_officer')->first()?->id ?? 2,
-        ]);
-    }
-
-    /**
-     * Indicate that the user is a visitor.
-     */
-    public function visitor(): static
-    {
-        return $this->state(fn (array $attributes) => [
-            'role_id' => Role::where('slug', 'visitor')->first()?->id ?? 3,
         ]);
     }
 }
