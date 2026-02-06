@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Models\Role;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -24,7 +25,9 @@ class UserFactory extends Factory
     public function definition(): array
     {
         return [
-            'name' => fake()->name(),
+            'first_name' => fake()->firstName(),
+            'middle_name' => fake()->optional()->firstName(),
+            'last_name' => fake()->lastName(),
             'email' => fake()->unique()->safeEmail(),
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
@@ -55,5 +58,57 @@ class UserFactory extends Factory
             'two_factor_recovery_codes' => encrypt(json_encode(['recovery-code-1'])),
             'two_factor_confirmed_at' => now(),
         ]);
+    }
+
+    /**
+     * Indicate that the user is a super admin.
+     */
+    public function superAdmin(): static
+    {
+        return $this->afterCreating(function ($user) {
+            $role = Role::where('slug', 'super_admin')->first();
+            if ($role) {
+                $user->update(['role_id' => $role->id]);
+            }
+        });
+    }
+
+    /**
+     * Indicate that the user is a BJMP officer.
+     */
+    public function bjmpOfficer(): static
+    {
+        return $this->afterCreating(function ($user) {
+            $role = Role::where('slug', 'bjmp_officer')->first();
+            if ($role) {
+                $user->update(['role_id' => $role->id]);
+            }
+        });
+    }
+
+    /**
+     * Indicate that the user is a visitor.
+     */
+    public function visitor(): static
+    {
+        return $this->afterCreating(function ($user) {
+            $role = Role::where('slug', 'visitor')->first();
+            if ($role) {
+                $user->update(['role_id' => $role->id]);
+            }
+        });
+    }
+
+    /**
+     * Indicate that the user is a monitoring officer.
+     */
+    public function monitoringOfficer(): static
+    {
+        return $this->afterCreating(function ($user) {
+            $role = Role::where('slug', 'monitoring_officer')->first();
+            if ($role) {
+                $user->update(['role_id' => $role->id]);
+            }
+        });
     }
 }

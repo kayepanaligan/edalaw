@@ -1,10 +1,9 @@
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
-import { dashboard } from '@/routes';
 import type { BreadcrumbItem } from '@/types';
 import { Head } from '@inertiajs/react';
-import { Phone, PhoneIncoming, PhoneOutgoing, Clock } from 'lucide-react';
+import { Clock, Phone, PhoneIncoming, PhoneOutgoing } from 'lucide-react';
 
 type CallLog = {
     id: number;
@@ -24,10 +23,11 @@ type Props = {
 const breadcrumbs: BreadcrumbItem[] = [
     {
         title: 'Dashboard',
-        href: dashboard().url,
+        href: '/dashboard',
     },
     {
         title: 'Call Logs',
+        href: '/visitor/call-logs',
     },
 ];
 
@@ -142,6 +142,7 @@ export default function CallLogs({ callLogs }: Props) {
         </AppLayout>
     );
 }
+
 
 
 

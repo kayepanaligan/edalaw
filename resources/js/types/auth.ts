@@ -1,6 +1,5 @@
 export type User = {
     id: number;
-    name: string;
     first_name: string | null;
     middle_name: string | null;
     last_name: string | null;
@@ -15,7 +14,7 @@ export type User = {
     municipality: string | null;
     province: string | null;
     postal_code: string | null;
-    role: 'super_admin' | 'bjmp_officer' | 'visitor';
+    role: 'super_admin' | 'bjmp_officer' | 'visitor' | 'monitoring_officer';
     created_at: string;
     updated_at: string;
     [key: string]: unknown;

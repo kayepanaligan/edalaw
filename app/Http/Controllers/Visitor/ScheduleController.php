@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Visitor;
 
 use App\Http\Controllers\Controller;
 use App\Models\Visit;
+use App\Services\NotificationService;
 use App\VisitStatus;
 use App\VisitType;
 use Illuminate\Http\RedirectResponse;
@@ -34,6 +35,7 @@ class ScheduleController extends Controller
                     'inmate_last_name' => $visit->inmate_last_name,
                     'status' => $visit->status->value,
                     'notes' => $visit->notes,
+                    'meeting_link' => $visit->meeting_link,
                     'created_at' => $visit->created_at->format('Y-m-d H:i:s'),
                 ];
             });
@@ -63,6 +65,7 @@ class ScheduleController extends Controller
                             return $time;
                         }
                     }
+
                     return (string) $time;
                 })
                 ->filter()
@@ -108,6 +111,7 @@ class ScheduleController extends Controller
                         return $time;
                     }
                 }
+
                 return (string) $time;
             })
             ->filter()
@@ -153,7 +157,7 @@ class ScheduleController extends Controller
                 ->withInput();
         }
 
-        Visit::create([
+        $visit = Visit::create([
             'user_id' => auth()->id(),
             'scheduled_date' => $request->scheduled_date,
             'scheduled_time' => $request->scheduled_time,
@@ -165,6 +169,90 @@ class ScheduleController extends Controller
             'notes' => $request->notes,
         ]);
 
-        return redirect()->back()->with('success', 'Visit schedule submitted successfully. Waiting for approval.');
+        // Create notification that application was received
+        NotificationService::createVisitSubmittedNotification($visit);
+        NotificationService::notifySuperAdminsAboutVisit($visit);
+
+        return redirect()->back()->with('success', 'Visit schedule submitted successfully. Your application has been sent to the BJMP officer for review. Please wait for approval.');
+    }
+
+    /**
+     * Cancel a visit schedule.
+     */
+    public function cancel(Request $request, Visit $visit): RedirectResponse
+    {
+        // Ensure the visit belongs to the authenticated user
+        if ($visit->user_id !== auth()->id()) {
+            abort(403, 'Unauthorized action.');
+        }
+
+        // Only allow cancellation of pending or approved visits
+        if (! in_array($visit->status, [VisitStatus::Pending, VisitStatus::Approved])) {
+            return redirect()->back()
+                ->withErrors(['visit' => 'You can only cancel pending or approved visits.']);
+        }
+
+        $visit->update([
+            'status' => VisitStatus::Cancelled,
+        ]);
+
+        // Create notification
+        NotificationService::createVisitNotification($visit, 'cancelled');
+
+        return redirect()->back()->with('success', 'Visit schedule cancelled successfully.');
+    }
+
+    /**
+     * Reschedule a visit.
+     */
+    public function reschedule(Request $request, Visit $visit): RedirectResponse
+    {
+        // Ensure the visit belongs to the authenticated user
+        if ($visit->user_id !== auth()->id()) {
+            abort(403, 'Unauthorized action.');
+        }
+
+        // Only allow rescheduling of pending or approved visits
+        if (! in_array($visit->status, [VisitStatus::Pending, VisitStatus::Approved])) {
+            return redirect()->back()
+                ->withErrors(['visit' => 'You can only reschedule pending or approved visits.']);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'scheduled_date' => ['required', 'date', 'after_or_equal:today'],
+            'scheduled_time' => ['required', 'date_format:H:i'],
+        ]);
+
+        if ($validator->fails()) {
+            return redirect()->back()
+                ->withErrors($validator)
+                ->withInput();
+        }
+
+        // Check if the new time slot is already booked (excluding the current visit)
+        $isBooked = Visit::where('scheduled_date', $request->scheduled_date)
+            ->where('scheduled_time', $request->scheduled_time)
+            ->whereIn('status', [VisitStatus::Pending, VisitStatus::Approved])
+            ->where('id', '!=', $visit->id)
+            ->exists();
+
+        if ($isBooked) {
+            return redirect()->back()
+                ->withErrors(['scheduled_time' => 'This time slot is already booked. Please select another time.'])
+                ->withInput();
+        }
+
+        // Update the visit status to pending after rescheduling
+        $visit->update([
+            'scheduled_date' => $request->scheduled_date,
+            'scheduled_time' => $request->scheduled_time,
+            'status' => VisitStatus::Pending,
+            'meeting_link' => null, // Clear meeting link as it needs to be re-approved
+        ]);
+
+        // Create notification
+        NotificationService::createVisitSubmittedNotification($visit);
+
+        return redirect()->back()->with('success', 'Visit schedule rescheduled successfully. Your rescheduled request has been sent to the BJMP officer for review.');
     }
 }

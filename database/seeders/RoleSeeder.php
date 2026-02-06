@@ -2,7 +2,7 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
+use App\Models\Role;
 use Illuminate\Database\Seeder;
 
 class RoleSeeder extends Seeder
@@ -12,6 +12,24 @@ class RoleSeeder extends Seeder
      */
     public function run(): void
     {
-        //
+        Role::firstOrCreate(
+            ['slug' => 'super_admin'],
+            ['name' => 'Super Admin']
+        );
+
+        Role::firstOrCreate(
+            ['slug' => 'bjmp_officer'],
+            ['name' => 'BJMP Officer']
+        );
+
+        Role::firstOrCreate(
+            ['slug' => 'visitor'],
+            ['name' => 'Visitor']
+        );
+
+        Role::firstOrCreate(
+            ['slug' => 'monitoring_officer'],
+            ['name' => 'Monitoring Officer']
+        );
     }
 }

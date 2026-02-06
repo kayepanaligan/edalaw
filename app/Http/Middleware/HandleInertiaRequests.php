@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\Notification;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -36,9 +37,25 @@ class HandleInertiaRequests extends Middleware
     public function share(Request $request): array
     {
         $user = $request->user();
-        
+
         if ($user) {
             $user->load('role');
+        }
+
+        $unreadNotificationCount = 0;
+        $unreadAdminNotificationCount = 0;
+        if ($user) {
+            $unreadNotificationCount = Notification::where('user_id', $user->id)
+                ->whereNull('read_at')
+                ->count();
+
+            // Get admin notification count for super admins
+            if ($user->role?->slug === 'super_admin') {
+                $unreadAdminNotificationCount = Notification::where('user_id', $user->id)
+                    ->where('type', 'admin_notification')
+                    ->whereNull('read_at')
+                    ->count();
+            }
         }
 
         return [
@@ -51,6 +68,12 @@ class HandleInertiaRequests extends Middleware
                 ] : null,
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
+            'unreadNotificationCount' => $unreadNotificationCount,
+            'unreadAdminNotificationCount' => $unreadAdminNotificationCount,
+            'flash' => [
+                'success' => $request->session()->get('success'),
+                'error' => $request->session()->get('error'),
+            ],
         ];
     }
 }

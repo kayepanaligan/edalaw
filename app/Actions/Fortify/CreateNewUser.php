@@ -28,8 +28,7 @@ class CreateNewUser implements CreatesNewUsers
 
         $visitorRole = Role::where('slug', 'visitor')->first();
 
-        return User::create([
-            'name' => $input['name'],
+        $user = User::create([
             'first_name' => $input['first_name'],
             'middle_name' => $input['middle_name'] ?? null,
             'last_name' => $input['last_name'],
@@ -45,5 +44,10 @@ class CreateNewUser implements CreatesNewUsers
             'role_id' => $visitorRole->id,
             'approval_status' => ApprovalStatus::Pending,
         ]);
+
+        // Notify super admins about new user registration
+        \App\Services\NotificationService::notifySuperAdminsAboutNewUser($user);
+
+        return $user;
     }
 }

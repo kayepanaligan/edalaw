@@ -34,7 +34,6 @@ import type { BreadcrumbItem, NavItem, SharedData } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
 import { BookOpen, Folder, LayoutGrid, Menu, Search } from 'lucide-react';
 import AppLogo from './app-logo';
-import AppLogoIcon from './app-logo-icon';
 
 type Props = {
     breadcrumbs?: BreadcrumbItem[];
@@ -93,7 +92,11 @@ export function AppHeader({ breadcrumbs = [] }: Props) {
                                     Navigation Menu
                                 </SheetTitle>
                                 <SheetHeader className="flex justify-start text-left">
-                                    <AppLogoIcon className="h-6 w-6 fill-current text-black dark:text-white" />
+                                    <img
+                                        src="/edalaw_logo.png"
+                                        alt="EDALaw Logo"
+                                        className="h-20 w-auto object-contain"
+                                    />
                                 </SheetHeader>
                                 <div className="flex h-full flex-1 flex-col space-y-4 p-4">
                                     <div className="flex h-full flex-col justify-between text-sm">
@@ -142,7 +145,7 @@ export function AppHeader({ breadcrumbs = [] }: Props) {
                         <AppLogo />
                     </Link>
 
-                    {/* Desktop Navigation */}
+                   
                     <div className="ml-6 hidden h-full items-center space-x-6 lg:flex">
                         <NavigationMenu className="flex h-full items-stretch">
                             <NavigationMenuList className="flex h-full items-stretch space-x-2">
@@ -224,10 +227,10 @@ export function AppHeader({ breadcrumbs = [] }: Props) {
                                     <Avatar className="size-8 overflow-hidden rounded-full">
                                         <AvatarImage
                                             src={auth.user.avatar}
-                                            alt={auth.user.name}
+                                            alt={[auth.user.first_name, auth.user.middle_name, auth.user.last_name].filter(Boolean).join(' ') || 'User'}
                                         />
                                         <AvatarFallback className="rounded-lg bg-neutral-200 text-black dark:bg-neutral-700 dark:text-white">
-                                            {getInitials(auth.user.name)}
+                                            {getInitials([auth.user.first_name, auth.user.middle_name, auth.user.last_name].filter(Boolean).join(' ') || 'User')}
                                         </AvatarFallback>
                                     </Avatar>
                                 </Button>

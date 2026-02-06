@@ -34,7 +34,7 @@ export default function Register() {
                     
                     return (
                     <>
-                        <div className="grid gap-6">
+                        <div className="grid gap-6 rounded-lg border p-6">
                             <div className="space-y-4">
                                 <h3 className="text-lg font-semibold">Personal Information</h3>
                                 
@@ -86,21 +86,6 @@ export default function Register() {
                                     <InputError message={errors.last_name} className="mt-2" />
                                 </div>
 
-                                <div className="grid gap-2">
-                                    <Label htmlFor="name">Full Name</Label>
-                                    <Input
-                                        id="name"
-                                        type="text"
-                                        required
-                                        tabIndex={4}
-                                        autoComplete="name"
-                                        name="name"
-                                        placeholder="Full name"
-                                        value={data?.name || ''}
-                                        onChange={(e) => setData('name', e.target.value)}
-                                    />
-                                    <InputError message={errors.name} className="mt-2" />
-                                </div>
 
                                 <div className="grid gap-2">
                                     <Label htmlFor="dob">Date of Birth</Label>

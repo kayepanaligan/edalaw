@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\NotificationService;
 use App\VisitStatus;
 use App\VisitType;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -27,6 +28,7 @@ class Visit extends Model
         'inmate_last_name',
         'status',
         'notes',
+        'meeting_link',
     ];
 
     /**
@@ -51,5 +53,30 @@ class Visit extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * Get the appeals for the visit.
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\MorphMany<Appeal>
+     */
+    public function appeals(): \Illuminate\Database\Eloquent\Relations\MorphMany
+    {
+        return $this->morphMany(Appeal::class, 'appealable');
+    }
+
+    /**
+     * Boot the model.
+     */
+    protected static function boot(): void
+    {
+        parent::boot();
+
+        static::updated(function ($visit) {
+            // Check if status has changed
+            if ($visit->wasChanged('status') && $visit->status !== VisitStatus::Pending) {
+                NotificationService::createVisitNotification($visit, $visit->status->value);
+            }
+        });
     }
 }
