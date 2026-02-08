@@ -21,7 +21,7 @@ class ScheduleManagementController extends Controller
      */
     public function index(Request $request): Response
     {
-        $visits = Visit::with('user')
+        $visits = Visit::with(['user', 'monitoringOfficer'])
             ->orderBy('scheduled_date', 'desc')
             ->orderBy('created_at', 'desc')
             ->get()
@@ -39,8 +39,12 @@ class ScheduleManagementController extends Controller
                     'inmate_last_name' => $visit->inmate_last_name,
                     'status' => $visit->status->value,
                     'notes' => $visit->notes,
-                    'meeting_link' => $visit->meeting_link,
+                    'meeting_link' => $visit->meeting_link ?? $visit->daily_co_room_url,
+                    'access_key' => $visit->access_key,
+                    'access_key_expires_at' => $visit->access_key_expires_at?->format('Y-m-d H:i:s'),
                     'rejection_reason' => $visit->rejection_reason,
+                    'monitoring_officer_id' => $visit->monitoring_officer_id,
+                    'monitoring_officer_name' => $visit->monitoringOfficer ? trim("{$visit->monitoringOfficer->first_name} {$visit->monitoringOfficer->middle_name} {$visit->monitoringOfficer->last_name}") : null,
                     'created_at' => $visit->created_at->format('Y-m-d H:i:s'),
                 ];
             });
@@ -60,20 +64,113 @@ class ScheduleManagementController extends Controller
                 ];
             });
 
+        // Get all monitoring officers
+        $monitoringOfficers = User::whereHas('role', function ($query) {
+            $query->where('slug', 'monitoring_officer');
+        })
+            ->where('approval_status', 'approved')
+            ->orderBy('first_name')
+            ->get()
+            ->map(function ($user) {
+                return [
+                    'id' => $user->id,
+                    'name' => trim("{$user->first_name} {$user->middle_name} {$user->last_name}"),
+                    'email' => $user->email,
+                ];
+            });
+
         return Inertia::render('Admin/ScheduleManagement', [
             'visits' => $visits,
             'visitors' => $visitors,
+            'monitoringOfficers' => $monitoringOfficers,
         ]);
     }
 
     /**
      * Approve a visit schedule.
      */
-    public function approve(Visit $visit): RedirectResponse
+    public function approve(Request $request, Visit $visit): RedirectResponse
     {
-        $visit->update([
-            'status' => VisitStatus::Approved,
+        $request->validate([
+            'monitoring_officer_id' => ['nullable', 'exists:users,id'],
+            'access_key' => ['nullable', 'string', 'regex:/^[A-Z0-9]{8,12}$/'],
         ]);
+
+        $oldMonitoringOfficerId = $visit->monitoring_officer_id;
+
+        $updateData = [
+            'status' => VisitStatus::Approved,
+            'monitoring_officer_id' => $request->monitoring_officer_id,
+        ];
+
+        // Create VideoSDK room for virtual visits
+        if ($visit->visit_type === \App\VisitType::Virtual) {
+            $videoSdkService = new \App\Services\VideoSdkService;
+            $roomName = "visit-{$visit->id}-".uniqid();
+            $roomResult = $videoSdkService->createRoom($roomName);
+
+            if ($roomResult['success']) {
+                $updateData['meeting_link'] = $roomResult['room_url'] ?? null;
+                $updateData['daily_co_room_id'] = $roomResult['room_id'] ?? null;
+                $updateData['daily_co_room_name'] = $roomResult['room_name'] ?? $roomName;
+                $updateData['daily_co_room_url'] = $roomResult['room_url'] ?? null;
+                $updateData['room_created_at'] = now();
+
+                // Create monitoring session
+                \App\Models\MonitoringSession::create([
+                    'visit_id' => $visit->id,
+                    'visitor_id' => $visit->user_id,
+                    'session_type' => 'visit',
+                    'session_token' => $roomResult['room_id'] ?? $roomName,
+                    'status' => 'pending',
+                    'started_at' => now(),
+                ]);
+            } else {
+                // Log error but don't block approval - admin can manually add meeting link
+                \Illuminate\Support\Facades\Log::error('VideoSDK room creation failed during approval', [
+                    'visit_id' => $visit->id,
+                    'error' => $roomResult['error'] ?? 'Unknown error',
+                ]);
+
+                // Show warning message
+                return redirect()->back()
+                    ->with('warning', 'Schedule approved, but video room creation failed: '.($roomResult['error'] ?? 'Unknown error').'. Please add meeting link manually.')
+                    ->withInput();
+            }
+        }
+
+        // Handle access key for physical visits
+        if ($visit->visit_type === \App\VisitType::Physical) {
+            if ($request->access_key) {
+                // Use provided access key
+                $updateData['access_key'] = strtoupper($request->access_key);
+            } elseif (! $visit->access_key) {
+                // Generate new access key if not provided and doesn't exist
+                $updateData['access_key'] = Visit::generateAccessKey();
+            }
+
+            // Set expiration to scheduled visit time (not 24 hours after)
+            $scheduledDateTime = $visit->scheduled_date->copy();
+            if ($visit->scheduled_time) {
+                [$hours, $minutes] = explode(':', $visit->scheduled_time);
+                $scheduledDateTime->setTime((int) $hours, (int) $minutes);
+            }
+            // Access key expires at the scheduled visit time
+            $updateData['access_key_expires_at'] = $scheduledDateTime;
+        }
+
+        $visit->update($updateData);
+
+        // Refresh visit to get updated meeting_link
+        $visit->refresh();
+
+        // Notify monitoring officer if assigned and it's a new assignment
+        if ($request->monitoring_officer_id && $oldMonitoringOfficerId !== $request->monitoring_officer_id) {
+            \App\Services\NotificationService::notifyMonitoringOfficerAboutVisit($visit);
+        }
+
+        // Send notification with meeting link
+        NotificationService::createVisitNotification($visit, 'approved');
 
         return redirect()->route('admin.schedules.index')
             ->with('success', 'Schedule approved successfully.');
@@ -105,8 +202,10 @@ class ScheduleManagementController extends Controller
         $request->validate([
             'status' => 'required|in:pending,approved,rejected,completed,missed,cancelled',
             'rejection_reason' => ['required_if:status,rejected', 'string', 'min:10', 'max:1000'],
+            'monitoring_officer_id' => ['nullable', 'exists:users,id'],
         ]);
 
+        $oldMonitoringOfficerId = $visit->monitoring_officer_id;
         $updateData = ['status' => $request->status];
 
         // If rejecting, require and store rejection reason
@@ -117,10 +216,59 @@ class ScheduleManagementController extends Controller
             $updateData['rejection_reason'] = null;
         }
 
+        // Update monitoring officer if provided
+        if ($request->has('monitoring_officer_id')) {
+            $updateData['monitoring_officer_id'] = $request->monitoring_officer_id;
+        }
+
+        // Generate access key for physical visits when approved
+        if ($request->status === 'approved' && $visit->visit_type === \App\VisitType::Physical && ! $visit->access_key) {
+            $updateData['access_key'] = Visit::generateAccessKey();
+            // Access key expires 24 hours after the scheduled visit time
+            $scheduledDateTime = $visit->scheduled_date->copy();
+            if ($visit->scheduled_time) {
+                [$hours, $minutes] = explode(':', $visit->scheduled_time);
+                $scheduledDateTime->setTime((int) $hours, (int) $minutes);
+            }
+            $updateData['access_key_expires_at'] = $scheduledDateTime->addHours(24);
+        }
+
         $visit->update($updateData);
+
+        // Notify monitoring officer if assigned and it's a new assignment
+        if ($request->monitoring_officer_id && $oldMonitoringOfficerId !== $request->monitoring_officer_id && in_array($request->status, ['approved', 'pending'])) {
+            \App\Services\NotificationService::notifyMonitoringOfficerAboutVisit($visit);
+        }
 
         return redirect()->route('admin.schedules.index')
             ->with('success', 'Schedule status updated successfully.');
+    }
+
+    /**
+     * Generate or regenerate access key for a physical visit.
+     */
+    public function generateAccessKey(Visit $visit): RedirectResponse
+    {
+        if ($visit->visit_type !== \App\VisitType::Physical) {
+            return redirect()->back()
+                ->withErrors(['error' => 'Access keys can only be generated for physical visits.']);
+        }
+
+        $accessKey = Visit::generateAccessKey();
+        $scheduledDateTime = $visit->scheduled_date->copy();
+        if ($visit->scheduled_time) {
+            [$hours, $minutes] = explode(':', $visit->scheduled_time);
+            $scheduledDateTime->setTime((int) $hours, (int) $minutes);
+        }
+        $expiresAt = $scheduledDateTime->addHours(24);
+
+        $visit->update([
+            'access_key' => $accessKey,
+            'access_key_expires_at' => $expiresAt,
+        ]);
+
+        return redirect()->route('admin.schedules.index')
+            ->with('success', "Access key generated successfully: {$accessKey}");
     }
 
     /**

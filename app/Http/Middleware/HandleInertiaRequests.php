@@ -44,6 +44,8 @@ class HandleInertiaRequests extends Middleware
 
         $unreadNotificationCount = 0;
         $unreadAdminNotificationCount = 0;
+        $recentNotifications = [];
+
         if ($user) {
             $unreadNotificationCount = Notification::where('user_id', $user->id)
                 ->whereNull('read_at')
@@ -56,6 +58,23 @@ class HandleInertiaRequests extends Middleware
                     ->whereNull('read_at')
                     ->count();
             }
+
+            // Get recent unread notifications (last 10) for toast notifications
+            $recentNotifications = Notification::where('user_id', $user->id)
+                ->whereNull('read_at')
+                ->orderBy('created_at', 'desc')
+                ->limit(10)
+                ->get()
+                ->map(function ($notification) {
+                    return [
+                        'id' => $notification->id,
+                        'type' => $notification->type,
+                        'title' => $notification->title,
+                        'message' => $notification->message,
+                        'created_at' => $notification->created_at->format('Y-m-d H:i:s'),
+                    ];
+                })
+                ->toArray();
         }
 
         return [
@@ -70,6 +89,7 @@ class HandleInertiaRequests extends Middleware
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
             'unreadNotificationCount' => $unreadNotificationCount,
             'unreadAdminNotificationCount' => $unreadAdminNotificationCount,
+            'recentNotifications' => $recentNotifications,
             'flash' => [
                 'success' => $request->session()->get('success'),
                 'error' => $request->session()->get('error'),

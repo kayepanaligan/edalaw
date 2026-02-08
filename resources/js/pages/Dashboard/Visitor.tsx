@@ -25,6 +25,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardDescription, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAppearance } from '@/hooks/use-appearance';
+import { useNotifications } from '@/hooks/use-notifications';
 import { useToast } from '@/hooks/use-toast';
 import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
@@ -180,6 +181,7 @@ export default function VisitorDashboard({
     const unreadNotificationCount = (page.props as { unreadNotificationCount?: number }).unreadNotificationCount || 0;
     const { resolvedAppearance, updateAppearance } = useAppearance();
     useToast();
+    useNotifications();
     
     const toggleTheme = () => {
         updateAppearance(resolvedAppearance === 'dark' ? 'light' : 'dark');

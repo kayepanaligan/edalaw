@@ -1,4 +1,6 @@
 import { PlaceholderPattern } from '@/components/ui/placeholder-pattern';
+import { useNotifications } from '@/hooks/use-notifications';
+import { useToast } from '@/hooks/use-toast';
 import AppLayout from '@/layouts/app-layout';
 import { dashboard } from '@/routes';
 import type { BreadcrumbItem } from '@/types';
@@ -15,6 +17,9 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 export default function BjmpOfficerDashboard() {
+    useToast();
+    useNotifications();
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="BJMP Officer Dashboard" />
@@ -55,6 +60,7 @@ export default function BjmpOfficerDashboard() {
         </AppLayout>
     );
 }
+
 
 
 

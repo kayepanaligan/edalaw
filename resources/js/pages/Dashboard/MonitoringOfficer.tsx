@@ -2,6 +2,8 @@ import { Head } from '@inertiajs/react';
 import { AlertTriangle, Camera, Clock, FileText, Monitor, Video } from 'lucide-react';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useNotifications } from '@/hooks/use-notifications';
+import { useToast } from '@/hooks/use-toast';
 import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
 
@@ -25,6 +27,9 @@ type Props = {
 };
 
 export default function MonitoringOfficerDashboard({ stats }: Props) {
+    useToast();
+    useNotifications();
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Monitoring Officer Dashboard" />

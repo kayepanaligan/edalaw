@@ -10,9 +10,54 @@ import { useCurrentUrl } from '@/hooks/use-current-url';
 import type { NavItem } from '@/types';
 import { Link } from '@inertiajs/react';
 
-export function NavMain({ items = [] }: { items: NavItem[] }) {
+type NavGroup = {
+    label: string;
+    items: NavItem[];
+};
+
+type NavMainProps = {
+    items?: NavItem[];
+    groups?: NavGroup[];
+};
+
+export function NavMain({ items = [], groups = [] }: NavMainProps) {
     const { isCurrentUrl } = useCurrentUrl();
 
+    // If groups are provided, render groups; otherwise render flat items
+    if (groups.length > 0) {
+        return (
+            <>
+                {groups.map((group, groupIndex) => (
+                    <SidebarGroup key={groupIndex} className="px-2 py-0">
+                        <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
+                        <SidebarMenu>
+                            {group.items.map((item) => (
+                                <SidebarMenuItem key={item.title}>
+                                    <SidebarMenuButton
+                                        asChild
+                                        isActive={isCurrentUrl(item.href)}
+                                        tooltip={{ children: item.title }}
+                                    >
+                                        <Link href={item.href} prefetch className="w-full">
+                                            {item.icon && <item.icon />}
+                                            <span className="flex-1">{item.title}</span>
+                                            {item.badge !== undefined && item.badge > 0 && (
+                                                <Badge variant="default" className="ml-auto bg-blue-500 hover:bg-blue-600">
+                                                    {item.badge}
+                                                </Badge>
+                                            )}
+                                        </Link>
+                                    </SidebarMenuButton>
+                                </SidebarMenuItem>
+                            ))}
+                        </SidebarMenu>
+                    </SidebarGroup>
+                ))}
+            </>
+        );
+    }
+
+    // Default: render flat items with "Platform" label
     return (
         <SidebarGroup className="px-2 py-0">
             <SidebarGroupLabel>Platform</SidebarGroupLabel>

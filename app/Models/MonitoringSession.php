@@ -46,6 +46,10 @@ class MonitoringSession extends Model
             'started_at' => 'datetime',
             'ended_at' => 'datetime',
             'connection_health' => 'array',
+            'visitor_camera_enabled' => 'boolean',
+            'visitor_microphone_enabled' => 'boolean',
+            'chat_locked' => 'boolean',
+            'video_locked' => 'boolean',
         ];
     }
 

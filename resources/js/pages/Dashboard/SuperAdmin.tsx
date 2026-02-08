@@ -1,5 +1,5 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { Users, MessageSquare, Scale, Heart } from 'lucide-react';
+import { Users, MessageSquare, Scale, Heart, HelpCircle, LineChart as LineChartIcon } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import {
     Bar,
@@ -7,10 +7,12 @@ import {
     CartesianGrid,
     Cell,
     Legend,
+    Line,
+    LineChart,
     Pie,
     PieChart,
     ResponsiveContainer,
-    Tooltip,
+    Tooltip as RechartsTooltip,
     XAxis,
     YAxis,
 } from 'recharts';
@@ -33,6 +35,14 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { useNotifications } from '@/hooks/use-notifications';
+import { useToast } from '@/hooks/use-toast';
 import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
 
@@ -113,6 +123,13 @@ type Props = {
     barangays: string[];
     location_distribution: Array<{ name: string; count: number }>;
     age_distribution: Array<{ name: string; count: number }>;
+    visit_volume_over_time: Array<{ date: string; physical: number; virtual: number }>;
+    peak_usage_hours: Array<{ hour: string; sessions: number }>;
+    incident_reports_summary: { minor: number; major: number; critical: number };
+    flagged_messages_over_time: Array<{ date: string; count: number }>;
+    enforcement_actions: { forced_mutes: number; terminations: number; chat_locks: number };
+    physical_visit_key_usage: { generated: number; used: number; expired: number };
+    complaints_reviews_trend: Array<{ date: string; submitted: number; resolved: number }>;
 }
 
 function getFullName(user: User): string {
@@ -156,7 +173,26 @@ function getRoleBadge(role: string | null) {
     );
 }
 
-const COLORS = ['#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#00ff00', '#ff00ff', '#00ffff'];
+// Helper component for chart titles with tooltips
+function ChartTitleWithTooltip({ title, description }: { title: string; description: string }) {
+    return (
+        <div className="flex items-center gap-2">
+            <CardTitle>{title}</CardTitle>
+            <TooltipProvider>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                        <p>{description}</p>
+                    </TooltipContent>
+                </Tooltip>
+            </TooltipProvider>
+        </div>
+    );
+}
+
+const COLORS = ['#facc15', '#22c55e', '#eab308', '#16a34a', '#fbbf24', '#10b981', '#fde047'];
 
 export default function SuperAdminDashboard({
     stats,
@@ -173,6 +209,13 @@ export default function SuperAdminDashboard({
     barangays: initialBarangays,
     location_distribution: initialLocationDistribution,
     age_distribution,
+    visit_volume_over_time = [],
+    peak_usage_hours = [],
+    incident_reports_summary = { minor: 0, major: 0, critical: 0 },
+    flagged_messages_over_time = [],
+    enforcement_actions = { forced_mutes: 0, terminations: 0, chat_locks: 0 },
+    physical_visit_key_usage = { generated: 0, used: 0, expired: 0 },
+    complaints_reviews_trend = [],
 }: Props) {
     const [selectedProvince, setSelectedProvince] = useState<string>('all');
     const [selectedMunicipality, setSelectedMunicipality] = useState<string>('all');
@@ -180,6 +223,9 @@ export default function SuperAdminDashboard({
     const [locationDistribution, setLocationDistribution] = useState(initialLocationDistribution);
     const [municipalities, setMunicipalities] = useState(initialMunicipalities);
     const [barangays, setBarangays] = useState(initialBarangays);
+
+    useToast();
+    useNotifications();
 
     // Gender distribution chart data
     const genderChartData = useMemo(() => {
@@ -391,7 +437,7 @@ export default function SuperAdminDashboard({
                                             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                         ))}
                                     </Pie>
-                                    <Tooltip />
+                                    <RechartsTooltip />
                                     <Legend />
                                 </PieChart>
                             </ResponsiveContainer>
@@ -422,7 +468,7 @@ export default function SuperAdminDashboard({
                                             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                         ))}
                                     </Pie>
-                                    <Tooltip />
+                                    <RechartsTooltip />
                                     <Legend />
                                 </PieChart>
                             </ResponsiveContainer>
@@ -456,7 +502,7 @@ export default function SuperAdminDashboard({
                                             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                         ))}
                                     </Pie>
-                                    <Tooltip />
+                                    <RechartsTooltip />
                                     <Legend />
                                 </PieChart>
                             </ResponsiveContainer>
@@ -487,7 +533,7 @@ export default function SuperAdminDashboard({
                                             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                         ))}
                                     </Pie>
-                                    <Tooltip />
+                                    <RechartsTooltip />
                                     <Legend />
                                 </PieChart>
                             </ResponsiveContainer>
@@ -561,9 +607,9 @@ export default function SuperAdminDashboard({
                                     height={100}
                                 />
                                 <YAxis />
-                                <Tooltip />
+                                <RechartsTooltip />
                                 <Legend />
-                                <Bar dataKey="count" fill="#8884d8" name="Number of Visitors" />
+                                <Bar dataKey="count" fill="#facc15" name="Number of Visitors" />
                             </BarChart>
                         </ResponsiveContainer>
                     </CardContent>
@@ -583,13 +629,202 @@ export default function SuperAdminDashboard({
                                 <CartesianGrid strokeDasharray="3 3" />
                                 <XAxis dataKey="name" />
                                 <YAxis />
-                                <Tooltip />
+                                <RechartsTooltip />
                                 <Legend />
-                                <Bar dataKey="count" fill="#82ca9d" name="Number of Visitors" />
+                                <Bar dataKey="count" fill="#22c55e" name="Number of Visitors" />
                             </BarChart>
                         </ResponsiveContainer>
                     </CardContent>
                 </Card>
+
+                {/* Reports Section */}
+                <div className="grid gap-4 md:grid-cols-2">
+                    {/* Visit Volume Over Time */}
+                    <Card>
+                        <CardHeader>
+                            <ChartTitleWithTooltip
+                                title="Visit Volume Over Time"
+                                description="Are visitation demands increasing or declining? This chart shows visits per day over the last 30 days, with separate lines for physical and virtual visits."
+                            />
+                            <CardDescription>Visits per day (last 30 days)</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <ResponsiveContainer width="100%" height={300}>
+                                <LineChart data={visit_volume_over_time}>
+                                    <CartesianGrid strokeDasharray="3 3" />
+                                    <XAxis dataKey="date" />
+                                    <YAxis />
+                                    <RechartsTooltip />
+                                    <Legend />
+                                    <Line type="monotone" dataKey="physical" stroke="#facc15" name="Physical" />
+                                    <Line type="monotone" dataKey="virtual" stroke="#22c55e" name="Virtual" />
+                                </LineChart>
+                            </ResponsiveContainer>
+                        </CardContent>
+                    </Card>
+
+                    {/* Peak Usage Hours */}
+                    <Card>
+                        <CardHeader>
+                            <ChartTitleWithTooltip
+                                title="Peak Usage Hours"
+                                description="When are system and staff resources most strained? This heatmap shows the number of sessions per hour of the day."
+                            />
+                            <CardDescription>Sessions per hour</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <ResponsiveContainer width="100%" height={300}>
+                                <BarChart data={peak_usage_hours}>
+                                    <CartesianGrid strokeDasharray="3 3" />
+                                    <XAxis dataKey="hour" />
+                                    <YAxis />
+                                    <RechartsTooltip />
+                                    <Bar dataKey="sessions" fill="#eab308" name="Sessions" />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </CardContent>
+                    </Card>
+
+                    {/* Incident Reports Summary */}
+                    <Card>
+                        <CardHeader>
+                            <ChartTitleWithTooltip
+                                title="Incident Reports Summary"
+                                description="How safe and compliant are sessions overall? This donut chart shows the breakdown of incidents by severity: minor, major, and critical."
+                            />
+                            <CardDescription>Incidents by classification</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <ResponsiveContainer width="100%" height={300}>
+                                <PieChart>
+                                    <Pie
+                                        data={[
+                                            { name: 'Minor', value: incident_reports_summary.minor },
+                                            { name: 'Major', value: incident_reports_summary.major },
+                                            { name: 'Critical', value: incident_reports_summary.critical },
+                                        ]}
+                                        cx="50%"
+                                        cy="50%"
+                                        labelLine={false}
+                                        label={({ name, percent }) => `${name}: ${((percent ?? 0) * 100).toFixed(0)}%`}
+                                        outerRadius={80}
+                                        innerRadius={40}
+                                        fill="#8884d8"
+                                        dataKey="value"
+                                    >
+                                        <Cell fill="#facc15" />
+                                        <Cell fill="#eab308" />
+                                        <Cell fill="#dc2626" />
+                                    </Pie>
+                                    <RechartsTooltip />
+                                    <Legend />
+                                </PieChart>
+                            </ResponsiveContainer>
+                        </CardContent>
+                    </Card>
+
+                    {/* Flagged Chat Messages Over Time */}
+                    <Card>
+                        <CardHeader>
+                            <ChartTitleWithTooltip
+                                title="Flagged Chat Messages Over Time"
+                                description="Are communication violations increasing? This line chart shows the count of flagged messages per day over the last 30 days."
+                            />
+                            <CardDescription>Flagged messages per day (last 30 days)</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <ResponsiveContainer width="100%" height={300}>
+                                <LineChart data={flagged_messages_over_time}>
+                                    <CartesianGrid strokeDasharray="3 3" />
+                                    <XAxis dataKey="date" />
+                                    <YAxis />
+                                    <RechartsTooltip />
+                                    <Line type="monotone" dataKey="count" stroke="#dc2626" name="Flagged Messages" />
+                                </LineChart>
+                            </ResponsiveContainer>
+                        </CardContent>
+                    </Card>
+
+                    {/* Session Enforcement Actions */}
+                    <Card>
+                        <CardHeader>
+                            <ChartTitleWithTooltip
+                                title="Session Enforcement Actions"
+                                description="How often do monitors intervene? This bar chart shows the frequency of forced mutes, session terminations, and chat locks."
+                            />
+                            <CardDescription>Enforcement actions taken</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <ResponsiveContainer width="100%" height={300}>
+                                <BarChart
+                                    data={[
+                                        { name: 'Forced Mutes', value: enforcement_actions.forced_mutes },
+                                        { name: 'Terminations', value: enforcement_actions.terminations },
+                                        { name: 'Chat Locks', value: enforcement_actions.chat_locks },
+                                    ]}
+                                >
+                                    <CartesianGrid strokeDasharray="3 3" />
+                                    <XAxis dataKey="name" />
+                                    <YAxis />
+                                    <RechartsTooltip />
+                                    <Bar dataKey="value" fill="#facc15" name="Count" />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </CardContent>
+                    </Card>
+
+                    {/* Physical Visit Key Usage */}
+                    <Card>
+                        <CardHeader>
+                            <ChartTitleWithTooltip
+                                title="Physical Visit Key Usage"
+                                description="Are physical visits being properly validated? This bar chart shows the number of generated keys, used keys, and expired keys for physical visits."
+                            />
+                            <CardDescription>Access key statistics</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <ResponsiveContainer width="100%" height={300}>
+                                <BarChart
+                                    data={[
+                                        { name: 'Generated', value: physical_visit_key_usage.generated },
+                                        { name: 'Used', value: physical_visit_key_usage.used },
+                                        { name: 'Expired', value: physical_visit_key_usage.expired },
+                                    ]}
+                                >
+                                    <CartesianGrid strokeDasharray="3 3" />
+                                    <XAxis dataKey="name" />
+                                    <YAxis />
+                                    <RechartsTooltip />
+                                    <Bar dataKey="value" fill="#22c55e" name="Count" />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </CardContent>
+                    </Card>
+
+                    {/* Complaints & Reviews Trend */}
+                    <Card className="md:col-span-2">
+                        <CardHeader>
+                            <ChartTitleWithTooltip
+                                title="Complaints & Reviews Trend"
+                                description="Is user satisfaction improving or worsening? This line chart shows complaints submitted and resolved per day over the last 30 days."
+                            />
+                            <CardDescription>Complaints submitted vs resolved (last 30 days)</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <ResponsiveContainer width="100%" height={300}>
+                                <LineChart data={complaints_reviews_trend}>
+                                    <CartesianGrid strokeDasharray="3 3" />
+                                    <XAxis dataKey="date" />
+                                    <YAxis />
+                                    <RechartsTooltip />
+                                    <Legend />
+                                    <Line type="monotone" dataKey="submitted" stroke="#dc2626" name="Submitted" />
+                                    <Line type="monotone" dataKey="resolved" stroke="#22c55e" name="Resolved" />
+                                </LineChart>
+                            </ResponsiveContainer>
+                        </CardContent>
+                    </Card>
+                </div>
 
                 {/* Recent Users Table */}
                 <Card>
@@ -613,6 +848,7 @@ export default function SuperAdminDashboard({
                             <Table>
                                 <TableHeader>
                                     <TableRow>
+                                        <TableHead>ID</TableHead>
                                         <TableHead>Name</TableHead>
                                         <TableHead>Email</TableHead>
                                         <TableHead>Role</TableHead>
@@ -624,7 +860,7 @@ export default function SuperAdminDashboard({
                                     {recent_users.length === 0 ? (
                                         <TableRow>
                                             <TableCell
-                                                colSpan={5}
+                                                colSpan={6}
                                                 className="h-24 text-center"
                                             >
                                                 No users found.
@@ -633,6 +869,9 @@ export default function SuperAdminDashboard({
                                     ) : (
                                         recent_users.map((user) => (
                                             <TableRow key={user.id}>
+                                                <TableCell className="font-medium">
+                                                    {user.id}
+                                                </TableCell>
                                                 <TableCell className="font-medium">
                                                     {getFullName(user)}
                                                 </TableCell>

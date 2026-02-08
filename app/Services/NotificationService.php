@@ -9,9 +9,32 @@ use App\Models\Role;
 use App\Models\Suggestion;
 use App\Models\User;
 use App\Models\Visit;
+use Illuminate\Support\Facades\Log;
 
 class NotificationService
 {
+    /**
+     * Send SMS notification to visitor if they have a contact number.
+     */
+    private static function sendSmsToVisitor(User $user, string $title, string $message): void
+    {
+        // Only send SMS to visitors
+        if ($user->role?->slug !== 'visitor' || ! $user->contact_number) {
+            return;
+        }
+
+        try {
+            $smsService = new SemaphoreSmsService;
+            $smsMessage = "eDalawPlus: {$title}. {$message}";
+            $smsService->send($user->contact_number, $smsMessage);
+        } catch (\Exception $e) {
+            Log::error('Failed to send SMS notification', [
+                'user_id' => $user->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
     /**
      * Create a notification for visit status change.
      */
@@ -35,7 +58,12 @@ class NotificationService
         $message = ($statusMessages[$status] ?? 'Your visit schedule status has been updated.')
             ." Inmate: {$inmateName}. Scheduled for: {$visit->scheduled_date->format('M d, Y')}";
 
-        Notification::create([
+        // Add meeting link to message if approved and virtual
+        if ($status === 'approved' && $visit->visit_type === \App\VisitType::Virtual && $visit->meeting_link) {
+            $message .= " Meeting Link: {$visit->meeting_link}";
+        }
+
+        $notification = Notification::create([
             'user_id' => $visit->user_id,
             'type' => 'visit_status',
             'title' => $titles[$status] ?? 'Visit Status Updated',
@@ -43,6 +71,12 @@ class NotificationService
             'notifiable_id' => $visit->id,
             'notifiable_type' => Visit::class,
         ]);
+
+        // Send SMS to visitor
+        $user = $visit->user;
+        if ($user) {
+            self::sendSmsToVisitor($user, $titles[$status] ?? 'Visit Status Updated', $message);
+        }
     }
 
     /**
@@ -66,7 +100,7 @@ class NotificationService
         $message = ($statusMessages[$status] ?? 'Your e-burol application status has been updated.')
             ." Deceased: {$deceasedName}. Wake period: {$eburol->wake_start_date->format('M d, Y')} - {$eburol->wake_end_date->format('M d, Y')}";
 
-        Notification::create([
+        $notification = Notification::create([
             'user_id' => $eburol->user_id,
             'type' => 'eburol_status',
             'title' => $titles[$status] ?? 'E-Burol Status Updated',
@@ -74,6 +108,12 @@ class NotificationService
             'notifiable_id' => $eburol->id,
             'notifiable_type' => Eburol::class,
         ]);
+
+        // Send SMS to visitor
+        $user = $eburol->user;
+        if ($user) {
+            self::sendSmsToVisitor($user, $titles[$status] ?? 'E-Burol Status Updated', $message);
+        }
     }
 
     /**
@@ -84,7 +124,7 @@ class NotificationService
         $inmateName = trim("{$visit->inmate_first_name} {$visit->inmate_middle_name} {$visit->inmate_last_name}");
         $visitType = $visit->visit_type->value === 'virtual' ? 'Virtual' : 'Physical';
 
-        Notification::create([
+        $notification = Notification::create([
             'user_id' => $visit->user_id,
             'type' => 'visit_status',
             'title' => 'Visit Schedule Application Received',
@@ -92,6 +132,12 @@ class NotificationService
             'notifiable_id' => $visit->id,
             'notifiable_type' => Visit::class,
         ]);
+
+        // Send SMS to visitor
+        $user = $visit->user;
+        if ($user) {
+            self::sendSmsToVisitor($user, 'Visit Schedule Application Received', $notification->message);
+        }
     }
 
     /**
@@ -101,7 +147,7 @@ class NotificationService
     {
         $deceasedName = trim("{$eburol->deceased_first_name} {$eburol->deceased_middle_name} {$eburol->deceased_last_name}");
 
-        Notification::create([
+        $notification = Notification::create([
             'user_id' => $eburol->user_id,
             'type' => 'eburol_status',
             'title' => 'E-Burol Application Received',
@@ -109,6 +155,12 @@ class NotificationService
             'notifiable_id' => $eburol->id,
             'notifiable_type' => Eburol::class,
         ]);
+
+        // Send SMS to visitor
+        $user = $eburol->user;
+        if ($user) {
+            self::sendSmsToVisitor($user, 'E-Burol Application Received', $notification->message);
+        }
     }
 
     /**
@@ -118,7 +170,7 @@ class NotificationService
     {
         $appealableType = $appeal->appealable_type === Visit::class ? 'Visit Schedule' : 'E-Burol Application';
 
-        Notification::create([
+        $notification = Notification::create([
             'user_id' => $appeal->user_id,
             'type' => 'appeal_status',
             'title' => 'Appeal Submitted',
@@ -126,6 +178,12 @@ class NotificationService
             'notifiable_id' => $appeal->id,
             'notifiable_type' => Appeal::class,
         ]);
+
+        // Send SMS to visitor
+        $user = $appeal->user;
+        if ($user) {
+            self::sendSmsToVisitor($user, 'Appeal Submitted', $notification->message);
+        }
     }
 
     /**
@@ -147,7 +205,7 @@ class NotificationService
         $message = ($statusMessages[$appeal->status->value] ?? 'Your appeal status has been updated.')
             ." Appeal for: {$appealableType}.";
 
-        Notification::create([
+        $notification = Notification::create([
             'user_id' => $appeal->user_id,
             'type' => 'appeal_status',
             'title' => $titles[$appeal->status->value] ?? 'Appeal Status Updated',
@@ -155,6 +213,12 @@ class NotificationService
             'notifiable_id' => $appeal->id,
             'notifiable_type' => Appeal::class,
         ]);
+
+        // Send SMS to visitor
+        $user = $appeal->user;
+        if ($user) {
+            self::sendSmsToVisitor($user, $titles[$appeal->status->value] ?? 'Appeal Status Updated', $message);
+        }
     }
 
     /**
@@ -175,6 +239,32 @@ class NotificationService
             Notification::create([
                 'user_id' => $admin->id,
                 'type' => 'admin_notification',
+                'title' => 'New Appeal Submitted',
+                'message' => "{$userName} has submitted an appeal for {$appealableType}. Reason: ".substr($appeal->reason, 0, 100).'...',
+                'notifiable_id' => $appeal->id,
+                'notifiable_type' => Appeal::class,
+            ]);
+        }
+    }
+
+    /**
+     * Notify all BJMP officers about a new appeal.
+     */
+    public static function notifyBjmpOfficersAboutAppeal(Appeal $appeal): void
+    {
+        $bjmpRole = Role::where('slug', 'bjmp_officer')->first();
+        if (! $bjmpRole) {
+            return;
+        }
+
+        $bjmpOfficers = User::where('role_id', $bjmpRole->id)->get();
+        $appealableType = $appeal->appealable_type === Visit::class ? 'Visit Schedule' : 'E-Burol Application';
+        $userName = trim("{$appeal->user->first_name} {$appeal->user->last_name}");
+
+        foreach ($bjmpOfficers as $officer) {
+            Notification::create([
+                'user_id' => $officer->id,
+                'type' => 'appeal_notification',
                 'title' => 'New Appeal Submitted',
                 'message' => "{$userName} has submitted an appeal for {$appealableType}. Reason: ".substr($appeal->reason, 0, 100).'...',
                 'notifiable_id' => $appeal->id,
@@ -216,7 +306,7 @@ class NotificationService
     {
         $typeLabel = $suggestion->type === 'suggestion' ? 'Suggestion' : 'Complaint';
 
-        Notification::create([
+        $notification = Notification::create([
             'user_id' => $suggestion->user_id,
             'type' => $suggestion->type === 'suggestion' ? 'suggestion_feedback' : 'complaint_feedback',
             'title' => "{$typeLabel} Submitted",
@@ -224,6 +314,12 @@ class NotificationService
             'notifiable_id' => $suggestion->id,
             'notifiable_type' => Suggestion::class,
         ]);
+
+        // Send SMS to visitor
+        $user = $suggestion->user;
+        if ($user) {
+            self::sendSmsToVisitor($user, "{$typeLabel} Submitted", $notification->message);
+        }
     }
 
     /**
@@ -257,7 +353,7 @@ class NotificationService
             $message .= " Response: {$responsePreview}";
         }
 
-        Notification::create([
+        $notification = Notification::create([
             'user_id' => $suggestion->user_id,
             'type' => $suggestion->type === 'suggestion' ? 'suggestion_feedback' : 'complaint_feedback',
             'title' => $titles[$status] ?? "{$typeLabel} Status Updated",
@@ -265,6 +361,12 @@ class NotificationService
             'notifiable_id' => $suggestion->id,
             'notifiable_type' => Suggestion::class,
         ]);
+
+        // Send SMS to visitor
+        $user = $suggestion->user;
+        if ($user) {
+            self::sendSmsToVisitor($user, $titles[$status] ?? "{$typeLabel} Status Updated", $message);
+        }
     }
 
     /**
@@ -333,6 +435,51 @@ class NotificationService
                 'notifiable_type' => Visit::class,
             ]);
         }
+    }
+
+    /**
+     * Notify monitoring officer when assigned to a visit.
+     */
+    public static function notifyMonitoringOfficerAboutVisit(Visit $visit): void
+    {
+        if (! $visit->monitoring_officer_id) {
+            return;
+        }
+
+        $inmateName = trim("{$visit->inmate_first_name} {$visit->inmate_middle_name} {$visit->inmate_last_name}");
+        $visitType = $visit->visit_type->value === 'virtual' ? 'Virtual' : 'Physical';
+        $visitorName = trim("{$visit->user->first_name} {$visit->user->last_name}");
+
+        Notification::create([
+            'user_id' => $visit->monitoring_officer_id,
+            'type' => 'monitoring_assignment',
+            'title' => 'New Visit Assignment',
+            'message' => "You have been assigned to monitor a {$visitType} visit. Visitor: {$visitorName}. Inmate: {$inmateName}. Scheduled for: {$visit->scheduled_date->format('M d, Y')} at {$visit->scheduled_time}.",
+            'notifiable_id' => $visit->id,
+            'notifiable_type' => Visit::class,
+        ]);
+    }
+
+    /**
+     * Notify monitoring officer when assigned to an e-burol.
+     */
+    public static function notifyMonitoringOfficerAboutEburol(Eburol $eburol): void
+    {
+        if (! $eburol->monitoring_officer_id) {
+            return;
+        }
+
+        $deceasedName = trim("{$eburol->deceased_first_name} {$eburol->deceased_middle_name} {$eburol->deceased_last_name}");
+        $visitorName = trim("{$eburol->user->first_name} {$eburol->user->last_name}");
+
+        Notification::create([
+            'user_id' => $eburol->monitoring_officer_id,
+            'type' => 'monitoring_assignment',
+            'title' => 'New E-Burol Assignment',
+            'message' => "You have been assigned to monitor an e-burol. Visitor: {$visitorName}. Deceased: {$deceasedName}. Wake period: {$eburol->wake_start_date->format('M d, Y')} - {$eburol->wake_end_date->format('M d, Y')}.",
+            'notifiable_id' => $eburol->id,
+            'notifiable_type' => Eburol::class,
+        ]);
     }
 
     /**

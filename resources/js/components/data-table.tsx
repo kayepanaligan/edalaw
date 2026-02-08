@@ -1,5 +1,3 @@
-'use client';
-
 import {
     ColumnDef,
     ColumnFiltersState,
@@ -32,6 +30,7 @@ interface DataTableProps<TData, TValue> {
     searchPlaceholder?: string;
     headerActions?: ReactNode;
     enableGlobalFilter?: boolean;
+    globalFilterFn?: (row: any, columnId: string, filterValue: string) => boolean;
 }
 
 export function DataTable<TData, TValue>({
@@ -41,6 +40,7 @@ export function DataTable<TData, TValue>({
     searchPlaceholder = 'Search...',
     headerActions,
     enableGlobalFilter = true,
+    globalFilterFn: customGlobalFilterFn,
 }: DataTableProps<TData, TValue>) {
     const [sorting, setSorting] = useState<SortingState>([]);
     const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
@@ -56,18 +56,19 @@ export function DataTable<TData, TValue>({
         onColumnFiltersChange: setColumnFilters,
         getFilteredRowModel: getFilteredRowModel(),
         onGlobalFilterChange: setGlobalFilter,
-        globalFilterFn: (row, columnId, filterValue) => {
+        globalFilterFn: customGlobalFilterFn || ((row, columnId, filterValue) => {
             if (!enableGlobalFilter || !filterValue) {
                 return true;
             }
 
+            // Default search across all values
             const searchValue = filterValue.toLowerCase();
             const searchableValues = Object.values(row.original as Record<string, unknown>)
                 .filter((val) => val !== null && val !== undefined)
                 .map((val) => String(val).toLowerCase());
 
             return searchableValues.some((val) => val.includes(searchValue));
-        },
+        }),
         state: {
             sorting,
             columnFilters,
@@ -84,9 +85,9 @@ export function DataTable<TData, TValue>({
         <div className="space-y-4">
             {/* Header with Search, Filters, and Actions */}
             {(enableGlobalFilter && searchKey) || headerActions ? (
-                <div className="flex items-center justify-between gap-4">
+                <div className="flex flex-wrap items-center gap-4">
                     {enableGlobalFilter && searchKey && (
-                        <div className="relative flex-1 max-w-sm">
+                        <div className="relative flex-1 min-w-[200px] max-w-sm">
                             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                             <Input
                                 placeholder={searchPlaceholder}
@@ -97,7 +98,7 @@ export function DataTable<TData, TValue>({
                         </div>
                     )}
                     {headerActions && (
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                             {headerActions}
                         </div>
                     )}

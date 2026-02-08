@@ -7,7 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Eburol;
 use App\Models\MonitoringSession;
 use App\Services\AuditLogService;
-use App\Services\DailyCoService;
+use App\Services\VideoSdkService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -74,36 +74,19 @@ class EburolManagementController extends Controller
      */
     public function approve(Request $request, Eburol $eburol): RedirectResponse
     {
-        // Create Daily.co room for e-burol session
-        $dailyCoService = app(DailyCoService::class);
+        // Create VideoSDK room for e-burol session
+        $videoSdkService = new VideoSdkService;
         $roomName = "eburol-{$eburol->id}-".uniqid();
-        $roomConfig = [
-            'properties' => [
-                'enable_chat' => true,
-                'enable_screenshare' => false,
-                'enable_recording' => 'cloud',
-                'enable_knocking' => false,
-                'enable_prejoin_ui' => true,
-                'exp' => strtotime($eburol->wake_end_date) + (2 * 60 * 60), // 2 hours after wake end
-                'max_participants' => 5,
-            ],
-        ];
-
-        $room = $dailyCoService->createRoom($roomName, $roomConfig);
+        $roomResult = $videoSdkService->createRoom($roomName);
 
         $updateData = [
             'status' => EburolStatus::Approved,
         ];
 
-        if ($room) {
-            // Generate inmate token
-            $inmateToken = $dailyCoService->createInmateToken($roomName, "eburol-{$eburol->id}");
-
-            $updateData['daily_co_room_id'] = $room['room_id'];
-            $updateData['daily_co_room_name'] = $room['room_name'];
-            $updateData['daily_co_room_url'] = $room['room_url'];
-            $updateData['daily_co_config'] = $room['config'];
-            $updateData['inmate_token'] = $inmateToken;
+        if ($roomResult['success']) {
+            $updateData['daily_co_room_id'] = $roomResult['room_id'] ?? null;
+            $updateData['daily_co_room_name'] = $roomResult['room_name'] ?? $roomName;
+            $updateData['daily_co_room_url'] = $roomResult['room_url'] ?? null;
             $updateData['room_created_at'] = now();
 
             // Create monitoring session
@@ -111,9 +94,15 @@ class EburolManagementController extends Controller
                 'eburol_id' => $eburol->id,
                 'visitor_id' => $eburol->user_id,
                 'session_type' => 'eburol',
-                'session_token' => $roomName,
+                'session_token' => $roomResult['room_id'] ?? $roomName,
                 'status' => 'pending',
                 'started_at' => now(),
+            ]);
+        } else {
+            // Log error but don't block approval
+            \Illuminate\Support\Facades\Log::error('VideoSDK room creation failed during e-burol approval', [
+                'eburol_id' => $eburol->id,
+                'error' => $roomResult['error'] ?? 'Unknown error',
             ]);
         }
 

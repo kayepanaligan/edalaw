@@ -1,5 +1,5 @@
 import { Head, router, useForm } from '@inertiajs/react';
-import { Calendar, Clock, Plus, User, Video, Check, X, MoreVertical, Eye, Edit, Trash2 } from 'lucide-react';
+import { Calendar, Clock, Plus, User, Video, Check, X, MoreVertical, Eye, Edit, Trash2, Key, RefreshCw } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { ColumnDef } from '@tanstack/react-table';
@@ -66,6 +66,8 @@ type Visit = {
     notes: string | null;
     meeting_link: string | null;
     rejection_reason: string | null;
+    access_key: string | null;
+    access_key_expires_at: string | null;
     created_at: string;
 };
 
@@ -75,9 +77,16 @@ type Visitor = {
     email: string;
 };
 
+type MonitoringOfficer = {
+    id: number;
+    name: string;
+    email: string;
+};
+
 type Props = {
     visits: Visit[];
     visitors: Visitor[];
+    monitoringOfficers?: MonitoringOfficer[];
 };
 
 function getStatusBadge(status: string) {
@@ -134,11 +143,14 @@ function getVisitTypeBadge(type: string) {
     );
 }
 
-export default function ScheduleManagement({ visits, visitors }: Props) {
+export default function ScheduleManagement({ visits, visitors, monitoringOfficers = [] }: Props) {
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
     const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
     const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [isApproveModalOpen, setIsApproveModalOpen] = useState(false);
     const [selectedVisit, setSelectedVisit] = useState<Visit | null>(null);
     const [statusFilter, setStatusFilter] = useState<string>('all');
     const [visitTypeFilter, setVisitTypeFilter] = useState<string>('all');
@@ -154,6 +166,11 @@ export default function ScheduleManagement({ visits, visitors }: Props) {
     const statusForm = useForm({
         status: 'pending' as 'pending' | 'approved' | 'rejected' | 'missed' | 'completed' | 'cancelled',
         rejection_reason: '',
+    });
+
+    const approveForm = useForm({
+        monitoring_officer_id: '',
+        access_key: '',
     });
 
     const editForm = useForm({
@@ -180,6 +197,59 @@ export default function ScheduleManagement({ visits, visitors }: Props) {
         notes: '',
         meeting_link: '',
     });
+
+    // Generate random alphanumeric access key (8-12 characters)
+    const generateAccessKey = (): string => {
+        const length = Math.floor(Math.random() * 5) + 8; // Random length between 8-12
+        const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        let result = '';
+        for (let i = 0; i < length; i++) {
+            result += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return result;
+    };
+
+    const handleGenerateAccessKey = () => {
+        approveForm.setData('access_key', generateAccessKey());
+    };
+
+    const handleApprove = () => {
+        if (!selectedVisit) {
+            return;
+        }
+
+        const data: { monitoring_officer_id?: string; access_key?: string } = {};
+        
+        if (selectedVisit.visit_type === 'virtual' && approveForm.data.monitoring_officer_id) {
+            data.monitoring_officer_id = approveForm.data.monitoring_officer_id;
+        }
+
+        if (selectedVisit.visit_type === 'physical') {
+            if (!approveForm.data.access_key || approveForm.data.access_key.length < 8 || approveForm.data.access_key.length > 12) {
+                toast.error('Access key must be 8-12 alphanumeric characters');
+                return;
+            }
+            // Validate alphanumeric
+            if (!/^[A-Z0-9]+$/.test(approveForm.data.access_key.toUpperCase())) {
+                toast.error('Access key must contain only letters and numbers');
+                return;
+            }
+            data.access_key = approveForm.data.access_key.toUpperCase();
+        }
+
+        router.post(`/admin/schedules/${selectedVisit.id}/approve`, data, {
+            preserveScroll: true,
+            onSuccess: () => {
+                toast.success('Schedule approved successfully.');
+                setIsApproveModalOpen(false);
+                setSelectedVisit(null);
+                approveForm.reset();
+            },
+            onError: () => {
+                toast.error('Failed to approve schedule.');
+            },
+        });
+    };
 
     // Fetch booked slots when date changes
     const fetchBookedSlots = async (date: string) => {
@@ -462,15 +532,12 @@ export default function ScheduleManagement({ visits, visitors }: Props) {
                                         <DropdownMenuSeparator />
                                         <DropdownMenuItem
                                             onClick={() => {
-                                                router.post(`/admin/schedules/${visit.id}/approve`, {}, {
-                                                    preserveScroll: true,
-                                                    onSuccess: () => {
-                                                        toast.success('Schedule approved successfully.');
-                                                    },
-                                                    onError: () => {
-                                                        toast.error('Failed to approve schedule.');
-                                                    },
-                                                });
+                                                setSelectedVisit(visit);
+                                                approveForm.reset();
+                                                if (visit.visit_type === 'physical') {
+                                                    approveForm.setData('access_key', generateAccessKey());
+                                                }
+                                                setIsApproveModalOpen(true);
                                             }}
                                         >
                                             <Check className="mr-2 h-4 w-4" />
@@ -818,6 +885,104 @@ export default function ScheduleManagement({ visits, visitors }: Props) {
                                 disabled={rejectForm.processing}
                             >
                                 {rejectForm.processing ? 'Rejecting...' : 'Reject Schedule'}
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+
+                {/* Approve Modal */}
+                <Dialog open={isApproveModalOpen} onOpenChange={setIsApproveModalOpen}>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Approve Schedule</DialogTitle>
+                            <DialogDescription>
+                                {selectedVisit?.visit_type === 'physical' 
+                                    ? 'Generate or enter an access key for this physical visit. The key will expire after the scheduled visit time.'
+                                    : 'Assign a monitoring officer for this virtual visit (optional).'}
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                            {selectedVisit && (
+                                <div className="rounded-lg bg-muted p-4">
+                                    <p className="text-sm font-medium">Approving schedule for:</p>
+                                    <p className="text-sm text-muted-foreground mt-1">
+                                        {selectedVisit.visitor_name} - {selectedVisit.scheduled_date} at {selectedVisit.scheduled_time || 'N/A'}
+                                    </p>
+                                    <p className="text-sm text-muted-foreground mt-1">
+                                        Visit Type: <span className="font-medium capitalize">{selectedVisit.visit_type}</span>
+                                    </p>
+                                </div>
+                            )}
+
+                            {selectedVisit?.visit_type === 'virtual' && (
+                                <div className="space-y-2">
+                                    <Label htmlFor="monitoring_officer_id">Monitoring Officer (Optional)</Label>
+                                    <Select
+                                        value={approveForm.data.monitoring_officer_id}
+                                        onValueChange={(value) => approveForm.setData('monitoring_officer_id', value)}
+                                    >
+                                        <SelectTrigger id="monitoring_officer_id">
+                                            <SelectValue placeholder="Select monitoring officer" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="">None</SelectItem>
+                                            {monitoringOfficers.map((officer) => (
+                                                <SelectItem key={officer.id} value={officer.id.toString()}>
+                                                    {officer.name}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    <InputError message={approveForm.errors.monitoring_officer_id} />
+                                </div>
+                            )}
+
+                            {selectedVisit?.visit_type === 'physical' && (
+                                <div className="space-y-2">
+                                    <Label htmlFor="access_key">
+                                        Access Key <span className="text-destructive">*</span>
+                                    </Label>
+                                    <div className="flex gap-2">
+                                        <Input
+                                            id="access_key"
+                                            type="text"
+                                            required
+                                            value={approveForm.data.access_key}
+                                            onChange={(e) => approveForm.setData('access_key', e.target.value.toUpperCase())}
+                                            placeholder="Enter 8-12 alphanumeric characters"
+                                            minLength={8}
+                                            maxLength={12}
+                                            pattern="[A-Z0-9]{8,12}"
+                                        />
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            onClick={handleGenerateAccessKey}
+                                            title="Generate random access key"
+                                        >
+                                            <RefreshCw className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                    <InputError message={approveForm.errors.access_key} />
+                                    <p className="text-xs text-muted-foreground">
+                                        8-12 alphanumeric characters (letters and numbers only). The key will expire after the scheduled visit time.
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                        <DialogFooter>
+                            <Button
+                                variant="outline"
+                                onClick={() => {
+                                    setIsApproveModalOpen(false);
+                                    setSelectedVisit(null);
+                                    approveForm.reset();
+                                }}
+                            >
+                                Cancel
+                            </Button>
+                            <Button onClick={handleApprove} disabled={approveForm.processing}>
+                                {approveForm.processing ? 'Approving...' : 'Approve Schedule'}
                             </Button>
                         </DialogFooter>
                     </DialogContent>

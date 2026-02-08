@@ -7,13 +7,19 @@ use App\ApprovalStatus;
 use App\EburolStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Appeal;
+use App\Models\ChatFlag;
 use App\Models\Eburol;
+use App\Models\Incident;
+use App\Models\MonitoringLog;
+use App\Models\MonitoringSession;
 use App\Models\Role;
 use App\Models\Suggestion;
 use App\Models\User;
 use App\Models\Visit;
 use App\SuggestionStatus;
 use App\VisitType;
+use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -222,6 +228,27 @@ class SuperAdminDashboardController extends Controller
             ['name' => '65+', 'count' => $ageDistribution['65+'] ?? 0],
         ];
 
+        // Visit Volume Over Time (last 30 days, grouped by day)
+        $visitVolumeData = $this->getVisitVolumeOverTime();
+
+        // Peak Usage Hours (sessions per hour/day)
+        $peakUsageData = $this->getPeakUsageHours();
+
+        // Incident Reports Summary
+        $incidentReportsData = $this->getIncidentReportsSummary();
+
+        // Flagged Chat Messages Over Time
+        $flaggedMessagesData = $this->getFlaggedChatMessagesOverTime();
+
+        // Session Enforcement Actions
+        $enforcementActionsData = $this->getSessionEnforcementActions();
+
+        // Physical Visit Key Usage
+        $keyUsageData = $this->getPhysicalVisitKeyUsage();
+
+        // Complaints & Reviews Trend
+        $complaintsTrendData = $this->getComplaintsAndReviewsTrend();
+
         return Inertia::render('Dashboard/SuperAdmin', [
             'stats' => [
                 'total_users' => $totalUsers,
@@ -243,6 +270,213 @@ class SuperAdminDashboardController extends Controller
             'barangays' => $barangays,
             'location_distribution' => $locationDistribution,
             'age_distribution' => $ageChartData,
+            'visit_volume_over_time' => $visitVolumeData,
+            'peak_usage_hours' => $peakUsageData,
+            'incident_reports_summary' => $incidentReportsData,
+            'flagged_messages_over_time' => $flaggedMessagesData,
+            'enforcement_actions' => $enforcementActionsData,
+            'physical_visit_key_usage' => $keyUsageData,
+            'complaints_reviews_trend' => $complaintsTrendData,
         ]);
+    }
+
+    /**
+     * Get visit volume over time (last 30 days, grouped by day, separated by visit type).
+     */
+    private function getVisitVolumeOverTime(): array
+    {
+        $startDate = Carbon::now()->subDays(30);
+        $endDate = Carbon::now();
+
+        $visits = Visit::whereBetween('created_at', [$startDate, $endDate])
+            ->get()
+            ->groupBy(function ($visit) {
+                return $visit->created_at->format('Y-m-d');
+            });
+
+        $data = [];
+        $currentDate = $startDate->copy();
+
+        while ($currentDate <= $endDate) {
+            $dateKey = $currentDate->format('Y-m-d');
+            $dayVisits = $visits->get($dateKey, collect());
+
+            $data[] = [
+                'date' => $currentDate->format('M d'),
+                'physical' => $dayVisits->where('visit_type', VisitType::Physical)->count(),
+                'virtual' => $dayVisits->where('visit_type', VisitType::Virtual)->count(),
+            ];
+
+            $currentDate->addDay();
+        }
+
+        return $data;
+    }
+
+    /**
+     * Get peak usage hours (sessions per hour/day).
+     */
+    private function getPeakUsageHours(): array
+    {
+        $sessions = MonitoringSession::whereNotNull('started_at')
+            ->get();
+
+        $hourlyData = [];
+        for ($hour = 0; $hour < 24; $hour++) {
+            $hourlyData[$hour] = 0;
+        }
+
+        foreach ($sessions as $session) {
+            $hour = (int) $session->started_at->format('H');
+            $hourlyData[$hour]++;
+        }
+
+        $data = [];
+        foreach ($hourlyData as $hour => $count) {
+            $data[] = [
+                'hour' => sprintf('%02d:00', $hour),
+                'sessions' => $count,
+            ];
+        }
+
+        return $data;
+    }
+
+    /**
+     * Get incident reports summary (minor, major, critical).
+     */
+    private function getIncidentReportsSummary(): array
+    {
+        $incidents = Incident::select('classification', DB::raw('count(*) as count'))
+            ->groupBy('classification')
+            ->get()
+            ->pluck('count', 'classification')
+            ->toArray();
+
+        return [
+            'minor' => $incidents['minor'] ?? 0,
+            'major' => $incidents['major'] ?? 0,
+            'critical' => $incidents['critical'] ?? 0,
+        ];
+    }
+
+    /**
+     * Get flagged chat messages over time (last 30 days).
+     */
+    private function getFlaggedChatMessagesOverTime(): array
+    {
+        $startDate = Carbon::now()->subDays(30);
+        $endDate = Carbon::now();
+
+        $flags = ChatFlag::whereBetween('created_at', [$startDate, $endDate])
+            ->get()
+            ->groupBy(function ($flag) {
+                return $flag->created_at->format('Y-m-d');
+            });
+
+        $data = [];
+        $currentDate = $startDate->copy();
+
+        while ($currentDate <= $endDate) {
+            $dateKey = $currentDate->format('Y-m-d');
+            $count = $flags->get($dateKey, collect())->count();
+
+            $data[] = [
+                'date' => $currentDate->format('M d'),
+                'count' => $count,
+            ];
+
+            $currentDate->addDay();
+        }
+
+        return $data;
+    }
+
+    /**
+     * Get session enforcement actions (forced mutes, terminations, chat locks).
+     */
+    private function getSessionEnforcementActions(): array
+    {
+        // Forced mutes (disabled microphone)
+        $forcedMutes = MonitoringLog::where('action', 'disabled_microphone')->count();
+
+        // Session terminations
+        $terminations = MonitoringLog::where('action', 'terminated_session')->count();
+
+        // Chat locks
+        $chatLocks = MonitoringLog::where('action', 'locked_chat')->count();
+
+        return [
+            'forced_mutes' => $forcedMutes,
+            'terminations' => $terminations,
+            'chat_locks' => $chatLocks,
+        ];
+    }
+
+    /**
+     * Get physical visit key usage (generated, used, expired).
+     */
+    private function getPhysicalVisitKeyUsage(): array
+    {
+        $physicalVisits = Visit::where('visit_type', VisitType::Physical)
+            ->whereNotNull('access_key')
+            ->get();
+
+        $generated = $physicalVisits->count();
+        $used = $physicalVisits->filter(function ($visit) {
+            return $visit->status->value === 'completed' || $visit->status->value === 'approved';
+        })->count();
+        $expired = $physicalVisits->filter(function ($visit) {
+            return $visit->access_key_expires_at && Carbon::parse($visit->access_key_expires_at)->isPast();
+        })->count();
+
+        return [
+            'generated' => $generated,
+            'used' => $used,
+            'expired' => $expired,
+        ];
+    }
+
+    /**
+     * Get complaints and reviews trend (last 30 days).
+     */
+    private function getComplaintsAndReviewsTrend(): array
+    {
+        $startDate = Carbon::now()->subDays(30);
+        $endDate = Carbon::now();
+
+        $complaints = Suggestion::where('type', 'complaint')
+            ->whereBetween('created_at', [$startDate, $endDate])
+            ->get()
+            ->groupBy(function ($complaint) {
+                return $complaint->created_at->format('Y-m-d');
+            });
+
+        $resolved = Suggestion::where('type', 'complaint')
+            ->where('status', SuggestionStatus::Resolved)
+            ->whereBetween('updated_at', [$startDate, $endDate])
+            ->get()
+            ->groupBy(function ($complaint) {
+                return $complaint->updated_at->format('Y-m-d');
+            });
+
+        $data = [];
+        $currentDate = $startDate->copy();
+
+        while ($currentDate <= $endDate) {
+            $dateKey = $currentDate->format('Y-m-d');
+            $submitted = $complaints->get($dateKey, collect())->count();
+            $resolvedCount = $resolved->get($dateKey, collect())->count();
+
+            $data[] = [
+                'date' => $currentDate->format('M d'),
+                'submitted' => $submitted,
+                'resolved' => $resolvedCount,
+            ];
+
+            $currentDate->addDay();
+        }
+
+        return $data;
     }
 }

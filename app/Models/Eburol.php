@@ -19,6 +19,7 @@ class Eburol extends Model
      */
     protected $fillable = [
         'user_id',
+        'monitoring_officer_id',
         'inmate_first_name',
         'inmate_middle_name',
         'inmate_last_name',
@@ -70,6 +71,16 @@ class Eburol extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * Get the monitoring officer assigned to the e-burol.
+     *
+     * @return BelongsTo<User, Eburol>
+     */
+    public function monitoringOfficer(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'monitoring_officer_id');
     }
 
     /**

@@ -11,6 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (Schema::hasTable('appeal_documents')) {
+            return;
+        }
+
         Schema::create('appeal_documents', function (Blueprint $table) {
             $table->id();
             $table->foreignId('appeal_id')->constrained()->cascadeOnDelete();

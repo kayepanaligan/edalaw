@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Visitor;
 
 use App\AppealStatus;
+use App\EburolStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Appeal;
 use App\Models\AppealDocument;
@@ -10,6 +11,7 @@ use App\Models\Eburol;
 use App\Models\Visit;
 use App\Services\AuditLogService;
 use App\Services\NotificationService;
+use App\VisitStatus;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -83,7 +85,7 @@ class AppealController extends Controller
 
         // Get rejected visits and e-burols that can be appealed
         $rejectedVisits = Visit::where('user_id', auth()->id())
-            ->where('status', 'rejected')
+            ->where('status', VisitStatus::Rejected)
             ->whereDoesntHave('appeals', function ($query) {
                 $query->where('status', '!=', AppealStatus::Rejected);
             })
@@ -107,7 +109,7 @@ class AppealController extends Controller
             });
 
         $rejectedEburols = Eburol::where('user_id', auth()->id())
-            ->where('status', 'rejected')
+            ->where('status', EburolStatus::Rejected)
             ->whereDoesntHave('appeals', function ($query) {
                 $query->where('status', '!=', AppealStatus::Rejected);
             })
@@ -156,15 +158,23 @@ class AppealController extends Controller
                 ->withInput();
         }
 
-        // Determine the appealable model
+        // Determine the appealable model and status enum
         $appealableType = $request->appealable_type === 'visit' ? Visit::class : Eburol::class;
+        $rejectedStatus = $request->appealable_type === 'visit' ? VisitStatus::Rejected : EburolStatus::Rejected;
+
         $appealable = $appealableType::where('id', $request->appealable_id)
             ->where('user_id', auth()->id())
-            ->where('status', 'rejected')
-            ->firstOrFail();
+            ->where('status', $rejectedStatus)
+            ->first();
 
-        // Ensure the original request is rejected (cannot bypass approval workflow)
-        if ($appealable->status !== 'rejected') {
+        // Ensure the original request exists and is rejected
+        if (! $appealable) {
+            return redirect()->back()
+                ->withErrors(['appeal' => 'The requested item was not found or is not rejected.'])
+                ->withInput();
+        }
+
+        if ($appealable->status !== $rejectedStatus) {
             return redirect()->back()
                 ->withErrors(['appeal' => 'You can only appeal rejected requests.'])
                 ->withInput();
@@ -184,7 +194,8 @@ class AppealController extends Controller
         }
 
         // Check if within deadline (48 hours after rejection)
-        $deadline = $appealable->updated_at->addHours(48);
+        // Use copy() to avoid mutating the original timestamp
+        $deadline = $appealable->updated_at->copy()->addHours(48);
         if (now()->isAfter($deadline)) {
             return redirect()->back()
                 ->withErrors(['appeal' => 'The deadline for submitting an appeal has passed (48 hours after rejection).'])
@@ -219,6 +230,7 @@ class AppealController extends Controller
         // Create notification
         NotificationService::createAppealSubmittedNotification($appeal);
         NotificationService::notifySuperAdminsAboutAppeal($appeal);
+        NotificationService::notifyBjmpOfficersAboutAppeal($appeal);
 
         // Log appeal submission for audit
         $appealableType = $request->appealable_type === 'visit' ? 'Visit Schedule' : 'E-Burol Application';

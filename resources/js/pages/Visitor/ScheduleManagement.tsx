@@ -1,5 +1,5 @@
 import { Head, router, useForm, usePage } from '@inertiajs/react';
-import { Calendar, Clock, Plus, Scale, User, Video, X, CalendarClock } from 'lucide-react';
+import { Calendar, Clock, Plus, Scale, User, Video, X, CalendarClock, FileText } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { ColumnDef } from '@tanstack/react-table';
@@ -45,6 +45,10 @@ type Visit = {
     status: 'pending' | 'approved' | 'rejected' | 'missed' | 'completed' | 'cancelled';
     notes: string | null;
     meeting_link: string | null;
+    access_key: string | null;
+    access_key_expires_at: string | null;
+    monitoring_officer_id: number | null;
+    monitoring_officer_name: string | null;
     rejection_reason: string | null;
     created_at: string;
     can_appeal?: boolean;
@@ -134,6 +138,8 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
     const [rescheduleDate, setRescheduleDate] = useState<string>('');
     const [bookedSlots, setBookedSlots] = useState<string[]>(bookedTimeSlots);
     const [rescheduleBookedSlots, setRescheduleBookedSlots] = useState<string[]>([]);
+    const [slotCapacities, setSlotCapacities] = useState<Record<string, { current: number; max: number; isFull: boolean }>>({});
+    const [rescheduleSlotCapacities, setRescheduleSlotCapacities] = useState<Record<string, { current: number; max: number; isFull: boolean }>>({});
     const [loadingSlots, setLoadingSlots] = useState(false);
     const [statusFilter, setStatusFilter] = useState<string>('all');
     const [visitTypeFilter, setVisitTypeFilter] = useState<string>('all');
@@ -147,6 +153,8 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
         inmate_middle_name: '',
         inmate_last_name: '',
         notes: '',
+        relationship_proof: null as File | null,
+        additional_proof: null as File | null,
     });
 
     const rescheduleForm = useForm({
@@ -170,35 +178,31 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
         }
     }, [bookedTimeSlotsFromProps]);
 
-    // Fetch booked slots when date changes
+    // Fetch capacity information when date or visit type changes
     useEffect(() => {
-        if (!selectedDate) {
-            setBookedSlots([]);
+        if (!selectedDate || !visitType) {
+            setSlotCapacities({});
             setLoadingSlots(false);
             return;
         }
 
-        const fetchBookedSlots = async () => {
+        const fetchSlotCapacities = async () => {
             setLoadingSlots(true);
-            router.get(
-                visitor.schedule.index().url,
-                { date: selectedDate },
-                {
-                    preserveState: true,
-                    preserveScroll: true,
-                    only: ['bookedTimeSlots'],
-                    onSuccess: () => {
-                        setLoadingSlots(false);
-                    },
-                    onError: () => {
-                        setLoadingSlots(false);
-                    },
-                },
-            );
+            try {
+                const response = await fetch(`/visitor/schedules/booked-slots?date=${selectedDate}&visit_type=${visitType}`);
+                const data = await response.json();
+                if (data.slotCapacities) {
+                    setSlotCapacities(data.slotCapacities);
+                }
+            } catch (error) {
+                console.error('Error fetching slot capacities:', error);
+            } finally {
+                setLoadingSlots(false);
+            }
         };
 
-        fetchBookedSlots();
-    }, [selectedDate]);
+        fetchSlotCapacities();
+    }, [selectedDate, visitType]);
 
     // Filter visits based on selected filters
     const filteredVisits = useMemo(() => {
@@ -213,6 +217,7 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
         e.preventDefault();
         form.post(visitor.schedule.store().url, {
             preserveScroll: true,
+            forceFormData: true,
             onSuccess: () => {
                 form.reset();
                 setVisitType('');
@@ -321,8 +326,37 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
                 setSelectedVisitForAppeal(null);
                 toast.success('Appeal submitted successfully.');
             },
-            onError: () => {
-                toast.error('Failed to submit appeal. Please check the form and try again.');
+            onError: (errors) => {
+                console.error('Appeal submission errors:', errors);
+                
+                // Get the first error message to show in toast
+                const errorMessages: string[] = [];
+                
+                // Check for field-specific errors
+                if (errors.reason) {
+                    errorMessages.push(Array.isArray(errors.reason) ? errors.reason[0] : errors.reason);
+                }
+                if (errors.documents) {
+                    errorMessages.push(Array.isArray(errors.documents) ? errors.documents[0] : errors.documents);
+                }
+                if (errors.appealable_type) {
+                    errorMessages.push(Array.isArray(errors.appealable_type) ? errors.appealable_type[0] : errors.appealable_type);
+                }
+                if (errors.appealable_id) {
+                    errorMessages.push(Array.isArray(errors.appealable_id) ? errors.appealable_id[0] : errors.appealable_id);
+                }
+                
+                // Check for general appeal error
+                if (errors.appeal) {
+                    errorMessages.push(Array.isArray(errors.appeal) ? errors.appeal[0] : errors.appeal);
+                }
+                
+                // Show the first error message in toast
+                if (errorMessages.length > 0) {
+                    toast.error(errorMessages[0]);
+                } else {
+                    toast.error('Failed to submit appeal. Please check the form and try again.');
+                }
             },
         });
     };
@@ -359,6 +393,32 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
             const bookedSlots = bookedTimeSlots.filter(slot => slot !== currentTimeSlot);
             setRescheduleBookedSlots(bookedSlots);
         }
+    }, [rescheduleDate, selectedVisitForReschedule]);
+
+    // Fetch capacity information for reschedule
+    useEffect(() => {
+        if (!rescheduleDate || !selectedVisitForReschedule) {
+            setRescheduleSlotCapacities({});
+            return;
+        }
+
+        const fetchRescheduleSlotCapacities = async () => {
+            setLoadingSlots(true);
+            try {
+                const visitType = selectedVisitForReschedule.visit_type;
+                const response = await fetch(`/visitor/schedules/booked-slots?date=${rescheduleDate}&visit_type=${visitType}`);
+                const data = await response.json();
+                if (data.slotCapacities) {
+                    setRescheduleSlotCapacities(data.slotCapacities);
+                }
+            } catch (error) {
+                console.error('Error fetching reschedule slot capacities:', error);
+            } finally {
+                setLoadingSlots(false);
+            }
+        };
+
+        fetchRescheduleSlotCapacities();
     }, [rescheduleDate, selectedVisitForReschedule]);
 
     // Define columns for the data table
@@ -410,6 +470,59 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
             accessorKey: 'visit_type',
             header: 'Visit Type',
             cell: ({ row }) => getVisitTypeBadge(row.original.visit_type),
+        },
+        {
+            id: 'monitoring_officer',
+            header: 'Monitoring Officer',
+            cell: ({ row }) => {
+                const visit = row.original;
+                if (visit.visit_type === 'virtual' && visit.monitoring_officer_name) {
+                    return (
+                        <div className="flex items-center gap-2">
+                            <User className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-sm">{visit.monitoring_officer_name}</span>
+                        </div>
+                    );
+                }
+                if (visit.visit_type === 'virtual') {
+                    return <span className="text-sm text-muted-foreground">Not assigned</span>;
+                }
+                return <span className="text-sm text-muted-foreground">-</span>;
+            },
+        },
+        {
+            id: 'access_key',
+            header: 'Access Key',
+            cell: ({ row }) => {
+                const visit = row.original;
+                if (visit.visit_type === 'physical' && visit.access_key) {
+                    const isExpired = visit.access_key_expires_at 
+                        ? new Date(visit.access_key_expires_at) < new Date()
+                        : false;
+                    return (
+                        <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                                <code className="px-2 py-1 bg-muted rounded text-sm font-mono font-bold">
+                                    {visit.access_key}
+                                </code>
+                            </div>
+                            {visit.access_key_expires_at && (
+                                <div className="text-xs text-muted-foreground">
+                                    {isExpired ? (
+                                        <span className="text-destructive">Expired</span>
+                                    ) : (
+                                        <span>Expires: {new Date(visit.access_key_expires_at).toLocaleString()}</span>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    );
+                }
+                if (visit.visit_type === 'physical' && visit.status === 'approved') {
+                    return <span className="text-sm text-muted-foreground">Not generated</span>;
+                }
+                return <span className="text-sm text-muted-foreground">-</span>;
+            },
         },
         {
             accessorKey: 'status',
@@ -567,48 +680,6 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
                     </Button>
                 </div>
 
-                {/* Filters */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Filters</CardTitle>
-                        <CardDescription>Filter schedules by status and visit type</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="flex flex-wrap gap-4">
-                            <div className="flex-1 min-w-[200px]">
-                                <Label htmlFor="status-filter">Status</Label>
-                                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                                    <SelectTrigger id="status-filter">
-                                        <SelectValue placeholder="All Statuses" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">All Statuses</SelectItem>
-                                        <SelectItem value="pending">Pending</SelectItem>
-                                        <SelectItem value="approved">Approved</SelectItem>
-                                        <SelectItem value="rejected">Rejected</SelectItem>
-                                        <SelectItem value="completed">Completed</SelectItem>
-                                        <SelectItem value="missed">Missed</SelectItem>
-                                        <SelectItem value="cancelled">Cancelled</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div className="flex-1 min-w-[200px]">
-                                <Label htmlFor="visit-type-filter">Visit Type</Label>
-                                <Select value={visitTypeFilter} onValueChange={setVisitTypeFilter}>
-                                    <SelectTrigger id="visit-type-filter">
-                                        <SelectValue placeholder="All Types" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">All Types</SelectItem>
-                                        <SelectItem value="virtual">Virtual</SelectItem>
-                                        <SelectItem value="physical">Physical</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-
                 {/* Table */}
                 <Card>
                     <CardHeader>
@@ -618,16 +689,47 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
-                        {filteredVisits.length === 0 ? (
+                        {filteredVisits.length === 0 && visits.length === 0 ? (
                             <div className="text-center py-8 text-muted-foreground">
                                 <Calendar className="size-12 mx-auto mb-4 opacity-50" />
                                 <p>No visit schedules found.</p>
-                                {visits.length === 0 && (
-                                    <p className="text-sm mt-2">Click "Apply for Schedule" to submit a request.</p>
-                                )}
+                                <p className="text-sm mt-2">Click "Apply for Schedule" to submit a request.</p>
                             </div>
                         ) : (
-                            <DataTable columns={columns} data={filteredVisits} />
+                            <DataTable
+                                columns={columns}
+                                data={filteredVisits}
+                                searchKey="visitor_name"
+                                searchPlaceholder="Search by visitor name, inmate name, date..."
+                                headerActions={
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <Select value={statusFilter} onValueChange={setStatusFilter}>
+                                            <SelectTrigger className="w-[150px]">
+                                                <SelectValue placeholder="All Statuses" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="all">All Statuses</SelectItem>
+                                                <SelectItem value="pending">Pending</SelectItem>
+                                                <SelectItem value="approved">Approved</SelectItem>
+                                                <SelectItem value="rejected">Rejected</SelectItem>
+                                                <SelectItem value="completed">Completed</SelectItem>
+                                                <SelectItem value="missed">Missed</SelectItem>
+                                                <SelectItem value="cancelled">Cancelled</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                        <Select value={visitTypeFilter} onValueChange={setVisitTypeFilter}>
+                                            <SelectTrigger className="w-[130px]">
+                                                <SelectValue placeholder="All Types" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="all">All Types</SelectItem>
+                                                <SelectItem value="virtual">Virtual</SelectItem>
+                                                <SelectItem value="physical">Physical</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                }
+                            />
                         )}
                     </CardContent>
                 </Card>
@@ -693,6 +795,8 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
                                             <TimeSlotPicker
                                                 selectedTime={form.data.scheduled_time || ''}
                                                 bookedSlots={bookedSlots}
+                                                slotCapacities={slotCapacities}
+                                                visitType={form.data.visit_type as 'physical' | 'virtual'}
                                                 onTimeSelect={(time) => {
                                                     form.setData('scheduled_time', time);
                                                 }}
@@ -776,6 +880,56 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
                                             onChange={(e) => form.setData('inmate_last_name', e.target.value)}
                                         />
                                         <InputError message={form.errors.inmate_last_name} />
+                                    </div>
+                                </div>
+
+                                <div className="space-y-4">
+                                    <h3 className="text-sm font-semibold flex items-center gap-2">
+                                        <FileText className="size-4" />
+                                        Required Documents
+                                    </h3>
+
+                                    <div className="space-y-4">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="relationship_proof">
+                                                Proof of Relationship <span className="text-destructive">*</span>
+                                            </Label>
+                                            <Input
+                                                id="relationship_proof"
+                                                type="file"
+                                                name="relationship_proof"
+                                                accept=".pdf,.jpg,.jpeg,.png"
+                                                onChange={(e) => {
+                                                    const file = e.target.files?.[0] || null;
+                                                    form.setData('relationship_proof', file);
+                                                }}
+                                                required
+                                            />
+                                            <p className="text-xs text-muted-foreground">
+                                                Accepted formats: PDF, JPG, PNG (Max 10MB)
+                                            </p>
+                                            <InputError message={form.errors.relationship_proof} />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="additional_proof">
+                                                Additional/Supporting Proof of Relationship <span className="text-destructive">*</span>
+                                            </Label>
+                                            <Input
+                                                id="additional_proof"
+                                                type="file"
+                                                name="additional_proof"
+                                                accept=".pdf,.jpg,.jpeg,.png"
+                                                onChange={(e) => {
+                                                    const file = e.target.files?.[0] || null;
+                                                    form.setData('additional_proof', file);
+                                                }}
+                                                required
+                                            />
+                                            <p className="text-xs text-muted-foreground">
+                                                Accepted formats: PDF, JPG, PNG (Max 10MB)
+                                            </p>
+                                            <InputError message={form.errors.additional_proof} />
+                                        </div>
                                     </div>
                                 </div>
 
@@ -869,6 +1023,8 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
                                                     rescheduleForm.setData('scheduled_time', time);
                                                 }}
                                                 bookedSlots={rescheduleBookedSlots}
+                                                slotCapacities={rescheduleSlotCapacities}
+                                                visitType={selectedVisitForReschedule?.visit_type as 'physical' | 'virtual'}
                                             />
                                         </>
                                     )}
@@ -962,6 +1118,11 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
                                         onChange={handleAppealFileChange}
                                     />
                                     <InputError message={appealForm.errors.documents} />
+                                    {appealForm.errors.appeal && (
+                                        <div className="text-sm text-destructive">
+                                            {Array.isArray(appealForm.errors.appeal) ? appealForm.errors.appeal[0] : appealForm.errors.appeal}
+                                        </div>
+                                    )}
                                     <p className="text-xs text-muted-foreground">
                                         You can upload up to 5 files (PDF, DOC, DOCX, JPG, JPEG, PNG). Max 5MB per file.
                                     </p>

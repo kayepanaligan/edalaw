@@ -1,27 +1,38 @@
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Clock } from 'lucide-react';
+import { Clock, AlertCircle } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 type TimeSlot = {
     value: string; // HH:MM format (start time)
     label: string; // Display format (e.g., "7:00 AM - 7:10 AM")
     rangeLabel: string; // Full range display
     period: 'AM' | 'PM';
+    currentBookings?: number;
+    maxCapacity?: number;
+    isFull?: boolean;
 };
 
 type TimeSlotPickerProps = {
     selectedTime?: string;
     bookedSlots?: string[];
+    slotCapacities?: Record<string, { current: number; max: number; isFull: boolean }>;
     onTimeSelect: (time: string) => void;
     className?: string;
+    visitType?: 'physical' | 'virtual';
 };
 
 export function TimeSlotPicker({
     selectedTime,
     bookedSlots = [],
+    slotCapacities = {},
     onTimeSelect,
     className,
+    visitType,
 }: TimeSlotPickerProps) {
+    const [activeTab, setActiveTab] = useState<'AM' | 'PM'>('AM');
+
     // Generate time slots with 10-minute intervals
     const generateTimeSlots = (): TimeSlot[] => {
         const slots: TimeSlot[] = [];
@@ -55,12 +66,16 @@ export function TimeSlotPicker({
                 const endLabel = formatTime(endTime.hour, endTime.minute, endTime.hour < 12 ? 'AM' : 'PM');
                 
                 const rangeLabel = `${startLabel} - ${endLabel}`;
+                const capacity = slotCapacities[time24] || { current: 0, max: 4, isFull: false };
                 
                 slots.push({
                     value: time24,
                     label: rangeLabel,
                     rangeLabel: rangeLabel,
                     period: 'AM',
+                    currentBookings: capacity.current,
+                    maxCapacity: capacity.max,
+                    isFull: capacity.isFull,
                 });
             }
         }
@@ -76,12 +91,16 @@ export function TimeSlotPicker({
                 const endLabel = formatTime(endTime.hour, endTime.minute, endTime.hour < 12 ? 'AM' : 'PM');
                 
                 const rangeLabel = `${startLabel} - ${endLabel}`;
+                const capacity = slotCapacities[time24] || { current: 0, max: 4, isFull: false };
                 
                 slots.push({
                     value: time24,
                     label: rangeLabel,
                     rangeLabel: rangeLabel,
                     period: 'PM',
+                    currentBookings: capacity.current,
+                    maxCapacity: capacity.max,
+                    isFull: capacity.isFull,
                 });
             }
         }
@@ -93,106 +112,137 @@ export function TimeSlotPicker({
     const amSlots = timeSlots.filter((slot) => slot.period === 'AM');
     const pmSlots = timeSlots.filter((slot) => slot.period === 'PM');
 
-    const isBooked = (time: string): boolean => {
-        return bookedSlots.includes(time);
+    const isDisabled = (slot: TimeSlot): boolean => {
+        return slot.isFull || false;
+    };
+
+    const handleSlotClick = (slot: TimeSlot) => {
+        if (slot.isFull) {
+            return;
+        }
+        onTimeSelect(slot.value);
     };
 
     return (
         <div className={cn('space-y-4 border rounded-lg p-4 bg-card', className)}>
-            <div className="flex items-center gap-2 text-sm font-medium">
-                <Clock className="size-4" />
-                Select Time Range (10-minute intervals)
+            <div className="space-y-2">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                    <Clock className="size-4" />
+                    Select Time Range
+                </div>
+                <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 rounded-md p-3">
+                    <p className="text-xs text-blue-900 dark:text-blue-100 font-medium mb-1">
+                        <AlertCircle className="size-3 inline mr-1" />
+                        Important: You can only select one 10-minute time range per schedule.
+                    </p>
+                    <p className="text-xs text-blue-700 dark:text-blue-300">
+                        Each time slot represents exactly 10 minutes. Once a time slot reaches its maximum capacity, it will be unavailable for selection.
+                    </p>
+                </div>
             </div>
-            <p className="text-xs text-muted-foreground">
-                Each selection represents a 10-minute time range
-            </p>
             
-            <div className="grid grid-cols-2 gap-4">
-                {/* AM Slots */}
-                <div className="space-y-2">
-                    <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide px-1">
-                        AM (7:00 AM - 11:50 AM)
-                    </div>
+            <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'AM' | 'PM')} className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="AM">AM (7:00 AM - 11:50 AM)</TabsTrigger>
+                    <TabsTrigger value="PM">PM (12:00 PM - 5:50 PM)</TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="AM" className="mt-4">
                     <div className="grid grid-cols-2 gap-2 max-h-[400px] overflow-y-auto p-2 border rounded-md bg-muted/30">
                         {amSlots.map((slot) => {
                             const isSelected = selectedTime === slot.value;
-                            const isDisabled = isBooked(slot.value);
+                            const disabled = isDisabled(slot);
                             
                             return (
-                                <Button
-                                    key={slot.value}
-                                    type="button"
-                                    variant={isSelected ? 'default' : 'outline'}
-                                    size="sm"
-                                    disabled={isDisabled}
-                                    onClick={() => {
-                                        if (!isDisabled) {
-                                            onTimeSelect(slot.value);
-                                        }
-                                    }}
-                                    className={cn(
-                                        'text-xs font-medium transition-all',
-                                        isSelected && 'bg-primary text-primary-foreground shadow-md scale-105',
-                                        isDisabled && 'opacity-40 cursor-not-allowed hover:opacity-40',
-                                        !isDisabled && !isSelected && 'hover:bg-accent hover:scale-105 active:scale-95'
+                                <div key={slot.value} className="relative">
+                                    <Button
+                                        type="button"
+                                        variant={isSelected ? 'default' : 'outline'}
+                                        size="sm"
+                                        disabled={disabled}
+                                        onClick={() => handleSlotClick(slot)}
+                                        className={cn(
+                                            'w-full text-xs font-medium transition-all',
+                                            isSelected && 'bg-primary text-primary-foreground shadow-md',
+                                            disabled && 'opacity-40 cursor-not-allowed hover:opacity-40',
+                                            !disabled && !isSelected && 'hover:bg-accent'
+                                        )}
+                                        title={disabled ? `This time slot is full (${slot.currentBookings}/${slot.maxCapacity} visitors)` : slot.rangeLabel}
+                                    >
+                                        <div className="flex flex-col items-center gap-1">
+                                            <span>{slot.label}</span>
+                                            {slot.maxCapacity && (
+                                                <span className={cn(
+                                                    'text-[10px]',
+                                                    slot.isFull ? 'text-destructive' : 'text-muted-foreground'
+                                                )}>
+                                                    {slot.currentBookings || 0}/{slot.maxCapacity}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </Button>
+                                    {disabled && (
+                                        <div className="absolute inset-0 flex items-center justify-center bg-destructive/10 rounded-md pointer-events-none">
+                                            <span className="text-[10px] font-medium text-destructive">Full</span>
+                                        </div>
                                     )}
-                                >
-                                    {slot.label}
-                                </Button>
+                                </div>
                             );
                         })}
                     </div>
-                </div>
-
-                {/* PM Slots */}
-                <div className="space-y-2">
-                    <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide px-1">
-                        PM (12:00 PM - 5:50 PM)
-                    </div>
+                </TabsContent>
+                
+                <TabsContent value="PM" className="mt-4">
                     <div className="grid grid-cols-2 gap-2 max-h-[400px] overflow-y-auto p-2 border rounded-md bg-muted/30">
                         {pmSlots.map((slot) => {
                             const isSelected = selectedTime === slot.value;
-                            const isDisabled = isBooked(slot.value);
+                            const disabled = isDisabled(slot);
                             
                             return (
-                                <Button
-                                    key={slot.value}
-                                    type="button"
-                                    variant={isSelected ? 'default' : 'outline'}
-                                    size="sm"
-                                    disabled={isDisabled}
-                                    onClick={() => {
-                                        if (!isDisabled) {
-                                            onTimeSelect(slot.value);
-                                        }
-                                    }}
-                                    className={cn(
-                                        'text-xs font-medium transition-all',
-                                        isSelected && 'bg-primary text-primary-foreground shadow-md scale-105',
-                                        isDisabled && 'opacity-40 cursor-not-allowed hover:opacity-40',
-                                        !isDisabled && !isSelected && 'hover:bg-accent hover:scale-105 active:scale-95'
+                                <div key={slot.value} className="relative">
+                                    <Button
+                                        type="button"
+                                        variant={isSelected ? 'default' : 'outline'}
+                                        size="sm"
+                                        disabled={disabled}
+                                        onClick={() => handleSlotClick(slot)}
+                                        className={cn(
+                                            'w-full text-xs font-medium transition-all',
+                                            isSelected && 'bg-primary text-primary-foreground shadow-md',
+                                            disabled && 'opacity-40 cursor-not-allowed hover:opacity-40',
+                                            !disabled && !isSelected && 'hover:bg-accent'
+                                        )}
+                                        title={disabled ? `This time slot is full (${slot.currentBookings}/${slot.maxCapacity} visitors)` : slot.rangeLabel}
+                                    >
+                                        <div className="flex flex-col items-center gap-1">
+                                            <span>{slot.label}</span>
+                                            {slot.maxCapacity && (
+                                                <span className={cn(
+                                                    'text-[10px]',
+                                                    slot.isFull ? 'text-destructive' : 'text-muted-foreground'
+                                                )}>
+                                                    {slot.currentBookings || 0}/{slot.maxCapacity}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </Button>
+                                    {disabled && (
+                                        <div className="absolute inset-0 flex items-center justify-center bg-destructive/10 rounded-md pointer-events-none">
+                                            <span className="text-[10px] font-medium text-destructive">Full</span>
+                                        </div>
                                     )}
-                                >
-                                    {slot.label}
-                                </Button>
+                                </div>
                             );
                         })}
                     </div>
-                </div>
-            </div>
+                </TabsContent>
+            </Tabs>
             
             {selectedTime && (
                 <div className="text-sm font-medium text-primary border-t pt-3">
                     Selected Time Range: <span className="font-bold">{timeSlots.find(s => s.value === selectedTime)?.rangeLabel}</span>
                 </div>
             )}
-            
-            {bookedSlots.length > 0 && (
-                <p className="text-xs text-muted-foreground border-t pt-3">
-                    ⚠️ {bookedSlots.length} time slot(s) are already booked and disabled.
-                </p>
-            )}
         </div>
     );
 }
-

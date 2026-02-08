@@ -23,7 +23,8 @@ class ScheduleController extends Controller
      */
     public function index(Request $request): Response
     {
-        $visits = Visit::where('user_id', auth()->id())
+        $visits = Visit::with('monitoringOfficer')
+            ->where('user_id', auth()->id())
             ->orderBy('scheduled_date', 'desc')
             ->orderBy('created_at', 'desc')
             ->get()
@@ -57,7 +58,11 @@ class ScheduleController extends Controller
                     'inmate_last_name' => $visit->inmate_last_name,
                     'status' => $visit->status->value,
                     'notes' => $visit->notes,
-                    'meeting_link' => $visit->meeting_link,
+                    'meeting_link' => $visit->meeting_link ?? $visit->daily_co_room_url,
+                    'access_key' => $visit->access_key,
+                    'access_key_expires_at' => $visit->access_key_expires_at?->format('Y-m-d H:i:s'),
+                    'monitoring_officer_id' => $visit->monitoring_officer_id,
+                    'monitoring_officer_name' => $visit->monitoringOfficer ? trim("{$visit->monitoringOfficer->first_name} {$visit->monitoringOfficer->middle_name} {$visit->monitoringOfficer->last_name}") : null,
                     'rejection_reason' => $visit->rejection_reason,
                     'created_at' => $visit->created_at->format('Y-m-d H:i:s'),
                     'can_appeal' => $canAppeal,
@@ -106,46 +111,42 @@ class ScheduleController extends Controller
     }
 
     /**
-     * Get booked time slots for a specific date.
+     * Get booked time slots for a specific date with capacity information.
      */
     public function getBookedTimeSlots(Request $request): \Illuminate\Http\JsonResponse
     {
         $request->validate([
             'date' => ['required', 'date'],
+            'visit_type' => ['nullable', 'string', 'in:physical,virtual'],
         ]);
 
-        $bookedTimeSlots = Visit::where('scheduled_date', $request->date)
-            ->whereIn('status', ['pending', 'approved'])
-            ->whereNotNull('scheduled_time')
-            ->get()
-            ->map(function ($visit) {
-                // Convert time to HH:MM format
-                $time = $visit->scheduled_time;
-                if ($time instanceof \Carbon\Carbon) {
-                    return $time->format('H:i');
-                }
-                if (is_string($time)) {
-                    // If it's already in H:i format, return as is
-                    if (preg_match('/^\d{2}:\d{2}$/', $time)) {
-                        return $time;
-                    }
-                    // Try to parse and format
-                    try {
-                        return \Carbon\Carbon::createFromFormat('H:i:s', $time)->format('H:i');
-                    } catch (\Exception $e) {
-                        return $time;
-                    }
-                }
+        $visitType = $request->visit_type ?? 'physical';
+        $date = $request->date;
 
-                return (string) $time;
-            })
-            ->filter()
-            ->unique()
-            ->values()
-            ->toArray();
+        // Generate all time slots
+        $allTimeSlots = [];
+        for ($hour = 7; $hour < 18; $hour++) {
+            for ($minute = 0; $minute < 60; $minute += 10) {
+                $allTimeSlots[] = sprintf('%02d:%02d', $hour, $minute);
+            }
+        }
+
+        // Get capacity information for each slot
+        $slotCapacities = [];
+        foreach ($allTimeSlots as $timeSlot) {
+            $capacity = \App\Models\TimeSlotCapacity::getCapacity($timeSlot, $visitType);
+            $currentBookings = \App\Models\TimeSlotCapacity::getCurrentBookings($date, $timeSlot, $visitType);
+            $isFull = $currentBookings >= $capacity;
+
+            $slotCapacities[$timeSlot] = [
+                'current' => $currentBookings,
+                'max' => $capacity,
+                'isFull' => $isFull,
+            ];
+        }
 
         return response()->json([
-            'bookedTimeSlots' => $bookedTimeSlots,
+            'slotCapacities' => $slotCapacities,
         ]);
     }
 
@@ -162,6 +163,8 @@ class ScheduleController extends Controller
             'inmate_middle_name' => ['nullable', 'string', 'max:255'],
             'inmate_last_name' => ['required', 'string', 'max:255'],
             'notes' => ['nullable', 'string', 'max:1000'],
+            'relationship_proof' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'], // 10MB max
+            'additional_proof' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'], // 10MB max
         ]);
 
         if ($validator->fails()) {
@@ -170,16 +173,31 @@ class ScheduleController extends Controller
                 ->withInput();
         }
 
-        // Check if the time slot is already booked
-        $isBooked = Visit::where('scheduled_date', $request->scheduled_date)
-            ->where('scheduled_time', $request->scheduled_time)
-            ->whereIn('status', ['pending', 'approved'])
-            ->exists();
+        // Check if the time slot has capacity
+        $isAvailable = \App\Models\TimeSlotCapacity::isAvailable(
+            $request->scheduled_date,
+            $request->scheduled_time,
+            $request->visit_type
+        );
 
-        if ($isBooked) {
+        if (! $isAvailable) {
+            $capacity = \App\Models\TimeSlotCapacity::getCapacity($request->scheduled_time, $request->visit_type);
+
             return redirect()->back()
-                ->withErrors(['scheduled_time' => 'This time slot is already booked. Please select another time.'])
+                ->withErrors(['scheduled_time' => "This time slot is full (maximum capacity: {$capacity} visitors). Please select another time."])
                 ->withInput();
+        }
+
+        // Store uploaded files
+        $relationshipProofPath = null;
+        $additionalProofPath = null;
+
+        if ($request->hasFile('relationship_proof')) {
+            $relationshipProofPath = $request->file('relationship_proof')->store('visits/relationship_proofs', 'public');
+        }
+
+        if ($request->hasFile('additional_proof')) {
+            $additionalProofPath = $request->file('additional_proof')->store('visits/additional_proofs', 'public');
         }
 
         $visit = Visit::create([
@@ -192,6 +210,8 @@ class ScheduleController extends Controller
             'inmate_last_name' => $request->inmate_last_name,
             'status' => VisitStatus::Pending,
             'notes' => $request->notes,
+            'relationship_proof_path' => $relationshipProofPath,
+            'additional_proof_path' => $additionalProofPath,
         ]);
 
         // Create notification that application was received
@@ -285,16 +305,19 @@ class ScheduleController extends Controller
                 ->withInput();
         }
 
-        // Check if the new time slot is already booked (excluding the current visit)
-        $isBooked = Visit::where('scheduled_date', $request->scheduled_date)
-            ->where('scheduled_time', $request->scheduled_time)
-            ->whereIn('status', [VisitStatus::Pending, VisitStatus::Approved])
-            ->where('id', '!=', $visit->id)
-            ->exists();
+        // Check if the new time slot has capacity (excluding the current visit)
+        $isAvailable = \App\Models\TimeSlotCapacity::isAvailable(
+            $request->scheduled_date,
+            $request->scheduled_time,
+            $visit->visit_type->value,
+            $visit->id
+        );
 
-        if ($isBooked) {
+        if (! $isAvailable) {
+            $capacity = \App\Models\TimeSlotCapacity::getCapacity($request->scheduled_time, $visit->visit_type->value);
+
             return redirect()->back()
-                ->withErrors(['scheduled_time' => 'This time slot is already booked. Please select another time.'])
+                ->withErrors(['scheduled_time' => "This time slot is full (maximum capacity: {$capacity} visitors). Please select another time."])
                 ->withInput();
         }
 

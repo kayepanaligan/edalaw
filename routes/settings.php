@@ -29,3 +29,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('settings/two-factor', [TwoFactorAuthenticationController::class, 'show'])
         ->name('two-factor.show');
 });
+
+Route::middleware(['auth', 'verified', 'role:super_admin'])->group(function () {
+    Route::get('settings/time-slot-capacity', [\App\Http\Controllers\Admin\TimeSlotConfigurationController::class, 'index'])
+        ->name('settings.time-slot-capacity');
+});

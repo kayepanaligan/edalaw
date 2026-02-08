@@ -35,7 +35,17 @@ Route::get('/', function () {
 Route::post('webhooks/daily-co', [\App\Http\Controllers\Webhook\DailyCoWebhookController::class, 'handle'])
     ->name('webhooks.daily-co');
 
-Route::middleware(['auth', 'verified'])->group(function () {
+// OTP Verification routes (no auth required)
+Route::middleware('guest')->group(function () {
+    Route::get('otp-verification', [\App\Http\Controllers\Auth\OtpVerificationController::class, 'show'])
+        ->name('otp-verification.show');
+    Route::post('otp-verification/verify', [\App\Http\Controllers\Auth\OtpVerificationController::class, 'verify'])
+        ->name('otp-verification.verify');
+    Route::post('otp-verification/resend', [\App\Http\Controllers\Auth\OtpVerificationController::class, 'resend'])
+        ->name('otp-verification.resend');
+});
+
+Route::middleware(['auth', 'verified', 'approved'])->group(function () {
     Route::get('dashboard', function () {
         $user = auth()->user();
         $role = $user->role?->slug;
@@ -72,7 +82,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::middleware(['role:super_admin'])->prefix('admin')->name('admin.')->group(function () {
         Route::resource('users', \App\Http\Controllers\Admin\UserManagementController::class)
-            ->only(['index', 'update', 'destroy']);
+            ->only(['index', 'store', 'update', 'destroy']);
         Route::post('users/{user}/approve', [\App\Http\Controllers\Admin\UserManagementController::class, 'approve'])
             ->name('users.approve');
         Route::post('users/{user}/reject', [\App\Http\Controllers\Admin\UserManagementController::class, 'reject'])
@@ -94,18 +104,35 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->name('schedules.reject');
         Route::post('schedules/{visit}/update-status', [\App\Http\Controllers\Admin\ScheduleManagementController::class, 'updateStatus'])
             ->name('schedules.update-status');
+        Route::post('schedules/{visit}/generate-access-key', [\App\Http\Controllers\Admin\ScheduleManagementController::class, 'generateAccessKey'])
+            ->name('schedules.generate-access-key');
 
         Route::get('eburols', [\App\Http\Controllers\Admin\EburolManagementController::class, 'index'])
             ->name('eburols.index');
+        Route::post('eburols', [\App\Http\Controllers\Admin\EburolManagementController::class, 'store'])
+            ->name('eburols.store');
+        Route::put('eburols/{eburol}', [\App\Http\Controllers\Admin\EburolManagementController::class, 'update'])
+            ->name('eburols.update');
+        Route::delete('eburols/{eburol}', [\App\Http\Controllers\Admin\EburolManagementController::class, 'destroy'])
+            ->name('eburols.destroy');
         Route::post('eburols/{eburol}/approve', [\App\Http\Controllers\Admin\EburolManagementController::class, 'approve'])
             ->name('eburols.approve');
         Route::post('eburols/{eburol}/reject', [\App\Http\Controllers\Admin\EburolManagementController::class, 'reject'])
             ->name('eburols.reject');
         Route::post('eburols/{eburol}/update-status', [\App\Http\Controllers\Admin\EburolManagementController::class, 'updateStatus'])
             ->name('eburols.update-status');
+
+        Route::get('time-slot-capacities', [\App\Http\Controllers\Admin\TimeSlotConfigurationController::class, 'index'])
+            ->name('time-slot-capacities.index');
+        Route::put('time-slot-capacities/{timeSlotCapacity}', [\App\Http\Controllers\Admin\TimeSlotConfigurationController::class, 'update'])
+            ->name('time-slot-capacities.update');
+        Route::post('time-slot-capacities/update', [\App\Http\Controllers\Admin\TimeSlotConfigurationController::class, 'updateCapacity'])
+            ->name('time-slot-capacities.update-capacity');
     });
 
     Route::middleware(['role:visitor'])->prefix('visitor')->name('visitor.')->group(function () {
+        Route::get('schedules/booked-slots', [\App\Http\Controllers\Visitor\ScheduleController::class, 'getBookedTimeSlots'])
+            ->name('schedules.booked-slots');
         Route::get('schedule', [\App\Http\Controllers\Visitor\ScheduleController::class, 'index'])
             ->name('schedule.index');
         Route::post('schedule', [\App\Http\Controllers\Visitor\ScheduleController::class, 'store'])
@@ -174,6 +201,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->name('schedules.reject');
         Route::post('schedules/{visit}/update-status', [\App\Http\Controllers\BjmpOfficer\ScheduleManagementController::class, 'updateStatus'])
             ->name('schedules.update-status');
+        Route::post('schedules/{visit}/generate-access-key', [\App\Http\Controllers\BjmpOfficer\ScheduleManagementController::class, 'generateAccessKey'])
+            ->name('schedules.generate-access-key');
         Route::post('schedules/{visit}/reschedule', [\App\Http\Controllers\BjmpOfficer\ScheduleManagementController::class, 'reschedule'])
             ->name('schedules.reschedule');
 

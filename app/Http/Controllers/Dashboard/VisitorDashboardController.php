@@ -70,7 +70,7 @@ class VisitorDashboardController extends Controller
                         "{$visit->inmate_first_name} {$visit->inmate_middle_name} {$visit->inmate_last_name}"
                     ),
                     'status' => $visit->status->value,
-                    'meeting_link' => $visit->meeting_link,
+                    'meeting_link' => $visit->meeting_link ?? $visit->daily_co_room_url,
                     'created_at' => $visit->created_at->format('Y-m-d H:i:s'),
                 ];
             });

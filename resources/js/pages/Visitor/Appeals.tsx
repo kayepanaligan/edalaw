@@ -189,7 +189,35 @@ export default function Appeals({ appeals, rejected_visits, rejected_eburols }: 
             },
             onError: (errors) => {
                 console.error('Appeal submission errors:', errors);
-                toast.error('Failed to submit appeal. Please check the form and try again.');
+                
+                // Get the first error message to show in toast
+                const errorMessages: string[] = [];
+                
+                // Check for field-specific errors
+                if (errors.reason) {
+                    errorMessages.push(Array.isArray(errors.reason) ? errors.reason[0] : errors.reason);
+                }
+                if (errors.documents) {
+                    errorMessages.push(Array.isArray(errors.documents) ? errors.documents[0] : errors.documents);
+                }
+                if (errors.appealable_type) {
+                    errorMessages.push(Array.isArray(errors.appealable_type) ? errors.appealable_type[0] : errors.appealable_type);
+                }
+                if (errors.appealable_id) {
+                    errorMessages.push(Array.isArray(errors.appealable_id) ? errors.appealable_id[0] : errors.appealable_id);
+                }
+                
+                // Check for general appeal error
+                if (errors.appeal) {
+                    errorMessages.push(Array.isArray(errors.appeal) ? errors.appeal[0] : errors.appeal);
+                }
+                
+                // Show the first error message in toast
+                if (errorMessages.length > 0) {
+                    toast.error(errorMessages[0]);
+                } else {
+                    toast.error('Failed to submit appeal. Please check the form and try again.');
+                }
             },
         });
     };
@@ -689,6 +717,11 @@ export default function Appeals({ appeals, rejected_visits, rejected_eburols }: 
                                         onChange={handleFileChange}
                                     />
                                     <InputError message={form.errors.documents} />
+                                    {form.errors.appeal && (
+                                        <div className="text-sm text-destructive">
+                                            {Array.isArray(form.errors.appeal) ? form.errors.appeal[0] : form.errors.appeal}
+                                        </div>
+                                    )}
                                     <p className="text-xs text-muted-foreground">
                                         You can upload up to 5 files (PDF, DOC, DOCX, JPG, JPEG, PNG). Max 5MB per file.
                                     </p>

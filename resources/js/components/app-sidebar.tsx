@@ -1,5 +1,5 @@
 import { Link, usePage } from '@inertiajs/react';
-import { AlertTriangle, Bell, Calendar, FileText, LayoutGrid, MessageSquare, Phone, Scale, Shield, Users, Heart, Monitor, Video, Camera, Flag } from 'lucide-react';
+import { AlertTriangle, Bell, Calendar, FileText, LayoutGrid, MessageSquare, Phone, Scale, Shield, Users, Heart, Monitor, Video, Camera, Flag, Settings } from 'lucide-react';
 
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
@@ -26,13 +26,16 @@ export function AppSidebar() {
     const auth = page.props.auth;
     const userRole = auth?.user?.role;
 
-    const mainNavItems: NavItem[] = [
-        {
+    const mainNavItems: NavItem[] = [];
+    
+    // Only add Dashboard to mainNavItems for non-visitor roles
+    if (userRole !== 'visitor') {
+        mainNavItems.push({
             title: 'Dashboard',
             href: '/dashboard',
             icon: LayoutGrid,
-        },
-    ];
+        });
+    }
 
     // Add User Management and Schedule Management for super admin
     if (userRole === 'super_admin') {
@@ -56,54 +59,91 @@ export function AppSidebar() {
             href: '/admin/sessions',
             icon: Monitor,
         });
-    }
-
-    // Add Schedule Management, Call Logs, E-Burol, and Notifications for visitors
-    if (userRole === 'visitor') {
         mainNavItems.push({
-            title: 'Apply for Visit',
-            href: '/visitor/schedule',
-            icon: Calendar,
-        });
-        
-        mainNavItems.push({
-            title: 'Apply for E-Burol',
-            href: '/visitor/eburol',
+            title: 'E-Burol Management',
+            href: '/admin/eburols',
             icon: Heart,
         });
-        
+    }
+
+    // Visitor navigation with categories
+    let visitorNavGroups: Array<{ label: string; items: NavItem[] }> | undefined;
+    if (userRole === 'visitor') {
         const unreadCount = page.props.unreadNotificationCount || 0;
-        mainNavItems.push({
-            title: 'Notifications',
-            href: '/visitor/notifications',
-            icon: Bell,
-            badge: unreadCount > 0 ? unreadCount : undefined,
-        });
-        mainNavItems.push({
-            title: 'Session Tracking',
-            href: '/visitor/sessions',
-            icon: Shield,
-        });
-        mainNavItems.push({
-            title: 'Call Logs',
-            href: '/visitor/call-logs',
-            icon: Phone,
-        });
-        mainNavItems.push({
-            title: 'Appeal',
-            href: '/visitor/appeals',
-            icon: Scale,
-        });
-        mainNavItems.push({
-            title: 'Feedback',
-            href: '/visitor/suggestions',
-            icon: MessageSquare,
-        });
-        mainNavItems.push({
-            title: 'History',
-            href: '/visitor/history',
-            icon: FileText,
-        });
+        
+        visitorNavGroups = [
+            {
+                label: 'Main',
+                items: [
+                    {
+                        title: 'Dashboard',
+                        href: '/dashboard',
+                        icon: LayoutGrid,
+                    },
+                    {
+                        title: 'Notification',
+                        href: '/visitor/notifications',
+                        icon: Bell,
+                        badge: unreadCount > 0 ? unreadCount : undefined,
+                    },
+                ],
+            },
+            {
+                label: 'Applications',
+                items: [
+                    {
+                        title: 'Apply for Visit',
+                        href: '/visitor/schedule',
+                        icon: Calendar,
+                    },
+                    {
+                        title: 'Apply for E-Burol',
+                        href: '/visitor/eburol',
+                        icon: Heart,
+                    },
+                    {
+                        title: 'Appeal',
+                        href: '/visitor/appeals',
+                        icon: Scale,
+                    },
+                ],
+            },
+            {
+                label: 'Logs & Records',
+                items: [
+                    {
+                        title: 'History',
+                        href: '/visitor/history',
+                        icon: FileText,
+                    },
+                    {
+                        title: 'Call Logs',
+                        href: '/visitor/call-logs',
+                        icon: Phone,
+                    },
+                    {
+                        title: 'Session',
+                        href: '/visitor/sessions',
+                        icon: Shield,
+                    },
+                ],
+            },
+            {
+                label: 'Support',
+                items: [
+                    {
+                        title: 'Feedback',
+                        href: '/visitor/suggestions',
+                        icon: MessageSquare,
+                    },
+                    {
+                        title: 'Settings',
+                        href: '/settings',
+                        icon: Settings,
+                    },
+                ],
+            },
+        ];
     }
 
     // BJMP Officer navigation
@@ -127,6 +167,11 @@ export function AppSidebar() {
             title: 'History Logs',
             href: '/bjmp-officer/audit-logs',
             icon: FileText,
+        });
+        mainNavItems.push({
+            title: 'Settings',
+            href: '/settings',
+            icon: Settings,
         });
     }
 
@@ -172,6 +217,11 @@ export function AppSidebar() {
             href: '/monitoring-officer/alerts',
             icon: AlertTriangle,
         });
+        mainNavItems.push({
+            title: 'Settings',
+            href: '/settings',
+            icon: Settings,
+        });
     }
 
     // Super Admin navigation
@@ -193,6 +243,11 @@ export function AppSidebar() {
             href: '/admin/audit-logs',
             icon: FileText,
         });
+        mainNavItems.push({
+            title: 'Settings',
+            href: '/settings',
+            icon: Settings,
+        });
     }
 
     return (
@@ -210,7 +265,11 @@ export function AppSidebar() {
             </SidebarHeader>
 
             <SidebarContent>
-                <NavMain items={mainNavItems} />
+                {userRole === 'visitor' && visitorNavGroups ? (
+                    <NavMain groups={visitorNavGroups} />
+                ) : (
+                    <NavMain items={mainNavItems} />
+                )}
             </SidebarContent>
 
             <SidebarFooter>

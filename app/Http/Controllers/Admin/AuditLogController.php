@@ -37,18 +37,25 @@ class AuditLogController extends Controller
             $query->whereDate('created_at', '<=', $request->date_to);
         }
 
-        // Search filter
+        // Search filter - search across name, description, module, action, email, etc.
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('description', 'like', "%{$search}%")
                     ->orWhere('action', 'like', "%{$search}%")
                     ->orWhere('ip_address', 'like', "%{$search}%")
+                    ->orWhere('user_agent', 'like', "%{$search}%")
+                    ->orWhereRaw("JSON_EXTRACT(metadata, '$.module') LIKE ?", ["%{$search}%"])
                     ->orWhereHas('user', function ($userQuery) use ($search) {
                         $userQuery->where('first_name', 'like', "%{$search}%")
                             ->orWhere('middle_name', 'like', "%{$search}%")
                             ->orWhere('last_name', 'like', "%{$search}%")
-                            ->orWhere('email', 'like', "%{$search}%");
+                            ->orWhere('email', 'like', "%{$search}%")
+                            ->orWhereRaw("CONCAT(COALESCE(first_name, ''), ' ', COALESCE(middle_name, ''), ' ', COALESCE(last_name, '')) LIKE ?", ["%{$search}%"]);
+                    })
+                    ->orWhereHas('user.role', function ($roleQuery) use ($search) {
+                        $roleQuery->where('name', 'like', "%{$search}%")
+                            ->orWhere('slug', 'like', "%{$search}%");
                     });
             });
         }
@@ -134,11 +141,18 @@ class AuditLogController extends Controller
                 $q->where('description', 'like', "%{$search}%")
                     ->orWhere('action', 'like', "%{$search}%")
                     ->orWhere('ip_address', 'like', "%{$search}%")
+                    ->orWhere('user_agent', 'like', "%{$search}%")
+                    ->orWhereRaw("JSON_EXTRACT(metadata, '$.module') LIKE ?", ["%{$search}%"])
                     ->orWhereHas('user', function ($userQuery) use ($search) {
                         $userQuery->where('first_name', 'like', "%{$search}%")
                             ->orWhere('middle_name', 'like', "%{$search}%")
                             ->orWhere('last_name', 'like', "%{$search}%")
-                            ->orWhere('email', 'like', "%{$search}%");
+                            ->orWhere('email', 'like', "%{$search}%")
+                            ->orWhereRaw("CONCAT(COALESCE(first_name, ''), ' ', COALESCE(middle_name, ''), ' ', COALESCE(last_name, '')) LIKE ?", ["%{$search}%"]);
+                    })
+                    ->orWhereHas('user.role', function ($roleQuery) use ($search) {
+                        $roleQuery->where('name', 'like', "%{$search}%")
+                            ->orWhere('slug', 'like', "%{$search}%");
                     });
             });
         }

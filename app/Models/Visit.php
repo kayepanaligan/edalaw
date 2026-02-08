@@ -20,6 +20,7 @@ class Visit extends Model
      */
     protected $fillable = [
         'user_id',
+        'monitoring_officer_id',
         'scheduled_date',
         'scheduled_time',
         'visit_type',
@@ -28,7 +29,11 @@ class Visit extends Model
         'inmate_last_name',
         'status',
         'notes',
+        'relationship_proof_path',
+        'additional_proof_path',
         'meeting_link',
+        'access_key',
+        'access_key_expires_at',
         'rejection_reason',
         'daily_co_room_id',
         'daily_co_room_name',
@@ -49,9 +54,41 @@ class Visit extends Model
             'scheduled_date' => 'date',
             'visit_type' => VisitType::class,
             'status' => VisitStatus::class,
+            'access_key_expires_at' => 'datetime',
             'daily_co_config' => 'array',
             'room_created_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Generate a unique access key for physical visits.
+     * Returns a random 8-12 character alphanumeric key.
+     */
+    public static function generateAccessKey(): string
+    {
+        do {
+            // Generate random length between 8-12 characters
+            $length = random_int(8, 12);
+            $chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+            $key = '';
+            for ($i = 0; $i < $length; $i++) {
+                $key .= $chars[random_int(0, strlen($chars) - 1)];
+            }
+        } while (self::where('access_key', $key)->exists());
+
+        return $key;
+    }
+
+    /**
+     * Check if the access key is valid (exists and not expired).
+     */
+    public function isAccessKeyValid(): bool
+    {
+        if (! $this->access_key || ! $this->access_key_expires_at) {
+            return false;
+        }
+
+        return now()->isBefore($this->access_key_expires_at);
     }
 
     /**
@@ -62,6 +99,16 @@ class Visit extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * Get the monitoring officer assigned to the visit.
+     *
+     * @return BelongsTo<User, Visit>
+     */
+    public function monitoringOfficer(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'monitoring_officer_id');
     }
 
     /**
