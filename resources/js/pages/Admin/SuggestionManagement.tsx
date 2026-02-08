@@ -299,12 +299,12 @@ export default function SuggestionManagement({ suggestions, stats }: Props) {
         [handleOpenModal, handleQuickStatusUpdate]
     );
 
-    return (
+    return ( 
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Suggestions Management" />
-            <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-4">
+            <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-6">
                 <div className="flex items-center justify-between">
-                    <div>
+                    <div> 
                         <h1 className="text-2xl font-semibold">Suggestions & Complaints Management</h1>
                         <p className="text-muted-foreground">
                             Review and manage visitor feedback and complaints

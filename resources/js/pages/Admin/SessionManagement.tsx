@@ -343,9 +343,9 @@ export default function SessionManagement({ sessions, stats }: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Session Management" />
-            <div className="space-y-6">
+            <div className="space-y-6 p-6">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight">Session Management</h1>
+                    <h1 className="text-2xl font-semibold">Session Management</h1>
                     <p className="text-muted-foreground">
                         Monitor and manage all user sessions across the system
                     </p>

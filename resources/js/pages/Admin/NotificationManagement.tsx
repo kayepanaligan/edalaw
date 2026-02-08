@@ -256,9 +256,9 @@ export default function NotificationManagement({ notifications, unread_count, st
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Notification Management" />
-            <div className="space-y-6">
+            <div className="space-y-6  p-6"> 
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight">Notification Management</h1>
+                    <h1 className="text-2xl font-semibold">Notification Management</h1>
                     <p className="text-muted-foreground">
                         Monitor all system notifications and activities
                     </p>

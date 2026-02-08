@@ -1,19 +1,35 @@
 import { Head, router, useForm } from '@inertiajs/react';
-import { Calendar, Clock, FileText, MapPin, User, Users } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import type { ColumnDef } from '@tanstack/react-table';
+import { Calendar, Clock, FileText, MapPin, Scale, User, Users, MoreVertical, Eye, Edit, CalendarClock, Trash2 } from 'lucide-react';
+import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { ColumnDef } from '@tanstack/react-table';
 
-import InputError from '@/components/input-error';
-import { useToast } from '@/hooks/use-toast';
 import { DataTable } from '@/components/data-table';
+import InputError from '@/components/input-error';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import { Textarea } from '@/components/ui/textarea';
+import { useToast } from '@/hooks/use-toast';
 import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
 
@@ -36,7 +52,10 @@ type Eburol = {
     relationship_proof_path: string | null;
     status: 'pending' | 'approved' | 'rejected' | 'completed';
     admin_notes: string | null;
+    rejection_reason: string | null;
     created_at: string;
+    can_appeal?: boolean;
+    appeal_deadline?: string | null;
 };
 
 type Props = {
@@ -83,6 +102,12 @@ function getStatusBadge(status: string) {
 
 export default function EburolManagement({ eburols }: Props) {
     const [showForm, setShowForm] = useState(false);
+    const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [isRescheduleModalOpen, setIsRescheduleModalOpen] = useState(false);
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [isAppealModalOpen, setIsAppealModalOpen] = useState(false);
+    const [selectedEburol, setSelectedEburol] = useState<Eburol | null>(null);
     useToast();
     const today = new Date().toISOString().split('T')[0];
 
@@ -104,6 +129,37 @@ export default function EburolManagement({ eburols }: Props) {
         relationship_proof: null as File | null,
     });
 
+    const editForm = useForm({
+        inmate_first_name: '',
+        inmate_middle_name: '',
+        inmate_last_name: '',
+        deceased_first_name: '',
+        deceased_middle_name: '',
+        deceased_last_name: '',
+        deceased_date_of_death: '',
+        relationship_to_inmate: '',
+        wake_start_date: '',
+        wake_end_date: '',
+        preferred_time: '',
+        wake_location: '',
+        additional_details: '',
+        death_certificate: null as File | null,
+        relationship_proof: null as File | null,
+    });
+
+    const rescheduleForm = useForm({
+        wake_start_date: '',
+        wake_end_date: '',
+        preferred_time: '',
+    });
+
+    const appealForm = useForm({
+        appealable_type: 'eburol',
+        appealable_id: 0,
+        reason: '',
+        documents: [] as File[],
+    });
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         form.post('/visitor/eburol', {
@@ -113,6 +169,108 @@ export default function EburolManagement({ eburols }: Props) {
                 form.reset();
             },
         });
+    };
+
+    const handleEdit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!selectedEburol) {
+            return;
+        }
+
+        editForm.put(`/visitor/eburol/${selectedEburol.id}`, {
+            forceFormData: true,
+            preserveScroll: true,
+            onSuccess: () => {
+                toast.success('E-burol application updated successfully.');
+                setIsEditModalOpen(false);
+                setSelectedEburol(null);
+                editForm.reset();
+            },
+            onError: () => {
+                toast.error('Failed to update e-burol application.');
+            },
+        });
+    };
+
+    const handleReschedule = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!selectedEburol) {
+            return;
+        }
+
+        rescheduleForm.post(`/visitor/eburol/${selectedEburol.id}/reschedule`, {
+            preserveScroll: true,
+            onSuccess: () => {
+                toast.success('E-burol schedule rescheduled successfully.');
+                setIsRescheduleModalOpen(false);
+                setSelectedEburol(null);
+                rescheduleForm.reset();
+            },
+            onError: () => {
+                toast.error('Failed to reschedule e-burol application.');
+            },
+        });
+    };
+
+    const handleDelete = () => {
+        if (!selectedEburol) {
+            return;
+        }
+
+        router.delete(`/visitor/eburol/${selectedEburol.id}`, {
+            preserveScroll: true,
+            onSuccess: () => {
+                toast.success('E-burol application deleted successfully.');
+                setIsDeleteModalOpen(false);
+                setSelectedEburol(null);
+            },
+            onError: () => {
+                toast.error('Failed to delete e-burol application.');
+            },
+        });
+    };
+
+    const handleOpenAppealModal = useCallback((eburol: Eburol) => {
+        if (!eburol.can_appeal) {
+            toast.error('The deadline for submitting an appeal has passed (48 hours after rejection).');
+            return;
+        }
+        setSelectedEburol(eburol);
+        appealForm.setData({
+            appealable_type: 'eburol',
+            appealable_id: eburol.id,
+            reason: '',
+            documents: [],
+        });
+        setIsAppealModalOpen(true);
+    }, [appealForm]);
+
+    const handleAppealModalClose = () => {
+        setIsAppealModalOpen(false);
+        setSelectedEburol(null);
+        appealForm.reset();
+    };
+
+    const handleAppealSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        appealForm.post('/visitor/appeals', {
+            preserveScroll: true,
+            forceFormData: true,
+            onSuccess: () => {
+                appealForm.reset();
+                setIsAppealModalOpen(false);
+                setSelectedEburol(null);
+                toast.success('Appeal submitted successfully.');
+            },
+            onError: () => {
+                toast.error('Failed to submit appeal. Please check the form and try again.');
+            },
+        });
+    };
+
+    const handleAppealFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const files = Array.from(e.target.files || []);
+        appealForm.setData('documents', files);
     };
 
     const getInmateFullName = (eburol: Eburol): string => {
@@ -200,6 +358,21 @@ export default function EburolManagement({ eburols }: Props) {
             cell: ({ row }) => getStatusBadge(row.original.status),
         },
         {
+            accessorKey: 'rejection_reason',
+            header: 'Rejection Reason',
+            cell: ({ row }) => {
+                const eburol = row.original;
+                if (eburol.status === 'rejected' && eburol.rejection_reason) {
+                    return (
+                        <div className="max-w-md">
+                            <p className="text-sm text-destructive">{eburol.rejection_reason}</p>
+                        </div>
+                    );
+                }
+                return <span className="text-sm text-muted-foreground">-</span>;
+            },
+        },
+        {
             accessorKey: 'created_at',
             header: 'Submitted',
             cell: ({ row }) => (
@@ -207,6 +380,103 @@ export default function EburolManagement({ eburols }: Props) {
                     {new Date(row.original.created_at).toLocaleDateString()}
                 </div>
             ),
+        },
+        {
+            id: 'actions',
+            header: 'Actions',
+            cell: ({ row }) => {
+                const eburol = row.original;
+                const isPending = eburol.status === 'pending';
+                return (
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" className="h-8 w-8 p-0">
+                                <span className="sr-only">Open menu</span>
+                                <MoreVertical className="h-4 w-4" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                                onClick={() => {
+                                    setSelectedEburol(eburol);
+                                    setIsViewModalOpen(true);
+                                }}
+                            >
+                                <Eye className="mr-2 h-4 w-4" />
+                                View Details
+                            </DropdownMenuItem>
+                            {isPending && (
+                                <>
+                                    <DropdownMenuItem
+                                        onClick={() => {
+                                            setSelectedEburol(eburol);
+                                            editForm.setData({
+                                                inmate_first_name: eburol.inmate_first_name,
+                                                inmate_middle_name: eburol.inmate_middle_name || '',
+                                                inmate_last_name: eburol.inmate_last_name,
+                                                deceased_first_name: eburol.deceased_first_name,
+                                                deceased_middle_name: eburol.deceased_middle_name || '',
+                                                deceased_last_name: eburol.deceased_last_name,
+                                                deceased_date_of_death: eburol.deceased_date_of_death,
+                                                relationship_to_inmate: eburol.relationship_to_inmate,
+                                                wake_start_date: eburol.wake_start_date,
+                                                wake_end_date: eburol.wake_end_date,
+                                                preferred_time: eburol.preferred_time || '',
+                                                wake_location: eburol.wake_location,
+                                                additional_details: eburol.additional_details || '',
+                                                death_certificate: null,
+                                                relationship_proof: null,
+                                            });
+                                            setIsEditModalOpen(true);
+                                        }}
+                                    >
+                                        <Edit className="mr-2 h-4 w-4" />
+                                        Edit
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                        onClick={() => {
+                                            setSelectedEburol(eburol);
+                                            rescheduleForm.setData({
+                                                wake_start_date: eburol.wake_start_date,
+                                                wake_end_date: eburol.wake_end_date,
+                                                preferred_time: eburol.preferred_time || '',
+                                            });
+                                            setIsRescheduleModalOpen(true);
+                                        }}
+                                    >
+                                        <CalendarClock className="mr-2 h-4 w-4" />
+                                        Reschedule
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                        onClick={() => {
+                                            setSelectedEburol(eburol);
+                                            setIsDeleteModalOpen(true);
+                                        }}
+                                        className="text-destructive focus:text-destructive"
+                                    >
+                                        <Trash2 className="mr-2 h-4 w-4" />
+                                        Delete
+                                    </DropdownMenuItem>
+                                </>
+                            )}
+                            {eburol.status === 'rejected' && eburol.can_appeal && (
+                                <>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                        onClick={() => handleOpenAppealModal(eburol)}
+                                    >
+                                        <Scale className="mr-2 h-4 w-4" />
+                                        Appeal
+                                    </DropdownMenuItem>
+                                </>
+                            )}
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                );
+            },
         },
         {
             id: 'documents',
@@ -242,12 +512,12 @@ export default function EburolManagement({ eburols }: Props) {
                 );
             },
         },
-    ], []);
+    ], [editForm, rescheduleForm, handleOpenAppealModal]);
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="E-Burol Management" />
-            <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-4">
+            <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-6">
                 <div className="flex items-center justify-between">
                     <div>
                         <h1 className="text-2xl font-semibold">E-Burol Management</h1>
@@ -547,6 +817,566 @@ export default function EburolManagement({ eburols }: Props) {
                         )}
                     </CardContent>
                 </Card>
+
+                {/* View Details Modal */}
+                <Dialog open={isViewModalOpen} onOpenChange={setIsViewModalOpen}>
+                    <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+                        <DialogHeader>
+                            <DialogTitle>E-Burol Application Details</DialogTitle>
+                            <DialogDescription>
+                                View complete information about this e-burol application
+                            </DialogDescription>
+                        </DialogHeader>
+                        {selectedEburol && (
+                            <div className="space-y-6">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <Label className="text-muted-foreground">Status</Label>
+                                        <div className="mt-1">{getStatusBadge(selectedEburol.status)}</div>
+                                    </div>
+                                    <div>
+                                        <Label className="text-muted-foreground">Submitted</Label>
+                                        <p className="font-medium">
+                                            {new Date(selectedEburol.created_at).toLocaleString()}
+                                        </p>
+                                    </div>
+                                    <div className="col-span-2">
+                                        <Label className="text-muted-foreground">Inmate Name</Label>
+                                        <p className="font-medium">
+                                            {`${selectedEburol.inmate_first_name} ${selectedEburol.inmate_middle_name || ''} ${selectedEburol.inmate_last_name}`.trim()}
+                                        </p>
+                                    </div>
+                                    <div className="col-span-2">
+                                        <Label className="text-muted-foreground">Deceased Name</Label>
+                                        <p className="font-medium">
+                                            {`${selectedEburol.deceased_first_name} ${selectedEburol.deceased_middle_name || ''} ${selectedEburol.deceased_last_name}`.trim()}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <Label className="text-muted-foreground">Date of Death</Label>
+                                        <p className="font-medium">
+                                            {new Date(selectedEburol.deceased_date_of_death).toLocaleDateString()}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <Label className="text-muted-foreground">Relationship</Label>
+                                        <p className="font-medium">{selectedEburol.relationship_to_inmate}</p>
+                                    </div>
+                                    <div>
+                                        <Label className="text-muted-foreground">Wake Start Date</Label>
+                                        <p className="font-medium">
+                                            {new Date(selectedEburol.wake_start_date).toLocaleDateString()}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <Label className="text-muted-foreground">Wake End Date</Label>
+                                        <p className="font-medium">
+                                            {new Date(selectedEburol.wake_end_date).toLocaleDateString()}
+                                        </p>
+                                    </div>
+                                    {selectedEburol.preferred_time && (
+                                        <div>
+                                            <Label className="text-muted-foreground">Preferred Time</Label>
+                                            <p className="font-medium">{selectedEburol.preferred_time}</p>
+                                        </div>
+                                    )}
+                                    <div className="col-span-2">
+                                        <Label className="text-muted-foreground">Wake Location</Label>
+                                        <p className="font-medium">{selectedEburol.wake_location}</p>
+                                    </div>
+                                    {selectedEburol.additional_details && (
+                                        <div className="col-span-2">
+                                            <Label className="text-muted-foreground">Additional Details</Label>
+                                            <p className="font-medium">{selectedEburol.additional_details}</p>
+                                        </div>
+                                    )}
+                                    {selectedEburol.rejection_reason && (
+                                        <div className="col-span-2">
+                                            <Label className="text-muted-foreground">Rejection Reason</Label>
+                                            <p className="font-medium text-destructive">{selectedEburol.rejection_reason}</p>
+                                        </div>
+                                    )}
+                                    {selectedEburol.admin_notes && (
+                                        <div className="col-span-2">
+                                            <Label className="text-muted-foreground">Admin Notes</Label>
+                                            <p className="font-medium">{selectedEburol.admin_notes}</p>
+                                        </div>
+                                    )}
+                                    <div className="col-span-2 flex gap-2">
+                                        {selectedEburol.death_certificate_path && (
+                                            <Button
+                                                variant="outline"
+                                                onClick={() => window.open(selectedEburol.death_certificate_path!, '_blank')}
+                                            >
+                                                <FileText className="h-4 w-4 mr-2" />
+                                                View Death Certificate
+                                            </Button>
+                                        )}
+                                        {selectedEburol.relationship_proof_path && (
+                                            <Button
+                                                variant="outline"
+                                                onClick={() => window.open(selectedEburol.relationship_proof_path!, '_blank')}
+                                            >
+                                                <FileText className="h-4 w-4 mr-2" />
+                                                View Relationship Proof
+                                            </Button>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                        <DialogFooter>
+                            <Button
+                                variant="outline"
+                                onClick={() => {
+                                    setIsViewModalOpen(false);
+                                    setSelectedEburol(null);
+                                }}
+                            >
+                                Close
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+
+                {/* Edit Modal */}
+                <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+                    <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                        <DialogHeader>
+                            <DialogTitle>Edit E-Burol Application</DialogTitle>
+                            <DialogDescription>
+                                Update the details of your e-burol application. You can only edit pending applications.
+                            </DialogDescription>
+                        </DialogHeader>
+                        {selectedEburol && selectedEburol.status === 'pending' && (
+                            <form onSubmit={handleEdit} className="space-y-6">
+                                {/* Similar form structure as the create form, but using editForm */}
+                                <div className="space-y-4">
+                                    <h3 className="text-lg font-semibold flex items-center gap-2">
+                                        <User className="h-5 w-5" />
+                                        Inmate Information
+                                    </h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="edit_inmate_first_name">First Name *</Label>
+                                            <Input
+                                                id="edit_inmate_first_name"
+                                                value={editForm.data.inmate_first_name}
+                                                onChange={(e) => editForm.setData('inmate_first_name', e.target.value)}
+                                                required
+                                            />
+                                            <InputError message={editForm.errors.inmate_first_name} />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="edit_inmate_middle_name">Middle Name</Label>
+                                            <Input
+                                                id="edit_inmate_middle_name"
+                                                value={editForm.data.inmate_middle_name}
+                                                onChange={(e) => editForm.setData('inmate_middle_name', e.target.value)}
+                                            />
+                                            <InputError message={editForm.errors.inmate_middle_name} />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="edit_inmate_last_name">Last Name *</Label>
+                                            <Input
+                                                id="edit_inmate_last_name"
+                                                value={editForm.data.inmate_last_name}
+                                                onChange={(e) => editForm.setData('inmate_last_name', e.target.value)}
+                                                required
+                                            />
+                                            <InputError message={editForm.errors.inmate_last_name} />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-4">
+                                    <h3 className="text-lg font-semibold flex items-center gap-2">
+                                        <Users className="h-5 w-5" />
+                                        Deceased Information
+                                    </h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="edit_deceased_first_name">First Name *</Label>
+                                            <Input
+                                                id="edit_deceased_first_name"
+                                                value={editForm.data.deceased_first_name}
+                                                onChange={(e) => editForm.setData('deceased_first_name', e.target.value)}
+                                                required
+                                            />
+                                            <InputError message={editForm.errors.deceased_first_name} />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="edit_deceased_middle_name">Middle Name</Label>
+                                            <Input
+                                                id="edit_deceased_middle_name"
+                                                value={editForm.data.deceased_middle_name}
+                                                onChange={(e) => editForm.setData('deceased_middle_name', e.target.value)}
+                                            />
+                                            <InputError message={editForm.errors.deceased_middle_name} />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="edit_deceased_last_name">Last Name *</Label>
+                                            <Input
+                                                id="edit_deceased_last_name"
+                                                value={editForm.data.deceased_last_name}
+                                                onChange={(e) => editForm.setData('deceased_last_name', e.target.value)}
+                                                required
+                                            />
+                                            <InputError message={editForm.errors.deceased_last_name} />
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="edit_deceased_date_of_death">Date of Death *</Label>
+                                            <Input
+                                                id="edit_deceased_date_of_death"
+                                                type="date"
+                                                value={editForm.data.deceased_date_of_death}
+                                                onChange={(e) => editForm.setData('deceased_date_of_death', e.target.value)}
+                                                max={today}
+                                                required
+                                            />
+                                            <InputError message={editForm.errors.deceased_date_of_death} />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="edit_relationship_to_inmate">Relationship to Inmate *</Label>
+                                            <Input
+                                                id="edit_relationship_to_inmate"
+                                                value={editForm.data.relationship_to_inmate}
+                                                onChange={(e) => editForm.setData('relationship_to_inmate', e.target.value)}
+                                                required
+                                            />
+                                            <InputError message={editForm.errors.relationship_to_inmate} />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-4">
+                                    <h3 className="text-lg font-semibold flex items-center gap-2">
+                                        <Calendar className="h-5 w-5" />
+                                        Wake Schedule
+                                    </h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="edit_wake_start_date">Wake Start Date *</Label>
+                                            <Input
+                                                id="edit_wake_start_date"
+                                                type="date"
+                                                value={editForm.data.wake_start_date}
+                                                onChange={(e) => editForm.setData('wake_start_date', e.target.value)}
+                                                min={today}
+                                                required
+                                            />
+                                            <InputError message={editForm.errors.wake_start_date} />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="edit_wake_end_date">Wake End Date *</Label>
+                                            <Input
+                                                id="edit_wake_end_date"
+                                                type="date"
+                                                value={editForm.data.wake_end_date}
+                                                onChange={(e) => editForm.setData('wake_end_date', e.target.value)}
+                                                min={editForm.data.wake_start_date || today}
+                                                required
+                                            />
+                                            <InputError message={editForm.errors.wake_end_date} />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="edit_preferred_time">Preferred Time</Label>
+                                            <Input
+                                                id="edit_preferred_time"
+                                                type="time"
+                                                value={editForm.data.preferred_time}
+                                                onChange={(e) => editForm.setData('preferred_time', e.target.value)}
+                                            />
+                                            <InputError message={editForm.errors.preferred_time} />
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="edit_wake_location">Wake Location *</Label>
+                                        <Textarea
+                                            id="edit_wake_location"
+                                            value={editForm.data.wake_location}
+                                            onChange={(e) => editForm.setData('wake_location', e.target.value)}
+                                            rows={2}
+                                            required
+                                        />
+                                        <InputError message={editForm.errors.wake_location} />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="edit_additional_details">Additional Details</Label>
+                                        <Textarea
+                                            id="edit_additional_details"
+                                            value={editForm.data.additional_details}
+                                            onChange={(e) => editForm.setData('additional_details', e.target.value)}
+                                            rows={3}
+                                        />
+                                        <InputError message={editForm.errors.additional_details} />
+                                    </div>
+                                </div>
+
+                                <div className="space-y-4">
+                                    <h3 className="text-lg font-semibold flex items-center gap-2">
+                                        <FileText className="h-5 w-5" />
+                                        Documents (Optional - Leave empty to keep existing)
+                                    </h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="edit_death_certificate">Death Certificate</Label>
+                                            <Input
+                                                id="edit_death_certificate"
+                                                type="file"
+                                                accept=".pdf,.jpg,.jpeg,.png"
+                                                onChange={(e) => {
+                                                    const file = e.target.files?.[0] || null;
+                                                    editForm.setData('death_certificate', file);
+                                                }}
+                                            />
+                                            <p className="text-xs text-muted-foreground">
+                                                Accepted formats: PDF, JPG, PNG (Max 10MB). Leave empty to keep existing.
+                                            </p>
+                                            <InputError message={editForm.errors.death_certificate} />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="edit_relationship_proof">Proof of Relationship</Label>
+                                            <Input
+                                                id="edit_relationship_proof"
+                                                type="file"
+                                                accept=".pdf,.jpg,.jpeg,.png"
+                                                onChange={(e) => {
+                                                    const file = e.target.files?.[0] || null;
+                                                    editForm.setData('relationship_proof', file);
+                                                }}
+                                            />
+                                            <p className="text-xs text-muted-foreground">
+                                                Accepted formats: PDF, JPG, PNG (Max 10MB). Leave empty to keep existing.
+                                            </p>
+                                            <InputError message={editForm.errors.relationship_proof} />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <DialogFooter>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={() => {
+                                            setIsEditModalOpen(false);
+                                            setSelectedEburol(null);
+                                            editForm.reset();
+                                        }}
+                                    >
+                                        Cancel
+                                    </Button>
+                                    <Button type="submit" disabled={editForm.processing}>
+                                        {editForm.processing ? 'Updating...' : 'Update Application'}
+                                    </Button>
+                                </DialogFooter>
+                            </form>
+                        )}
+                    </DialogContent>
+                </Dialog>
+
+                {/* Reschedule Modal */}
+                <Dialog open={isRescheduleModalOpen} onOpenChange={setIsRescheduleModalOpen}>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Reschedule E-Burol</DialogTitle>
+                            <DialogDescription>
+                                Update the wake schedule dates and time. You can only reschedule pending applications.
+                            </DialogDescription>
+                        </DialogHeader>
+                        {selectedEburol && selectedEburol.status === 'pending' && (
+                            <form onSubmit={handleReschedule} className="space-y-4">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="reschedule_wake_start_date">Wake Start Date *</Label>
+                                        <Input
+                                            id="reschedule_wake_start_date"
+                                            type="date"
+                                            value={rescheduleForm.data.wake_start_date}
+                                            onChange={(e) => rescheduleForm.setData('wake_start_date', e.target.value)}
+                                            min={today}
+                                            required
+                                        />
+                                        <InputError message={rescheduleForm.errors.wake_start_date} />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="reschedule_wake_end_date">Wake End Date *</Label>
+                                        <Input
+                                            id="reschedule_wake_end_date"
+                                            type="date"
+                                            value={rescheduleForm.data.wake_end_date}
+                                            onChange={(e) => rescheduleForm.setData('wake_end_date', e.target.value)}
+                                            min={rescheduleForm.data.wake_start_date || today}
+                                            required
+                                        />
+                                        <InputError message={rescheduleForm.errors.wake_end_date} />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="reschedule_preferred_time">Preferred Time</Label>
+                                        <Input
+                                            id="reschedule_preferred_time"
+                                            type="time"
+                                            value={rescheduleForm.data.preferred_time}
+                                            onChange={(e) => rescheduleForm.setData('preferred_time', e.target.value)}
+                                        />
+                                        <InputError message={rescheduleForm.errors.preferred_time} />
+                                    </div>
+                                </div>
+                                <DialogFooter>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={() => {
+                                            setIsRescheduleModalOpen(false);
+                                            setSelectedEburol(null);
+                                            rescheduleForm.reset();
+                                        }}
+                                    >
+                                        Cancel
+                                    </Button>
+                                    <Button type="submit" disabled={rescheduleForm.processing}>
+                                        {rescheduleForm.processing ? 'Rescheduling...' : 'Reschedule'}
+                                    </Button>
+                                </DialogFooter>
+                            </form>
+                        )}
+                    </DialogContent>
+                </Dialog>
+
+                {/* Appeal Modal */}
+                <Dialog open={isAppealModalOpen} onOpenChange={setIsAppealModalOpen}>
+                    <DialogContent className="max-w-2xl">
+                        <DialogHeader>
+                            <DialogTitle>Submit Appeal</DialogTitle>
+                            <DialogDescription>
+                                Provide a reason for your appeal and optionally attach supporting documents.
+                                Appeals must be submitted within 48 hours after rejection.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <form onSubmit={handleAppealSubmit}>
+                            <div className="space-y-4">
+                                {selectedEburol && (
+                                    <div className="rounded-lg bg-muted p-4">
+                                        <Label className="text-sm font-semibold">Appealing:</Label>
+                                        <p className="text-sm mt-1">
+                                            E-Burol Application - Deceased: {getDeceasedFullName(selectedEburol)}
+                                        </p>
+                                        <p className="text-sm text-muted-foreground">
+                                            For Inmate: {getInmateFullName(selectedEburol)}
+                                        </p>
+                                        <p className="text-sm text-muted-foreground">
+                                            Wake Period: {new Date(selectedEburol.wake_start_date).toLocaleDateString()} - {new Date(selectedEburol.wake_end_date).toLocaleDateString()}
+                                        </p>
+                                        {selectedEburol.rejection_reason && (
+                                            <p className="text-sm text-destructive mt-2">
+                                                <strong>Rejection Reason:</strong> {selectedEburol.rejection_reason}
+                                            </p>
+                                        )}
+                                    </div>
+                                )}
+
+                                <div className="grid gap-2">
+                                    <Label htmlFor="appeal_reason">
+                                        Appeal Reason <span className="text-destructive">*</span>
+                                    </Label>
+                                    <Textarea
+                                        id="appeal_reason"
+                                        required
+                                        rows={6}
+                                        value={appealForm.data.reason}
+                                        onChange={(e) => appealForm.setData('reason', e.target.value)}
+                                        placeholder="Please provide a detailed reason for your appeal. Explain why you believe the rejection should be reconsidered..."
+                                        minLength={10}
+                                        maxLength={2000}
+                                    />
+                                    <InputError message={appealForm.errors.reason} />
+                                    <p className="text-xs text-muted-foreground">
+                                        Minimum 10 characters, maximum 2000 characters
+                                    </p>
+                                </div>
+
+                                <div className="grid gap-2">
+                                    <Label htmlFor="appeal_documents">
+                                        Supporting Documents (Optional)
+                                    </Label>
+                                    <Input
+                                        id="appeal_documents"
+                                        type="file"
+                                        multiple
+                                        accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                                        onChange={handleAppealFileChange}
+                                    />
+                                    <InputError message={appealForm.errors.documents} />
+                                    <p className="text-xs text-muted-foreground">
+                                        You can upload up to 5 files (PDF, DOC, DOCX, JPG, JPEG, PNG). Max 5MB per file.
+                                    </p>
+                                    {appealForm.data.documents.length > 0 && (
+                                        <div className="text-sm text-muted-foreground">
+                                            Selected: {appealForm.data.documents.length} file(s)
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                            <DialogFooter className="mt-6">
+                                <Button type="button" variant="outline" onClick={handleAppealModalClose}>
+                                    Cancel
+                                </Button>
+                                <Button type="submit" disabled={appealForm.processing}>
+                                    {appealForm.processing ? 'Submitting...' : 'Submit Appeal'}
+                                </Button>
+                            </DialogFooter>
+                        </form>
+                    </DialogContent>
+                </Dialog>
+
+                {/* Delete Confirmation Modal */}
+                <Dialog open={isDeleteModalOpen} onOpenChange={setIsDeleteModalOpen}>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Delete E-Burol Application</DialogTitle>
+                            <DialogDescription>
+                                Are you sure you want to delete this e-burol application? This action cannot be undone. You can only delete pending applications.
+                            </DialogDescription>
+                        </DialogHeader>
+                        {selectedEburol && selectedEburol.status === 'pending' && (
+                            <div className="space-y-4">
+                                <div className="rounded-lg border p-4 bg-muted/50">
+                                    <p className="text-sm font-medium">Application Details:</p>
+                                    <p className="text-sm text-muted-foreground mt-1">
+                                        Inmate: {`${selectedEburol.inmate_first_name} ${selectedEburol.inmate_last_name}`}
+                                    </p>
+                                    <p className="text-sm text-muted-foreground">
+                                        Deceased: {`${selectedEburol.deceased_first_name} ${selectedEburol.deceased_last_name}`}
+                                    </p>
+                                    <p className="text-sm text-muted-foreground">
+                                        Wake Dates: {new Date(selectedEburol.wake_start_date).toLocaleDateString()} - {new Date(selectedEburol.wake_end_date).toLocaleDateString()}
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+                        <DialogFooter>
+                            <Button
+                                variant="outline"
+                                onClick={() => {
+                                    setIsDeleteModalOpen(false);
+                                    setSelectedEburol(null);
+                                }}
+                            >
+                                Cancel
+                            </Button>
+                            {selectedEburol && selectedEburol.status === 'pending' && (
+                                <Button
+                                    variant="destructive"
+                                    onClick={handleDelete}
+                                >
+                                    Delete
+                                </Button>
+                            )}
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
             </div>
         </AppLayout>
     );

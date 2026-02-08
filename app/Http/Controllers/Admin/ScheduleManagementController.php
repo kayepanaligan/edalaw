@@ -40,6 +40,7 @@ class ScheduleManagementController extends Controller
                     'status' => $visit->status->value,
                     'notes' => $visit->notes,
                     'meeting_link' => $visit->meeting_link,
+                    'rejection_reason' => $visit->rejection_reason,
                     'created_at' => $visit->created_at->format('Y-m-d H:i:s'),
                 ];
             });
@@ -81,10 +82,15 @@ class ScheduleManagementController extends Controller
     /**
      * Reject a visit schedule.
      */
-    public function reject(Visit $visit): RedirectResponse
+    public function reject(Request $request, Visit $visit): RedirectResponse
     {
+        $request->validate([
+            'rejection_reason' => ['required', 'string', 'min:10', 'max:1000'],
+        ]);
+
         $visit->update([
             'status' => VisitStatus::Rejected,
+            'rejection_reason' => $request->rejection_reason,
         ]);
 
         return redirect()->route('admin.schedules.index')
@@ -98,11 +104,20 @@ class ScheduleManagementController extends Controller
     {
         $request->validate([
             'status' => 'required|in:pending,approved,rejected,completed,missed,cancelled',
+            'rejection_reason' => ['required_if:status,rejected', 'string', 'min:10', 'max:1000'],
         ]);
 
-        $visit->update([
-            'status' => $request->status,
-        ]);
+        $updateData = ['status' => $request->status];
+
+        // If rejecting, require and store rejection reason
+        if ($request->status === 'rejected') {
+            $updateData['rejection_reason'] = $request->rejection_reason;
+        } else {
+            // Clear rejection reason if status changes from rejected
+            $updateData['rejection_reason'] = null;
+        }
+
+        $visit->update($updateData);
 
         return redirect()->route('admin.schedules.index')
             ->with('success', 'Schedule status updated successfully.');
@@ -169,5 +184,66 @@ class ScheduleManagementController extends Controller
 
         return redirect()->route('admin.schedules.index')
             ->with('success', 'Schedule created and approved successfully.');
+    }
+
+    /**
+     * Update a visit schedule.
+     */
+    public function update(Request $request, Visit $visit): RedirectResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'scheduled_date' => ['required', 'date', 'after_or_equal:today'],
+            'scheduled_time' => ['required', 'date_format:H:i'],
+            'visit_type' => ['required', 'in:virtual,physical'],
+            'inmate_first_name' => ['required', 'string', 'max:255'],
+            'inmate_middle_name' => ['nullable', 'string', 'max:255'],
+            'inmate_last_name' => ['required', 'string', 'max:255'],
+            'notes' => ['nullable', 'string', 'max:1000'],
+            'meeting_link' => ['nullable', 'url', 'required_if:visit_type,virtual'],
+        ]);
+
+        if ($validator->fails()) {
+            return redirect()->back()
+                ->withErrors($validator)
+                ->withInput();
+        }
+
+        // Check for time slot conflicts (excluding current visit)
+        $conflictingVisit = Visit::where('scheduled_date', $request->scheduled_date)
+            ->where('scheduled_time', $request->scheduled_time)
+            ->whereIn('status', [VisitStatus::Pending, VisitStatus::Approved])
+            ->where('id', '!=', $visit->id)
+            ->first();
+
+        if ($conflictingVisit) {
+            return redirect()->back()
+                ->withErrors(['scheduled_time' => 'This time slot is already booked.'])
+                ->withInput();
+        }
+
+        $visit->update([
+            'scheduled_date' => $request->scheduled_date,
+            'scheduled_time' => $request->scheduled_time,
+            'visit_type' => VisitType::from($request->visit_type),
+            'inmate_first_name' => $request->inmate_first_name,
+            'inmate_middle_name' => $request->inmate_middle_name,
+            'inmate_last_name' => $request->inmate_last_name,
+            'notes' => $request->notes,
+            'meeting_link' => $request->meeting_link,
+        ]);
+
+        return redirect()->route('admin.schedules.index')
+            ->with('success', 'Schedule updated successfully.');
+    }
+
+    /**
+     * Delete a visit schedule.
+     */
+    public function destroy(Visit $visit): RedirectResponse
+    {
+        $visit->delete();
+
+        return redirect()->route('admin.schedules.index')
+            ->with('success', 'Schedule deleted successfully.');
     }
 }

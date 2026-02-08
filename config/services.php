@@ -35,4 +35,10 @@ return [
         ],
     ],
 
+    'daily_co' => [
+        'api_key' => env('DAILY_CO_API_KEY'),
+        'api_url' => env('DAILY_CO_API_URL', 'https://api.daily.co/v1'),
+        'webhook_secret' => env('DAILY_CO_WEBHOOK_SECRET'),
+    ],
+
 ];

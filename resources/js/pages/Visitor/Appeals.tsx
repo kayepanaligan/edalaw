@@ -1,10 +1,11 @@
-import { Head, router, useForm } from '@inertiajs/react';
-import { Calendar, FileText, Scale, Plus, Clock, CheckCircle, XCircle } from 'lucide-react';
-import { useState } from 'react';
+import { Head, useForm } from '@inertiajs/react';
+import type { ColumnDef } from '@tanstack/react-table';
+import { FileText, Scale, Plus, Clock, CheckCircle, XCircle } from 'lucide-react';
+import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
+import { DataTable } from '@/components/data-table';
 import InputError from '@/components/input-error';
-import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -26,8 +27,8 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { useToast } from '@/hooks/use-toast';
 import AppLayout from '@/layouts/app-layout';
-import visitor from '@/routes/visitor/index';
 import type { BreadcrumbItem } from '@/types';
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -84,6 +85,8 @@ type RejectedItem = {
     wake_start_date?: string;
     wake_end_date?: string;
     rejected_at: string;
+    can_appeal: boolean;
+    appeal_deadline: string;
 };
 
 type Props = {
@@ -119,39 +122,87 @@ function getStatusBadge(status: string) {
     );
 }
 
+function getRequestStatusBadge(status: string) {
+    const badges: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; className: string; label: string }> = {
+        pending: {
+            variant: 'secondary',
+            className: 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border-yellow-500/20',
+            label: 'Pending',
+        },
+        approved: {
+            variant: 'default',
+            className: 'bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20',
+            label: 'Approved',
+        },
+        rejected: {
+            variant: 'destructive',
+            className: 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20',
+            label: 'Rejected',
+        },
+        completed: {
+            variant: 'default',
+            className: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20',
+            label: 'Completed',
+        },
+        missed: {
+            variant: 'outline',
+            className: 'bg-gray-500/10 text-gray-600 dark:text-gray-400 border-gray-500/20',
+            label: 'Missed',
+        },
+    };
+
+    const config = badges[status] || badges.pending;
+    return (
+        <Badge variant={config.variant} className={config.className}>
+            {config.label}
+        </Badge>
+    );
+}
+
 export default function Appeals({ appeals, rejected_visits, rejected_eburols }: Props) {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedItem, setSelectedItem] = useState<RejectedItem | null>(null);
+    const [statusFilter, setStatusFilter] = useState<string>('all');
+    const [appealableFilter, setAppealableFilter] = useState<string>('all');
+    const [appealableTypeFilter, setAppealableTypeFilter] = useState<string>('all');
+    const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+    const [selectedAppeal, setSelectedAppeal] = useState<Appeal | null>(null);
     useToast();
 
     const form = useForm({
         appealable_type: '',
-        appealable_id: '',
+        appealable_id: 0,
         reason: '',
         documents: [] as File[],
     });
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        form.post(visitor.appeals.store().url, {
+        form.post('/visitor/appeals', {
             preserveScroll: true,
             forceFormData: true,
             onSuccess: () => {
                 form.reset();
                 setIsModalOpen(false);
                 setSelectedItem(null);
+                toast.success('Appeal submitted successfully.');
             },
-            onError: () => {
+            onError: (errors) => {
+                console.error('Appeal submission errors:', errors);
                 toast.error('Failed to submit appeal. Please check the form and try again.');
             },
         });
     };
 
     const handleOpenModal = (item: RejectedItem) => {
+        if (!item.can_appeal) {
+            toast.error('The deadline for submitting an appeal has passed (48 hours after rejection).');
+            return;
+        }
         setSelectedItem(item);
         form.setData({
             appealable_type: item.type,
-            appealable_id: item.id.toString(),
+            appealable_id: item.id,
             reason: '',
             documents: [],
         });
@@ -171,10 +222,193 @@ export default function Appeals({ appeals, rejected_visits, rejected_eburols }: 
 
     const allRejectedItems = [...rejected_visits, ...rejected_eburols];
 
+    const filteredAppeals = useMemo(() => {
+        return appeals.filter((appeal) => {
+            const matchesStatus = statusFilter === 'all' || appeal.status === statusFilter;
+            
+            // Check if appealable data is still available (can be appealed)
+            // This is based on whether there are rejected items that can still be appealed
+            let canAppeal = false;
+            if (appeal.appealable_data.type === 'visit') {
+                const rejectedItem = rejected_visits.find(v => v.id === appeal.appealable_data.id);
+                canAppeal = rejectedItem?.can_appeal || false;
+            } else {
+                const rejectedItem = rejected_eburols.find(e => e.id === appeal.appealable_data.id);
+                canAppeal = rejectedItem?.can_appeal || false;
+            }
+            
+            // For appeals that are already submitted, we check if the original item can still be appealed
+            // If appeal status is pending and within deadline, the appealable is still "available"
+            const appealableAvailable = appeal.status === 'pending' && appeal.is_within_deadline;
+            
+            const matchesAppealable = appealableFilter === 'all' || 
+                (appealableFilter === 'available' && (appealableAvailable || canAppeal)) ||
+                (appealableFilter === 'unavailable' && !appealableAvailable && !canAppeal);
+            
+            // Filter by appealable type (visit or eburol)
+            const matchesAppealableType = appealableTypeFilter === 'all' || 
+                (appealableTypeFilter === 'visit' && appeal.appealable_data.type === 'visit') ||
+                (appealableTypeFilter === 'eburol' && appeal.appealable_data.type === 'eburol');
+            
+            return matchesStatus && matchesAppealable && matchesAppealableType;
+        });
+    }, [appeals, statusFilter, appealableFilter, appealableTypeFilter, rejected_visits, rejected_eburols]);
+
+    const columns: ColumnDef<Appeal>[] = useMemo(() => [
+        {
+            accessorKey: 'appealable_type',
+            header: 'Type',
+            cell: ({ row }) => (
+                <div className="font-medium">{row.original.appealable_type}</div>
+            ),
+        },
+        {
+            accessorKey: 'appealable_data',
+            header: 'Details',
+            cell: ({ row }) => {
+                const appeal = row.original;
+                const data = appeal.appealable_data;
+                if (data.type === 'visit') {
+                    return (
+                        <div className="text-sm">
+                            <div className="font-medium">Inmate: {data.inmate_name}</div>
+                            <div className="text-muted-foreground">
+                                {data.scheduled_date} {data.scheduled_time && `at ${data.scheduled_time}`}
+                            </div>
+                            <div className="text-muted-foreground">Type: {data.visit_type}</div>
+                        </div>
+                    );
+                } else {
+                    return (
+                        <div className="text-sm">
+                            <div className="font-medium">Deceased: {data.deceased_name}</div>
+                            <div className="text-muted-foreground">Inmate: {data.inmate_name}</div>
+                            <div className="text-muted-foreground">
+                                Wake: {data.wake_start_date} to {data.wake_end_date}
+                            </div>
+                        </div>
+                    );
+                }
+            },
+        },
+        {
+            accessorKey: 'status',
+            header: 'Appeal Status',
+            cell: ({ row }) => {
+                const appeal = row.original;
+                return (
+                    <div className="flex items-center gap-2">
+                        {getStatusBadge(appeal.status)}
+                        {!appeal.is_within_deadline && appeal.status === 'pending' && (
+                            <Badge variant="outline" className="bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20">
+                                <Clock className="mr-1 h-3 w-3" />
+                                Past Deadline
+                            </Badge>
+                        )}
+                    </div>
+                );
+            },
+        },
+        {
+            accessorKey: 'appealable_data.status',
+            header: 'Request Status',
+            cell: ({ row }) => {
+                const appeal = row.original;
+                const requestStatus = appeal.appealable_data.status;
+                if (!requestStatus) {
+                    return <span className="text-sm text-muted-foreground">-</span>;
+                }
+                return getRequestStatusBadge(requestStatus);
+            },
+        },
+        {
+            accessorKey: 'submitted_at',
+            header: 'Submitted',
+            cell: ({ row }) => (
+                <div className="text-sm text-muted-foreground">
+                    {new Date(row.original.submitted_at).toLocaleString()}
+                </div>
+            ),
+        },
+        {
+            accessorKey: 'deadline',
+            header: 'Deadline',
+            cell: ({ row }) => {
+                const appeal = row.original;
+                if (!appeal.deadline) {
+                    return <span className="text-sm text-muted-foreground">-</span>;
+                }
+                return (
+                    <div className="text-sm text-muted-foreground">
+                        {new Date(appeal.deadline).toLocaleString()}
+                    </div>
+                );
+            },
+        },
+        {
+            id: 'actions',
+            header: 'Actions',
+            cell: ({ row }) => {
+                const appeal = row.original;
+                return (
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                            setSelectedAppeal(appeal);
+                            setIsViewModalOpen(true);
+                        }}
+                    >
+                        <FileText className="mr-2 h-4 w-4" />
+                        View Details
+                    </Button>
+                );
+            },
+        },
+    ], []);
+
+    const headerActions = (
+        <div className="flex items-center gap-2">
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Filter by appeal status" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="all">All Appeal Statuses</SelectItem>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="approved">Approved</SelectItem>
+                    <SelectItem value="rejected">Rejected</SelectItem>
+                </SelectContent>
+            </Select>
+
+            <Select value={appealableTypeFilter} onValueChange={setAppealableTypeFilter}>
+                <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Filter by type" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="all">All Types</SelectItem>
+                    <SelectItem value="visit">Visit/Schedule</SelectItem>
+                    <SelectItem value="eburol">E-Burol</SelectItem>
+                </SelectContent>
+            </Select>
+
+            <Select value={appealableFilter} onValueChange={setAppealableFilter}>
+                <SelectTrigger className="w-[200px]">
+                    <SelectValue placeholder="Filter by appealable" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="all">All Appealable Items</SelectItem>
+                    <SelectItem value="available">Can Still Appeal</SelectItem>
+                    <SelectItem value="unavailable">Cannot Appeal Anymore</SelectItem>
+                </SelectContent>
+            </Select>
+        </div>
+    );
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Appeal Management" />
-            <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-4">
+            <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-6">
                 <div className="flex items-center justify-between">
                     <div>
                         <h1 className="text-2xl font-semibold">Appeal Management</h1>
@@ -196,7 +430,7 @@ export default function Appeals({ appeals, rejected_visits, rejected_eburols }: 
                         <CardContent>
                             <div className="space-y-4">
                                 {allRejectedItems.map((item) => (
-                                    <Card key={`${item.type}-${item.id}`} className="border-l-4 border-l-orange-500">
+                                    <Card key={`${item.type}-${item.id}`} className={`border-l-4 ${item.can_appeal ? 'border-l-orange-500' : 'border-l-gray-400 opacity-60'}`}>
                                         <CardHeader>
                                             <div className="flex items-start justify-between">
                                                 <div className="space-y-1 flex-1">
@@ -205,6 +439,12 @@ export default function Appeals({ appeals, rejected_visits, rejected_eburols }: 
                                                             {item.type_label}
                                                         </CardTitle>
                                                         <Badge variant="destructive">Rejected</Badge>
+                                                        {!item.can_appeal && (
+                                                            <Badge variant="outline" className="bg-gray-500/10 text-gray-600 dark:text-gray-400">
+                                                                <Clock className="mr-1 h-3 w-3" />
+                                                                Past Deadline
+                                                            </Badge>
+                                                        )}
                                                     </div>
                                                     <CardDescription>
                                                         {item.type === 'visit' ? (
@@ -223,11 +463,15 @@ export default function Appeals({ appeals, rejected_visits, rejected_eburols }: 
                                                     </CardDescription>
                                                     <CardDescription>
                                                         Rejected: {new Date(item.rejected_at).toLocaleString()}
+                                                        {item.can_appeal && (
+                                                            <> | Deadline: {new Date(item.appeal_deadline).toLocaleString()}</>
+                                                        )}
                                                     </CardDescription>
                                                 </div>
                                                 <Button
                                                     size="sm"
                                                     onClick={() => handleOpenModal(item)}
+                                                    disabled={!item.can_appeal}
                                                 >
                                                     <Plus className="mr-2 size-4" />
                                                     Appeal
@@ -259,115 +503,138 @@ export default function Appeals({ appeals, rejected_visits, rejected_eburols }: 
                                 )}
                             </div>
                         ) : (
-                            <div className="space-y-4">
-                                {appeals.map((appeal) => (
-                                    <Card key={appeal.id} className="border-l-4 border-l-primary">
-                                        <CardHeader>
-                                            <div className="flex items-start justify-between">
-                                                <div className="space-y-1 flex-1">
-                                                    <div className="flex items-center gap-2 flex-wrap">
-                                                        <CardTitle className="text-lg">
-                                                            {appeal.appealable_type}
-                                                        </CardTitle>
-                                                        {getStatusBadge(appeal.status)}
-                                                        {!appeal.is_within_deadline && appeal.status === 'pending' && (
-                                                            <Badge variant="outline" className="bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20">
-                                                                <Clock className="mr-1 size-3" />
-                                                                Past Deadline
-                                                            </Badge>
-                                                        )}
-                                                    </div>
-                                                    <CardDescription>
-                                                        {appeal.appealable_data.type === 'visit' ? (
-                                                            <>
-                                                                Inmate: {appeal.appealable_data.inmate_name} | 
-                                                                Date: {appeal.appealable_data.scheduled_date} {appeal.appealable_data.scheduled_time && `at ${appeal.appealable_data.scheduled_time}`} | 
-                                                                Type: {appeal.appealable_data.visit_type}
-                                                            </>
-                                                        ) : (
-                                                            <>
-                                                                Deceased: {appeal.appealable_data.deceased_name} | 
-                                                                Inmate: {appeal.appealable_data.inmate_name} | 
-                                                                Wake: {appeal.appealable_data.wake_start_date} to {appeal.appealable_data.wake_end_date}
-                                                            </>
-                                                        )}
-                                                    </CardDescription>
-                                                    <CardDescription>
-                                                        Submitted: {new Date(appeal.submitted_at).toLocaleString()}
-                                                        {appeal.deadline && (
-                                                            <> | Deadline: {new Date(appeal.deadline).toLocaleString()}</>
-                                                        )}
-                                                    </CardDescription>
-                                                </div>
-                                            </div>
-                                        </CardHeader>
-                                        <CardContent className="space-y-4">
-                                            <div>
-                                                <Label className="text-sm font-semibold">Appeal Reason:</Label>
-                                                <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap">
-                                                    {appeal.reason}
-                                                </p>
-                                            </div>
-
-                                            {appeal.documents.length > 0 && (
-                                                <div>
-                                                    <Label className="text-sm font-semibold">Supporting Documents:</Label>
-                                                    <div className="flex flex-wrap gap-2 mt-2">
-                                                        {appeal.documents.map((doc) => (
-                                                            <Button
-                                                                key={doc.id}
-                                                                variant="outline"
-                                                                size="sm"
-                                                                asChild
-                                                            >
-                                                                <a
-                                                                    href={doc.file_path}
-                                                                    target="_blank"
-                                                                    rel="noopener noreferrer"
-                                                                >
-                                                                    <FileText className="mr-2 size-4" />
-                                                                    {doc.file_name}
-                                                                </a>
-                                                            </Button>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            {appeal.status !== 'pending' && (
-                                                <div className="rounded-lg bg-muted p-4 border-l-4 border-l-primary">
-                                                    <div className="flex items-center gap-2 mb-2">
-                                                        {appeal.status === 'approved' ? (
-                                                            <CheckCircle className="size-5 text-green-600 dark:text-green-400" />
-                                                        ) : (
-                                                            <XCircle className="size-5 text-red-600 dark:text-red-400" />
-                                                        )}
-                                                        <Label className="text-sm font-semibold">
-                                                            {appeal.status === 'approved' ? 'Approved' : 'Rejected'} Decision
-                                                        </Label>
-                                                    </div>
-                                                    {appeal.decision_notes && (
-                                                        <p className="text-sm mt-1 whitespace-pre-wrap">
-                                                            {appeal.decision_notes}
-                                                        </p>
-                                                    )}
-                                                    {appeal.reviewed_by && (
-                                                        <p className="text-xs text-muted-foreground mt-2">
-                                                            Reviewed by: {appeal.reviewed_by}
-                                                            {appeal.reviewed_at && (
-                                                                <> on {new Date(appeal.reviewed_at).toLocaleString()}</>
-                                                            )}
-                                                        </p>
-                                                    )}
-                                                </div>
-                                            )}
-                                        </CardContent>
-                                    </Card>
-                                ))}
-                            </div>
+                            <DataTable
+                                columns={columns}
+                                data={filteredAppeals}
+                                enableGlobalFilter={true}
+                                searchPlaceholder="Search appeals by type, reason, or details..."
+                                headerActions={headerActions}
+                            />
                         )}
                     </CardContent>
                 </Card>
+
+                {/* View Appeal Details Modal */}
+                <Dialog open={isViewModalOpen} onOpenChange={setIsViewModalOpen}>
+                    <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+                        <DialogHeader>
+                            <DialogTitle>Appeal Details</DialogTitle>
+                            <DialogDescription>
+                                View complete information about this appeal
+                            </DialogDescription>
+                        </DialogHeader>
+                        {selectedAppeal && (
+                            <div className="space-y-6">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <Label className="text-muted-foreground">Type</Label>
+                                        <p className="font-medium">{selectedAppeal.appealable_type}</p>
+                                    </div>
+                                    <div>
+                                        <Label className="text-muted-foreground">Status</Label>
+                                        <div className="mt-1">{getStatusBadge(selectedAppeal.status)}</div>
+                                    </div>
+                                    <div className="col-span-2">
+                                        <Label className="text-muted-foreground">Details</Label>
+                                        {selectedAppeal.appealable_data.type === 'visit' ? (
+                                            <p className="font-medium">
+                                                Inmate: {selectedAppeal.appealable_data.inmate_name} | 
+                                                Date: {selectedAppeal.appealable_data.scheduled_date} {selectedAppeal.appealable_data.scheduled_time && `at ${selectedAppeal.appealable_data.scheduled_time}`} | 
+                                                Type: {selectedAppeal.appealable_data.visit_type}
+                                            </p>
+                                        ) : (
+                                            <p className="font-medium">
+                                                Deceased: {selectedAppeal.appealable_data.deceased_name} | 
+                                                Inmate: {selectedAppeal.appealable_data.inmate_name} | 
+                                                Wake: {selectedAppeal.appealable_data.wake_start_date} to {selectedAppeal.appealable_data.wake_end_date}
+                                            </p>
+                                        )}
+                                    </div>
+                                    <div>
+                                        <Label className="text-muted-foreground">Submitted</Label>
+                                        <p className="font-medium">
+                                            {new Date(selectedAppeal.submitted_at).toLocaleString()}
+                                        </p>
+                                    </div>
+                                    {selectedAppeal.deadline && (
+                                        <div>
+                                            <Label className="text-muted-foreground">Deadline</Label>
+                                            <p className="font-medium">
+                                                {new Date(selectedAppeal.deadline).toLocaleString()}
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+                                <div>
+                                    <Label className="text-muted-foreground">Appeal Reason</Label>
+                                    <p className="font-medium mt-1 whitespace-pre-wrap">{selectedAppeal.reason}</p>
+                                </div>
+                                {selectedAppeal.documents.length > 0 && (
+                                    <div>
+                                        <Label className="text-muted-foreground">Supporting Documents</Label>
+                                        <div className="flex flex-wrap gap-2 mt-2">
+                                            {selectedAppeal.documents.map((doc) => (
+                                                <Button
+                                                    key={doc.id}
+                                                    variant="outline"
+                                                    size="sm"
+                                                    asChild
+                                                >
+                                                    <a
+                                                        href={doc.file_path}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                    >
+                                                        <FileText className="mr-2 h-4 w-4" />
+                                                        {doc.file_name}
+                                                    </a>
+                                                </Button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                                {selectedAppeal.status !== 'pending' && (
+                                    <div className="rounded-lg bg-muted p-4 border-l-4 border-l-primary">
+                                        <div className="flex items-center gap-2 mb-2">
+                                            {selectedAppeal.status === 'approved' ? (
+                                                <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
+                                            ) : (
+                                                <XCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
+                                            )}
+                                            <Label className="text-sm font-semibold">
+                                                {selectedAppeal.status === 'approved' ? 'Approved' : 'Rejected'} Decision
+                                            </Label>
+                                        </div>
+                                        {selectedAppeal.decision_notes && (
+                                            <p className="text-sm mt-1 whitespace-pre-wrap">
+                                                {selectedAppeal.decision_notes}
+                                            </p>
+                                        )}
+                                        {selectedAppeal.reviewed_by && (
+                                            <p className="text-xs text-muted-foreground mt-2">
+                                                Reviewed by: {selectedAppeal.reviewed_by}
+                                                {selectedAppeal.reviewed_at && (
+                                                    <> on {new Date(selectedAppeal.reviewed_at).toLocaleString()}</>
+                                                )}
+                                            </p>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                        <DialogFooter>
+                            <Button
+                                variant="outline"
+                                onClick={() => {
+                                    setIsViewModalOpen(false);
+                                    setSelectedAppeal(null);
+                                }}
+                            >
+                                Close
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
 
                 {/* Submit Appeal Modal */}
                 <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
@@ -447,4 +714,3 @@ export default function Appeals({ appeals, rejected_visits, rejected_eburols }: 
         </AppLayout>
     );
 }
-

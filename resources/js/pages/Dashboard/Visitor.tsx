@@ -2,36 +2,30 @@ import { Head, Link, usePage } from '@inertiajs/react';
 import {
     Bell,
     Calendar,
-    CheckCircle,
-    Clock,
     Heart,
     MessageSquare,
     Moon,
     Phone,
     PhoneIncoming,
     PhoneOutgoing,
+    Scale,
     Sun,
-    TrendingDown,
-    UserCheck,
     Video,
-    XCircle,
 } from 'lucide-react';
-
-import { useAppearance } from '@/hooks/use-appearance';
-import { useToast } from '@/hooks/use-toast';
 import {
-    Bar,
-    BarChart,
-    CartesianGrid,
+    Cell,
     Legend,
+    Pie,
+    PieChart,
     ResponsiveContainer,
     Tooltip,
-    XAxis,
-    YAxis,
 } from 'recharts';
 
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card, CardDescription, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useAppearance } from '@/hooks/use-appearance';
+import { useToast } from '@/hooks/use-toast';
 import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
 
@@ -105,6 +99,24 @@ type Props = {
         status: 'pending' | 'approved' | 'rejected' | 'completed';
         created_at: string;
     }>;
+    appeals_stats: {
+        total_appeals: number;
+        pending_appeals: number;
+        approved_appeals: number;
+        rejected_appeals: number;
+    };
+    feedback_stats: {
+        total_feedback: number;
+        pending_feedback: number;
+        reviewed_feedback: number;
+        resolved_feedback: number;
+        in_progress_feedback: number;
+        dismissed_feedback: number;
+    };
+    feedback_types: {
+        complaints: number;
+        suggestions: number;
+    };
 };
 
 function getStatusBadge(status: string) {
@@ -160,9 +172,12 @@ export default function VisitorDashboard({
     recent_call_logs,
     eburol_stats,
     recent_eburols,
+    appeals_stats,
+    feedback_stats,
+    feedback_types,
 }: Props) {
     const page = usePage();
-    const unreadNotificationCount = (page.props as any).unreadNotificationCount || 0;
+    const unreadNotificationCount = (page.props as { unreadNotificationCount?: number }).unreadNotificationCount || 0;
     const { resolvedAppearance, updateAppearance } = useAppearance();
     useToast();
     
@@ -170,21 +185,24 @@ export default function VisitorDashboard({
         updateAppearance(resolvedAppearance === 'dark' ? 'light' : 'dark');
     };
     
-    const chartData = [
-        {
-            name: 'Physical',
-            visits: visit_types.physical,
-        },
-        {
-            name: 'Virtual',
-            visits: visit_types.virtual,
-        },
+    // Pie chart data for visit types
+    const visitTypeChartData = [
+        { name: 'Physical', value: visit_types.physical },
+        { name: 'Virtual', value: visit_types.virtual },
     ];
+
+    // Pie chart data for feedback types
+    const feedbackTypeChartData = [
+        { name: 'Complaints', value: feedback_types.complaints },
+        { name: 'Suggestions', value: feedback_types.suggestions },
+    ];
+
+    const COLORS = ['#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#00ff00'];
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Visitor Dashboard" />
-            <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-4">
+            <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-6">
                 <div className="flex items-center justify-between">
                     <div>
                         <h1 className="text-2xl font-semibold">Visitor Dashboard</h1>
@@ -221,7 +239,7 @@ export default function VisitorDashboard({
                             className="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
                         >
                             <Calendar className="mr-2 size-4" />
-                            Apply for Schedule
+                            Apply for Visit
                         </Link>
                         <Link
                             href="/visitor/eburol"
@@ -241,127 +259,142 @@ export default function VisitorDashboard({
                 </div>
 
                 {/* KPI Cards */}
-                <div className="grid auto-rows-min gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+                <div className="grid auto-rows-min gap-4 md:grid-cols-2 lg:grid-cols-4">
+                    {/* First Card: Schedules */}
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                             <CardTitle className="text-sm font-medium">
-                                Total Schedules
+                                Schedules Applied For
                             </CardTitle>
                             <Calendar className="h-4 w-4 text-muted-foreground" />
                         </CardHeader>
                         <CardContent>
                             <div className="text-2xl font-bold">{stats.total_schedules}</div>
-                            <p className="text-xs text-muted-foreground">
-                                All visit schedules
+                            <p className="text-xs text-muted-foreground mt-2">
+                                Pending: {stats.pending_schedules} • Approved: {stats.approved_schedules} • Rejected: {stats.rejected_schedules} • Completed: {stats.completed_schedules} • Missed: {stats.missed_schedules}
                             </p>
                         </CardContent>
                     </Card>
 
+                    {/* Second Card: E-Burol */}
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                             <CardTitle className="text-sm font-medium">
-                                Pending
+                                E-Burol Applications
                             </CardTitle>
-                            <Clock className="h-4 w-4 text-muted-foreground" />
+                            <Heart className="h-4 w-4 text-muted-foreground" />
                         </CardHeader>
                         <CardContent>
-                            <div className="text-2xl font-bold">{stats.pending_schedules}</div>
-                            <p className="text-xs text-muted-foreground">
-                                Awaiting approval
+                            <div className="text-2xl font-bold">{eburol_stats.total_eburols}</div>
+                            <p className="text-xs text-muted-foreground mt-2">
+                                Pending: {eburol_stats.pending_eburols} • Approved: {eburol_stats.approved_eburols} • Rejected: {eburol_stats.rejected_eburols} • Completed: {eburol_stats.completed_eburols}
                             </p>
                         </CardContent>
                     </Card>
 
+                    {/* Third Card: Appeals */}
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                             <CardTitle className="text-sm font-medium">
-                                Approved
+                                Appeals
                             </CardTitle>
-                            <CheckCircle className="h-4 w-4 text-muted-foreground" />
+                            <Scale className="h-4 w-4 text-muted-foreground" />
                         </CardHeader>
                         <CardContent>
-                            <div className="text-2xl font-bold">{stats.approved_schedules}</div>
-                            <p className="text-xs text-muted-foreground">
-                                Confirmed visits
+                            <div className="text-2xl font-bold">{appeals_stats.total_appeals}</div>
+                            <p className="text-xs text-muted-foreground mt-2">
+                                Pending: {appeals_stats.pending_appeals} • Approved: {appeals_stats.approved_appeals} • Rejected: {appeals_stats.rejected_appeals}
                             </p>
                         </CardContent>
                     </Card>
 
+                    {/* Fourth Card: Feedback */}
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                             <CardTitle className="text-sm font-medium">
-                                Rejected
+                                Feedback Submitted
                             </CardTitle>
-                            <XCircle className="h-4 w-4 text-muted-foreground" />
+                            <MessageSquare className="h-4 w-4 text-muted-foreground" />
                         </CardHeader>
                         <CardContent>
-                            <div className="text-2xl font-bold">{stats.rejected_schedules}</div>
-                            <p className="text-xs text-muted-foreground">
-                                Denied requests
-                            </p>
-                        </CardContent>
-                    </Card>
-
-                    <Card>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium">
-                                Completed
-                            </CardTitle>
-                            <UserCheck className="h-4 w-4 text-muted-foreground" />
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold">{stats.completed_schedules}</div>
-                            <p className="text-xs text-muted-foreground">
-                                Finished visits
-                            </p>
-                        </CardContent>
-                    </Card>
-
-                    <Card>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium">
-                                Missed
-                            </CardTitle>
-                            <TrendingDown className="h-4 w-4 text-muted-foreground" />
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold">{stats.missed_schedules}</div>
-                            <p className="text-xs text-muted-foreground">
-                                Missed appointments
+                            <div className="text-2xl font-bold">{feedback_stats.total_feedback}</div>
+                            <p className="text-xs text-muted-foreground mt-2">
+                                Pending: {feedback_stats.pending_feedback} • Reviewed: {feedback_stats.reviewed_feedback} • Resolved: {feedback_stats.resolved_feedback} • In Progress: {feedback_stats.in_progress_feedback} • Dismissed: {feedback_stats.dismissed_feedback}
                             </p>
                         </CardContent>
                     </Card>
                 </div>
 
-                {/* Charts and Recent Schedules */}
+                {/* Pie Charts */}
                 <div className="grid gap-4 md:grid-cols-2">
-                    {/* Bar Chart */}
+                    {/* Visit Type Distribution Pie Chart */}
                     <Card>
                         <CardHeader>
                             <CardTitle>Visit Type Distribution</CardTitle>
                             <CardDescription>
-                                Physical vs Virtual visits comparison
+                                Distribution of physical and virtual visits applied for
                             </CardDescription>
                         </CardHeader>
                         <CardContent>
                             <ResponsiveContainer width="100%" height={300}>
-                                <BarChart data={chartData}>
-                                    <CartesianGrid strokeDasharray="3 3" />
-                                    <XAxis dataKey="name" />
-                                    <YAxis />
+                                <PieChart>
+                                    <Pie
+                                        data={visitTypeChartData}
+                                        cx="50%"
+                                        cy="50%"
+                                        labelLine={false}
+                                        label={({ name, percent }) => `${name}: ${((percent ?? 0) * 100).toFixed(0)}%`}
+                                        outerRadius={80}
+                                        fill="#8884d8"
+                                        dataKey="value"
+                                    >
+                                        {visitTypeChartData.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                        ))}
+                                    </Pie>
                                     <Tooltip />
                                     <Legend />
-                                    <Bar
-                                        dataKey="visits"
-                                        fill="#8884d8"
-                                        name="Number of Visits"
-                                    />
-                                </BarChart>
+                                </PieChart>
                             </ResponsiveContainer>
                         </CardContent>
                     </Card>
 
-                    {/* Recent Schedules */}
+                    {/* Feedback Type Distribution Pie Chart */}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Feedback Type Distribution</CardTitle>
+                            <CardDescription>
+                                Distribution of complaints and suggestions submitted
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <ResponsiveContainer width="100%" height={300}>
+                                <PieChart>
+                                    <Pie
+                                        data={feedbackTypeChartData}
+                                        cx="50%"
+                                        cy="50%"
+                                        labelLine={false}
+                                        label={({ name, percent }) => `${name}: ${((percent ?? 0) * 100).toFixed(0)}%`}
+                                        outerRadius={80}
+                                        fill="#8884d8"
+                                        dataKey="value"
+                                    >
+                                        {feedbackTypeChartData.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                        ))}
+                                    </Pie>
+                                    <Tooltip />
+                                    <Legend />
+                                </PieChart>
+                            </ResponsiveContainer>
+                        </CardContent>
+                    </Card>
+                </div>
+
+                {/* Recent Schedules */}
+                <div className="grid gap-4 md:grid-cols-1">
+
                     <Card>
                         <CardHeader>
                             <CardTitle>Recent Schedules</CardTitle>

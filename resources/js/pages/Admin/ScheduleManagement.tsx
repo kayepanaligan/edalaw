@@ -1,5 +1,5 @@
 import { Head, router, useForm } from '@inertiajs/react';
-import { Calendar, Clock, Plus, User, Video, Check, X } from 'lucide-react';
+import { Calendar, Clock, Plus, User, Video, Check, X, MoreVertical, Eye, Edit, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { ColumnDef } from '@tanstack/react-table';
@@ -28,6 +28,14 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
@@ -57,6 +65,7 @@ type Visit = {
     status: 'pending' | 'approved' | 'rejected' | 'missed' | 'completed' | 'cancelled';
     notes: string | null;
     meeting_link: string | null;
+    rejection_reason: string | null;
     created_at: string;
 };
 
@@ -128,6 +137,8 @@ function getVisitTypeBadge(type: string) {
 export default function ScheduleManagement({ visits, visitors }: Props) {
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
+    const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
+    const [isViewModalOpen, setIsViewModalOpen] = useState(false);
     const [selectedVisit, setSelectedVisit] = useState<Visit | null>(null);
     const [statusFilter, setStatusFilter] = useState<string>('all');
     const [visitTypeFilter, setVisitTypeFilter] = useState<string>('all');
@@ -135,6 +146,26 @@ export default function ScheduleManagement({ visits, visitors }: Props) {
     const [bookedSlots, setBookedSlots] = useState<string[]>([]);
     const [loadingSlots, setLoadingSlots] = useState(false);
     useToast();
+
+    const rejectForm = useForm({
+        rejection_reason: '',
+    });
+
+    const statusForm = useForm({
+        status: 'pending' as 'pending' | 'approved' | 'rejected' | 'missed' | 'completed' | 'cancelled',
+        rejection_reason: '',
+    });
+
+    const editForm = useForm({
+        scheduled_date: '',
+        scheduled_time: '',
+        visit_type: '',
+        inmate_first_name: '',
+        inmate_middle_name: '',
+        inmate_last_name: '',
+        notes: '',
+        meeting_link: '',
+    });
 
     const today = new Date().toISOString().split('T')[0];
 
@@ -193,19 +224,62 @@ export default function ScheduleManagement({ visits, visitors }: Props) {
         });
     };
 
-    const handleUpdateStatus = (visit: Visit, newStatus: string) => {
-        router.post(
-            `/admin/schedules/${visit.id}/update-status`,
-            { status: newStatus },
+    const handleUpdateStatus = () => {
+        if (!selectedVisit) {
+            return;
+        }
+
+        const data: { status: string; rejection_reason?: string } = {
+            status: statusForm.data.status,
+        };
+
+        if (statusForm.data.status === 'rejected') {
+            if (!statusForm.data.rejection_reason || statusForm.data.rejection_reason.trim().length < 10) {
+                toast.error('Rejection reason is required (minimum 10 characters)');
+                return;
+            }
+            data.rejection_reason = statusForm.data.rejection_reason;
+        }
+
+        statusForm.post(
+            `/admin/schedules/${selectedVisit.id}/update-status`,
             {
                 preserveScroll: true,
                 onSuccess: () => {
                     toast.success('Schedule status updated successfully.');
                     setIsStatusModalOpen(false);
                     setSelectedVisit(null);
+                    statusForm.reset();
                 },
                 onError: () => {
                     toast.error('Failed to update schedule status.');
+                },
+            }
+        );
+    };
+
+    const handleReject = () => {
+        if (!selectedVisit) {
+            return;
+        }
+
+        if (!rejectForm.data.rejection_reason || rejectForm.data.rejection_reason.trim().length < 10) {
+            toast.error('Rejection reason is required (minimum 10 characters)');
+            return;
+        }
+
+        rejectForm.post(
+            `/admin/schedules/${selectedVisit.id}/reject`,
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    toast.success('Schedule rejected successfully.');
+                    setIsRejectModalOpen(false);
+                    setSelectedVisit(null);
+                    rejectForm.reset();
+                },
+                onError: () => {
+                    toast.error('Failed to reject schedule.');
                 },
             }
         );
@@ -332,58 +406,102 @@ export default function ScheduleManagement({ visits, visitors }: Props) {
                 cell: ({ row }) => {
                     const visit = row.original;
                     return (
-                        <div className="flex items-center gap-2">
-                            {visit.status === 'pending' && (
-                                <>
-                                    <Button
-                                        size="sm"
-                                        variant="default"
-                                        onClick={() => {
-                                            router.post(`/admin/schedules/${visit.id}/approve`, {}, {
-                                                preserveScroll: true,
-                                                onSuccess: () => {
-                                                    toast.success('Schedule approved successfully.');
-                                                },
-                                                onError: () => {
-                                                    toast.error('Failed to approve schedule.');
-                                                },
-                                            });
-                                        }}
-                                    >
-                                        <Check className="mr-1 size-4" />
-                                        Approve
-                                    </Button>
-                                    <Button
-                                        size="sm"
-                                        variant="destructive"
-                                        onClick={() => {
-                                            router.post(`/admin/schedules/${visit.id}/reject`, {}, {
-                                                preserveScroll: true,
-                                                onSuccess: () => {
-                                                    toast.success('Schedule rejected successfully.');
-                                                },
-                                                onError: () => {
-                                                    toast.error('Failed to reject schedule.');
-                                                },
-                                            });
-                                        }}
-                                    >
-                                        <X className="mr-1 size-4" />
-                                        Reject
-                                    </Button>
-                                </>
-                            )}
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => {
-                                    setSelectedVisit(visit);
-                                    setIsStatusModalOpen(true);
-                                }}
-                            >
-                                Update Status
-                            </Button>
-                        </div>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" className="h-8 w-8 p-0">
+                                    <span className="sr-only">Open menu</span>
+                                    <MoreVertical className="h-4 w-4" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                    onClick={() => {
+                                        setSelectedVisit(visit);
+                                        setIsViewModalOpen(true);
+                                    }}
+                                >
+                                    <Eye className="mr-2 h-4 w-4" />
+                                    View Details
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                    onClick={() => {
+                                        setSelectedVisit(visit);
+                                        editForm.setData({
+                                            scheduled_date: visit.scheduled_date,
+                                            scheduled_time: visit.scheduled_time || '',
+                                            visit_type: visit.visit_type,
+                                            inmate_first_name: visit.inmate_first_name,
+                                            inmate_middle_name: visit.inmate_middle_name || '',
+                                            inmate_last_name: visit.inmate_last_name,
+                                            notes: visit.notes || '',
+                                            meeting_link: visit.meeting_link || '',
+                                        });
+                                        setIsEditModalOpen(true);
+                                    }}
+                                >
+                                    <Edit className="mr-2 h-4 w-4" />
+                                    Update
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                    onClick={() => {
+                                        setSelectedVisit(visit);
+                                        statusForm.setData({
+                                            status: visit.status,
+                                            rejection_reason: visit.rejection_reason || '',
+                                        });
+                                        setIsStatusModalOpen(true);
+                                    }}
+                                >
+                                    <Check className="mr-2 h-4 w-4" />
+                                    Update Status
+                                </DropdownMenuItem>
+                                {visit.status === 'pending' && (
+                                    <>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem
+                                            onClick={() => {
+                                                router.post(`/admin/schedules/${visit.id}/approve`, {}, {
+                                                    preserveScroll: true,
+                                                    onSuccess: () => {
+                                                        toast.success('Schedule approved successfully.');
+                                                    },
+                                                    onError: () => {
+                                                        toast.error('Failed to approve schedule.');
+                                                    },
+                                                });
+                                            }}
+                                        >
+                                            <Check className="mr-2 h-4 w-4" />
+                                            Approve
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem
+                                            onClick={() => {
+                                                setSelectedVisit(visit);
+                                                rejectForm.setData('rejection_reason', '');
+                                                setIsRejectModalOpen(true);
+                                            }}
+                                            className="text-destructive focus:text-destructive"
+                                        >
+                                            <X className="mr-2 h-4 w-4" />
+                                            Reject
+                                        </DropdownMenuItem>
+                                    </>
+                                )}
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                    onClick={() => {
+                                        setSelectedVisit(visit);
+                                        setIsDeleteModalOpen(true);
+                                    }}
+                                    className="text-destructive focus:text-destructive"
+                                >
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    Delete
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
                     );
                 },
             },
@@ -396,7 +514,7 @@ export default function ScheduleManagement({ visits, visitors }: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Schedule Management" />
-            <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-4">
+            <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-6">
                 <div className="flex items-center justify-between">
                     <div>
                         <h1 className="text-2xl font-semibold">Schedule Management</h1>
@@ -651,6 +769,60 @@ export default function ScheduleManagement({ visits, visitors }: Props) {
                     </DialogContent>
                 </Dialog>
 
+                {/* Reject Modal */}
+                <Dialog open={isRejectModalOpen} onOpenChange={setIsRejectModalOpen}>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Reject Schedule</DialogTitle>
+                            <DialogDescription>
+                                Please provide a reason for rejecting this schedule. The visitor will see this reason.
+                            </DialogDescription>
+                        </DialogHeader>
+                        {selectedVisit && (
+                            <div className="space-y-4">
+                                <div className="grid gap-2">
+                                    <Label htmlFor="rejection_reason">
+                                        Rejection Reason <span className="text-destructive">*</span>
+                                    </Label>
+                                    <Textarea
+                                        id="rejection_reason"
+                                        value={rejectForm.data.rejection_reason}
+                                        onChange={(e) => rejectForm.setData('rejection_reason', e.target.value)}
+                                        placeholder="Please provide a detailed reason for rejection (minimum 10 characters)..."
+                                        rows={4}
+                                        className="min-h-[100px]"
+                                    />
+                                    {rejectForm.errors.rejection_reason && (
+                                        <p className="text-sm text-destructive">{rejectForm.errors.rejection_reason}</p>
+                                    )}
+                                    <p className="text-xs text-muted-foreground">
+                                        Minimum 10 characters required. This reason will be visible to the visitor.
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+                        <DialogFooter>
+                            <Button
+                                variant="outline"
+                                onClick={() => {
+                                    setIsRejectModalOpen(false);
+                                    setSelectedVisit(null);
+                                    rejectForm.reset();
+                                }}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                variant="destructive"
+                                onClick={handleReject}
+                                disabled={rejectForm.processing}
+                            >
+                                {rejectForm.processing ? 'Rejecting...' : 'Reject Schedule'}
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+
                 {/* Update Status Modal */}
                 <Dialog open={isStatusModalOpen} onOpenChange={setIsStatusModalOpen}>
                     <DialogContent>
@@ -665,9 +837,9 @@ export default function ScheduleManagement({ visits, visitors }: Props) {
                                 <div className="grid gap-2">
                                     <Label htmlFor="status">Status</Label>
                                     <Select
-                                        defaultValue={selectedVisit.status}
+                                        value={statusForm.data.status}
                                         onValueChange={(value) => {
-                                            handleUpdateStatus(selectedVisit, value);
+                                            statusForm.setData('status', value as 'pending' | 'approved' | 'rejected' | 'missed' | 'completed' | 'cancelled');
                                         }}
                                     >
                                         <SelectTrigger id="status">
@@ -683,6 +855,27 @@ export default function ScheduleManagement({ visits, visitors }: Props) {
                                         </SelectContent>
                                     </Select>
                                 </div>
+                                {statusForm.data.status === 'rejected' && (
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="status_rejection_reason">
+                                            Rejection Reason <span className="text-destructive">*</span>
+                                        </Label>
+                                        <Textarea
+                                            id="status_rejection_reason"
+                                            value={statusForm.data.rejection_reason}
+                                            onChange={(e) => statusForm.setData('rejection_reason', e.target.value)}
+                                            placeholder="Please provide a detailed reason for rejection (minimum 10 characters)..."
+                                            rows={4}
+                                            className="min-h-[100px]"
+                                        />
+                                        {statusForm.errors.rejection_reason && (
+                                            <p className="text-sm text-destructive">{statusForm.errors.rejection_reason}</p>
+                                        )}
+                                        <p className="text-xs text-muted-foreground">
+                                            Minimum 10 characters required. This reason will be visible to the visitor.
+                                        </p>
+                                    </div>
+                                )}
                             </div>
                         )}
                         <DialogFooter>
@@ -691,9 +884,342 @@ export default function ScheduleManagement({ visits, visitors }: Props) {
                                 onClick={() => {
                                     setIsStatusModalOpen(false);
                                     setSelectedVisit(null);
+                                    statusForm.reset();
                                 }}
                             >
                                 Cancel
+                            </Button>
+                            <Button
+                                onClick={handleUpdateStatus}
+                                disabled={statusForm.processing}
+                            >
+                                {statusForm.processing ? 'Updating...' : 'Update Status'}
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+
+                {/* View Details Modal */}
+                <Dialog open={isViewModalOpen} onOpenChange={setIsViewModalOpen}>
+                    <DialogContent className="max-w-2xl">
+                        <DialogHeader>
+                            <DialogTitle>Schedule Details</DialogTitle>
+                            <DialogDescription>
+                                View complete information about this schedule
+                            </DialogDescription>
+                        </DialogHeader>
+                        {selectedVisit && (
+                            <div className="space-y-4">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <Label className="text-muted-foreground">Visitor Name</Label>
+                                        <p className="font-medium">{selectedVisit.visitor_name}</p>
+                                    </div>
+                                    <div>
+                                        <Label className="text-muted-foreground">Visitor Email</Label>
+                                        <p className="font-medium">{selectedVisit.visitor_email}</p>
+                                    </div>
+                                    <div>
+                                        <Label className="text-muted-foreground">Scheduled Date</Label>
+                                        <p className="font-medium">
+                                            {new Date(selectedVisit.scheduled_date).toLocaleDateString('en-US', {
+                                                weekday: 'long',
+                                                year: 'numeric',
+                                                month: 'long',
+                                                day: 'numeric',
+                                            })}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <Label className="text-muted-foreground">Scheduled Time</Label>
+                                        <p className="font-medium">{selectedVisit.scheduled_time || 'N/A'}</p>
+                                    </div>
+                                    <div>
+                                        <Label className="text-muted-foreground">Visit Type</Label>
+                                        <div className="mt-1">{getVisitTypeBadge(selectedVisit.visit_type)}</div>
+                                    </div>
+                                    <div>
+                                        <Label className="text-muted-foreground">Status</Label>
+                                        <div className="mt-1">{getStatusBadge(selectedVisit.status)}</div>
+                                    </div>
+                                    <div className="col-span-2">
+                                        <Label className="text-muted-foreground">Inmate Name</Label>
+                                        <p className="font-medium">
+                                            {`${selectedVisit.inmate_first_name} ${selectedVisit.inmate_middle_name || ''} ${selectedVisit.inmate_last_name}`.trim()}
+                                        </p>
+                                    </div>
+                                    {selectedVisit.meeting_link && (
+                                        <div className="col-span-2">
+                                            <Label className="text-muted-foreground">Meeting Link</Label>
+                                            <p className="font-medium break-all">
+                                                <a
+                                                    href={selectedVisit.meeting_link}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-blue-600 hover:underline"
+                                                >
+                                                    {selectedVisit.meeting_link}
+                                                </a>
+                                            </p>
+                                        </div>
+                                    )}
+                                    {selectedVisit.notes && (
+                                        <div className="col-span-2">
+                                            <Label className="text-muted-foreground">Notes</Label>
+                                            <p className="font-medium">{selectedVisit.notes}</p>
+                                        </div>
+                                    )}
+                                    {selectedVisit.rejection_reason && (
+                                        <div className="col-span-2">
+                                            <Label className="text-muted-foreground">Rejection Reason</Label>
+                                            <p className="font-medium text-destructive">{selectedVisit.rejection_reason}</p>
+                                        </div>
+                                    )}
+                                    <div>
+                                        <Label className="text-muted-foreground">Created At</Label>
+                                        <p className="font-medium">
+                                            {new Date(selectedVisit.created_at).toLocaleString('en-US')}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                        <DialogFooter>
+                            <Button
+                                variant="outline"
+                                onClick={() => {
+                                    setIsViewModalOpen(false);
+                                    setSelectedVisit(null);
+                                }}
+                            >
+                                Close
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+
+                {/* Edit Modal */}
+                <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+                    <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                        <DialogHeader>
+                            <DialogTitle>Update Schedule</DialogTitle>
+                            <DialogDescription>
+                                Update the details of this schedule
+                            </DialogDescription>
+                        </DialogHeader>
+                        {selectedVisit && (
+                            <form
+                                onSubmit={(e) => {
+                                    e.preventDefault();
+                                    editForm.put(`/admin/schedules/${selectedVisit.id}`, {
+                                        preserveScroll: true,
+                                        onSuccess: () => {
+                                            toast.success('Schedule updated successfully.');
+                                            setIsEditModalOpen(false);
+                                            setSelectedVisit(null);
+                                            editForm.reset();
+                                        },
+                                        onError: () => {
+                                            toast.error('Failed to update schedule.');
+                                        },
+                                    });
+                                }}
+                            >
+                                <div className="space-y-4">
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="edit_scheduled_date">
+                                            Scheduled Date <span className="text-destructive">*</span>
+                                        </Label>
+                                        <Input
+                                            id="edit_scheduled_date"
+                                            type="date"
+                                            required
+                                            min={today}
+                                            value={editForm.data.scheduled_date}
+                                            onChange={(e) => editForm.setData('scheduled_date', e.target.value)}
+                                        />
+                                        <InputError message={editForm.errors.scheduled_date} />
+                                    </div>
+
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="edit_scheduled_time">
+                                            Scheduled Time <span className="text-destructive">*</span>
+                                        </Label>
+                                        <Input
+                                            id="edit_scheduled_time"
+                                            type="time"
+                                            required
+                                            value={editForm.data.scheduled_time}
+                                            onChange={(e) => editForm.setData('scheduled_time', e.target.value)}
+                                        />
+                                        <InputError message={editForm.errors.scheduled_time} />
+                                    </div>
+
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="edit_visit_type">
+                                            Visit Type <span className="text-destructive">*</span>
+                                        </Label>
+                                        <Select
+                                            value={editForm.data.visit_type}
+                                            onValueChange={(value) => editForm.setData('visit_type', value)}
+                                        >
+                                            <SelectTrigger id="edit_visit_type">
+                                                <SelectValue placeholder="Select visit type" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="virtual">Virtual</SelectItem>
+                                                <SelectItem value="physical">Physical</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                        <InputError message={editForm.errors.visit_type} />
+                                    </div>
+
+                                    {editForm.data.visit_type === 'virtual' && (
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="edit_meeting_link">
+                                                Meeting Link <span className="text-destructive">*</span>
+                                            </Label>
+                                            <Input
+                                                id="edit_meeting_link"
+                                                type="url"
+                                                required
+                                                value={editForm.data.meeting_link}
+                                                onChange={(e) => editForm.setData('meeting_link', e.target.value)}
+                                                placeholder="https://..."
+                                            />
+                                            <InputError message={editForm.errors.meeting_link} />
+                                        </div>
+                                    )}
+
+                                    <div className="grid grid-cols-3 gap-4">
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="edit_inmate_first_name">
+                                                Inmate First Name <span className="text-destructive">*</span>
+                                            </Label>
+                                            <Input
+                                                id="edit_inmate_first_name"
+                                                type="text"
+                                                required
+                                                value={editForm.data.inmate_first_name}
+                                                onChange={(e) => editForm.setData('inmate_first_name', e.target.value)}
+                                            />
+                                            <InputError message={editForm.errors.inmate_first_name} />
+                                        </div>
+
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="edit_inmate_middle_name">Inmate Middle Name</Label>
+                                            <Input
+                                                id="edit_inmate_middle_name"
+                                                type="text"
+                                                value={editForm.data.inmate_middle_name}
+                                                onChange={(e) => editForm.setData('inmate_middle_name', e.target.value)}
+                                            />
+                                            <InputError message={editForm.errors.inmate_middle_name} />
+                                        </div>
+
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="edit_inmate_last_name">
+                                                Inmate Last Name <span className="text-destructive">*</span>
+                                            </Label>
+                                            <Input
+                                                id="edit_inmate_last_name"
+                                                type="text"
+                                                required
+                                                value={editForm.data.inmate_last_name}
+                                                onChange={(e) => editForm.setData('inmate_last_name', e.target.value)}
+                                            />
+                                            <InputError message={editForm.errors.inmate_last_name} />
+                                        </div>
+                                    </div>
+
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="edit_notes">Notes</Label>
+                                        <Textarea
+                                            id="edit_notes"
+                                            rows={3}
+                                            value={editForm.data.notes}
+                                            onChange={(e) => editForm.setData('notes', e.target.value)}
+                                            placeholder="Additional notes (optional)"
+                                        />
+                                        <InputError message={editForm.errors.notes} />
+                                    </div>
+                                </div>
+                                <DialogFooter className="mt-6">
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={() => {
+                                            setIsEditModalOpen(false);
+                                            setSelectedVisit(null);
+                                            editForm.reset();
+                                        }}
+                                    >
+                                        Cancel
+                                    </Button>
+                                    <Button type="submit" disabled={editForm.processing}>
+                                        {editForm.processing ? 'Updating...' : 'Update Schedule'}
+                                    </Button>
+                                </DialogFooter>
+                            </form>
+                        )}
+                    </DialogContent>
+                </Dialog>
+
+                {/* Delete Confirmation Modal */}
+                <Dialog open={isDeleteModalOpen} onOpenChange={setIsDeleteModalOpen}>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Delete Schedule</DialogTitle>
+                            <DialogDescription>
+                                Are you sure you want to delete this schedule? This action cannot be undone.
+                            </DialogDescription>
+                        </DialogHeader>
+                        {selectedVisit && (
+                            <div className="space-y-4">
+                                <div className="rounded-lg border p-4 bg-muted/50">
+                                    <p className="text-sm font-medium">Schedule Details:</p>
+                                    <p className="text-sm text-muted-foreground mt-1">
+                                        Visitor: {selectedVisit.visitor_name}
+                                    </p>
+                                    <p className="text-sm text-muted-foreground">
+                                        Date: {new Date(selectedVisit.scheduled_date).toLocaleDateString()}
+                                    </p>
+                                    <p className="text-sm text-muted-foreground">
+                                        Time: {selectedVisit.scheduled_time || 'N/A'}
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+                        <DialogFooter>
+                            <Button
+                                variant="outline"
+                                onClick={() => {
+                                    setIsDeleteModalOpen(false);
+                                    setSelectedVisit(null);
+                                }}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                variant="destructive"
+                                onClick={() => {
+                                    if (!selectedVisit) {
+                                        return;
+                                    }
+                                    router.delete(`/admin/schedules/${selectedVisit.id}`, {
+                                        preserveScroll: true,
+                                        onSuccess: () => {
+                                            toast.success('Schedule deleted successfully.');
+                                            setIsDeleteModalOpen(false);
+                                            setSelectedVisit(null);
+                                        },
+                                        onError: () => {
+                                            toast.error('Failed to delete schedule.');
+                                        },
+                                    });
+                                }}
+                            >
+                                Delete
                             </Button>
                         </DialogFooter>
                     </DialogContent>

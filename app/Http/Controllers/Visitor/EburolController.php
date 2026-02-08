@@ -2,9 +2,12 @@
 
 namespace App\Http\Controllers\Visitor;
 
+use App\AppealStatus;
 use App\EburolStatus;
 use App\Http\Controllers\Controller;
+use App\Models\Appeal;
 use App\Models\Eburol;
+use App\Services\AuditLogService;
 use App\Services\NotificationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -25,6 +28,25 @@ class EburolController extends Controller
             ->orderBy('created_at', 'desc')
             ->get()
             ->map(function ($eburol) {
+                $canAppeal = false;
+                $appealDeadline = null;
+                if ($eburol->status === EburolStatus::Rejected) {
+                    $deadline = $eburol->updated_at->copy()->addHours(48);
+                    $canAppeal = now()->isBefore($deadline);
+                    $appealDeadline = $deadline->format('Y-m-d H:i:s');
+
+                    // Check if already has a pending or approved appeal
+                    $hasActiveAppeal = Appeal::where('user_id', auth()->id())
+                        ->where('appealable_type', Eburol::class)
+                        ->where('appealable_id', $eburol->id)
+                        ->where('status', '!=', AppealStatus::Rejected)
+                        ->exists();
+
+                    if ($hasActiveAppeal) {
+                        $canAppeal = false;
+                    }
+                }
+
                 return [
                     'id' => $eburol->id,
                     'inmate_first_name' => $eburol->inmate_first_name,
@@ -44,7 +66,10 @@ class EburolController extends Controller
                     'relationship_proof_path' => $eburol->relationship_proof_path ? Storage::disk('public')->url($eburol->relationship_proof_path) : null,
                     'status' => $eburol->status->value,
                     'admin_notes' => $eburol->admin_notes,
+                    'rejection_reason' => $eburol->rejection_reason,
                     'created_at' => $eburol->created_at->format('Y-m-d H:i:s'),
+                    'can_appeal' => $canAppeal,
+                    'appeal_deadline' => $appealDeadline,
                 ];
             });
 
@@ -118,6 +143,23 @@ class EburolController extends Controller
         NotificationService::createEburolSubmittedNotification($eburol);
         NotificationService::notifySuperAdminsAboutEburol($eburol);
 
+        // Log the action
+        $deceasedName = trim("{$eburol->deceased_first_name} {$eburol->deceased_middle_name} {$eburol->deceased_last_name}");
+        $inmateName = trim("{$eburol->inmate_first_name} {$eburol->inmate_middle_name} {$eburol->inmate_last_name}");
+        AuditLogService::logAction(
+            'eburol_submitted',
+            $eburol,
+            'E-Burol Management',
+            "E-Burol application submitted for deceased {$deceasedName}, inmate {$inmateName}. Wake period: {$eburol->wake_start_date->format('M d, Y')} - {$eburol->wake_end_date->format('M d, Y')}",
+            $request,
+            [
+                'deceased_name' => $deceasedName,
+                'inmate_name' => $inmateName,
+                'wake_start_date' => $eburol->wake_start_date->format('Y-m-d'),
+                'wake_end_date' => $eburol->wake_end_date->format('Y-m-d'),
+            ]
+        );
+
         return redirect()->back()->with('success', 'E-burol application submitted successfully. Your application has been sent to the BJMP officer for review. Please wait for approval.');
     }
 
@@ -156,5 +198,208 @@ class EburolController extends Controller
         return Inertia::render('Visitor/EburolShow', [
             'eburol' => $eburolData,
         ]);
+    }
+
+    /**
+     * Update an e-burol request (only if pending).
+     */
+    public function update(Request $request, Eburol $eburol): RedirectResponse
+    {
+        // Ensure the eburol belongs to the authenticated user
+        if ($eburol->user_id !== auth()->id()) {
+            abort(403);
+        }
+
+        // Only allow updates for pending applications
+        if ($eburol->status !== EburolStatus::Pending) {
+            return redirect()->back()
+                ->withErrors(['status' => 'You can only edit pending applications.'])
+                ->withInput();
+        }
+
+        $validator = Validator::make($request->all(), [
+            'inmate_first_name' => ['required', 'string', 'max:255'],
+            'inmate_middle_name' => ['nullable', 'string', 'max:255'],
+            'inmate_last_name' => ['required', 'string', 'max:255'],
+            'deceased_first_name' => ['required', 'string', 'max:255'],
+            'deceased_middle_name' => ['nullable', 'string', 'max:255'],
+            'deceased_last_name' => ['required', 'string', 'max:255'],
+            'deceased_date_of_death' => ['required', 'date', 'before_or_equal:today'],
+            'relationship_to_inmate' => ['required', 'string', 'max:255'],
+            'wake_start_date' => ['required', 'date', 'after_or_equal:today'],
+            'wake_end_date' => ['required', 'date', 'after_or_equal:wake_start_date'],
+            'preferred_time' => ['nullable', 'date_format:H:i'],
+            'wake_location' => ['required', 'string', 'max:500'],
+            'additional_details' => ['nullable', 'string', 'max:2000'],
+            'death_certificate' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'],
+            'relationship_proof' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'],
+        ]);
+
+        if ($validator->fails()) {
+            return redirect()->back()
+                ->withErrors($validator)
+                ->withInput();
+        }
+
+        $updateData = [
+            'inmate_first_name' => $request->inmate_first_name,
+            'inmate_middle_name' => $request->inmate_middle_name,
+            'inmate_last_name' => $request->inmate_last_name,
+            'deceased_first_name' => $request->deceased_first_name,
+            'deceased_middle_name' => $request->deceased_middle_name,
+            'deceased_last_name' => $request->deceased_last_name,
+            'deceased_date_of_death' => $request->deceased_date_of_death,
+            'relationship_to_inmate' => $request->relationship_to_inmate,
+            'wake_start_date' => $request->wake_start_date,
+            'wake_end_date' => $request->wake_end_date,
+            'preferred_time' => $request->preferred_time,
+            'wake_location' => $request->wake_location,
+            'additional_details' => $request->additional_details,
+        ];
+
+        // Update files only if new ones are provided
+        if ($request->hasFile('death_certificate')) {
+            // Delete old file if exists
+            if ($eburol->death_certificate_path) {
+                Storage::disk('public')->delete($eburol->death_certificate_path);
+            }
+            $updateData['death_certificate_path'] = $request->file('death_certificate')->store('eburols/death_certificates', 'public');
+        }
+
+        if ($request->hasFile('relationship_proof')) {
+            // Delete old file if exists
+            if ($eburol->relationship_proof_path) {
+                Storage::disk('public')->delete($eburol->relationship_proof_path);
+            }
+            $updateData['relationship_proof_path'] = $request->file('relationship_proof')->store('eburols/relationship_proofs', 'public');
+        }
+
+        $eburol->update($updateData);
+
+        // Log the action
+        $deceasedName = trim("{$eburol->deceased_first_name} {$eburol->deceased_middle_name} {$eburol->deceased_last_name}");
+        AuditLogService::logAction(
+            'eburol_updated',
+            $eburol,
+            'E-Burol Management',
+            "E-Burol application #{$eburol->id} updated for deceased {$deceasedName}",
+            $request
+        );
+
+        return redirect()->route('visitor.eburol.index')
+            ->with('success', 'E-burol application updated successfully.');
+    }
+
+    /**
+     * Reschedule an e-burol request (only if pending).
+     */
+    public function reschedule(Request $request, Eburol $eburol): RedirectResponse
+    {
+        // Ensure the eburol belongs to the authenticated user
+        if ($eburol->user_id !== auth()->id()) {
+            abort(403);
+        }
+
+        // Only allow rescheduling for pending applications
+        if ($eburol->status !== EburolStatus::Pending) {
+            return redirect()->back()
+                ->withErrors(['status' => 'You can only reschedule pending applications.'])
+                ->withInput();
+        }
+
+        $validator = Validator::make($request->all(), [
+            'wake_start_date' => ['required', 'date', 'after_or_equal:today'],
+            'wake_end_date' => ['required', 'date', 'after_or_equal:wake_start_date'],
+            'preferred_time' => ['nullable', 'date_format:H:i'],
+        ]);
+
+        if ($validator->fails()) {
+            return redirect()->back()
+                ->withErrors($validator)
+                ->withInput();
+        }
+
+        $oldStartDate = $eburol->wake_start_date->format('Y-m-d');
+        $oldEndDate = $eburol->wake_end_date->format('Y-m-d');
+
+        $eburol->update([
+            'wake_start_date' => $request->wake_start_date,
+            'wake_end_date' => $request->wake_end_date,
+            'preferred_time' => $request->preferred_time,
+        ]);
+
+        // Log the action
+        $deceasedName = trim("{$eburol->deceased_first_name} {$eburol->deceased_middle_name} {$eburol->deceased_last_name}");
+        AuditLogService::logAction(
+            'eburol_rescheduled',
+            $eburol,
+            'E-Burol Management',
+            "E-Burol application rescheduled for deceased {$deceasedName}. From: {$oldStartDate} - {$oldEndDate} to {$request->wake_start_date} - {$request->wake_end_date}",
+            $request,
+            [
+                'deceased_name' => $deceasedName,
+                'old_start_date' => $oldStartDate,
+                'old_end_date' => $oldEndDate,
+                'new_start_date' => $request->wake_start_date,
+                'new_end_date' => $request->wake_end_date,
+            ]
+        );
+
+        return redirect()->route('visitor.eburol.index')
+            ->with('success', 'E-burol schedule rescheduled successfully.');
+    }
+
+    /**
+     * Delete an e-burol request (only if pending).
+     */
+    public function destroy(Eburol $eburol): RedirectResponse
+    {
+        // Ensure the eburol belongs to the authenticated user
+        if ($eburol->user_id !== auth()->id()) {
+            abort(403);
+        }
+
+        // Only allow deletion for pending applications
+        if ($eburol->status !== EburolStatus::Pending) {
+            return redirect()->back()
+                ->withErrors(['status' => 'You can only delete pending applications.']);
+        }
+
+        // Delete associated files
+        if ($eburol->death_certificate_path) {
+            Storage::disk('public')->delete($eburol->death_certificate_path);
+        }
+        if ($eburol->relationship_proof_path) {
+            Storage::disk('public')->delete($eburol->relationship_proof_path);
+        }
+
+        // Log the action before deletion
+        $deceasedName = trim("{$eburol->deceased_first_name} {$eburol->deceased_middle_name} {$eburol->deceased_last_name}");
+        $eburolId = $eburol->id;
+        $wakeStartDate = $eburol->wake_start_date->format('Y-m-d');
+
+        $eburol->delete();
+
+        // Create a log entry manually since the model is deleted
+        \App\Models\AuditLog::create([
+            'action' => 'eburol_deleted',
+            'auditable_type' => Eburol::class,
+            'auditable_id' => $eburolId,
+            'user_id' => auth()->id(),
+            'user_role' => auth()->user()->role?->slug,
+            'description' => "E-Burol application #{$eburolId} deleted for deceased {$deceasedName}. Wake period: {$wakeStartDate}",
+            'metadata' => [
+                'user_email' => auth()->user()->email,
+                'user_name' => trim(auth()->user()->first_name.' '.auth()->user()->middle_name.' '.auth()->user()->last_name),
+                'module' => 'E-Burol Management',
+                'deceased_name' => $deceasedName,
+                'eburol_id' => $eburolId,
+            ],
+            'ip_address' => request()->ip(),
+            'user_agent' => request()->userAgent(),
+        ]);
+
+        return redirect()->route('visitor.eburol.index')
+            ->with('success', 'E-burol application deleted successfully.');
     }
 }

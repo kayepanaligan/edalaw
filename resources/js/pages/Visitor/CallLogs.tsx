@@ -1,9 +1,29 @@
+import { Head } from '@inertiajs/react';
+import type { ColumnDef } from '@tanstack/react-table';
+import { Clock, Eye, MoreVertical, Phone, PhoneIncoming, PhoneOutgoing } from 'lucide-react';
+import { useMemo, useState } from 'react';
+
+import { DataTable } from '@/components/data-table';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
-import { Head } from '@inertiajs/react';
-import { Clock, Phone, PhoneIncoming, PhoneOutgoing } from 'lucide-react';
 
 type CallLog = {
     id: number;
@@ -32,8 +52,13 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 export default function CallLogs({ callLogs }: Props) {
+    const [selectedCallLog, setSelectedCallLog] = useState<CallLog | null>(null);
+    const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+
     const formatDuration = (seconds: number | null): string => {
-        if (!seconds) return 'N/A';
+        if (!seconds) {
+            return 'N/A';
+        }
         const mins = Math.floor(seconds / 60);
         const secs = seconds % 60;
         return `${mins}:${secs.toString().padStart(2, '0')}`;
@@ -41,9 +66,9 @@ export default function CallLogs({ callLogs }: Props) {
 
     const getCallTypeIcon = (type: string) => {
         return type === 'incoming' ? (
-            <PhoneIncoming className="size-4 text-green-600" />
+            <PhoneIncoming className="h-4 w-4 text-green-600" />
         ) : (
-            <PhoneOutgoing className="size-4 text-blue-600" />
+            <PhoneOutgoing className="h-4 w-4 text-blue-600" />
         );
     };
 
@@ -56,9 +81,7 @@ export default function CallLogs({ callLogs }: Props) {
                     </Badge>
                 );
             case 'missed':
-                return (
-                    <Badge variant="destructive">Missed</Badge>
-                );
+                return <Badge variant="destructive">Missed</Badge>;
             case 'failed':
                 return (
                     <Badge variant="outline" className="bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20">
@@ -66,16 +89,103 @@ export default function CallLogs({ callLogs }: Props) {
                     </Badge>
                 );
             default:
-                return (
-                    <Badge variant="secondary">{status}</Badge>
-                );
+                return <Badge variant="secondary">{status}</Badge>;
         }
     };
+
+    const handleViewDetails = (callLog: CallLog) => {
+        setSelectedCallLog(callLog);
+        setIsViewModalOpen(true);
+    };
+
+    const columns: ColumnDef<CallLog>[] = useMemo(
+        () => [
+            {
+                accessorKey: 'phone_number',
+                header: 'Phone Number',
+                cell: ({ row }) => {
+                    const callLog = row.original;
+                    return (
+                        <div className="flex items-center gap-2">
+                            {getCallTypeIcon(callLog.call_type)}
+                            <div>
+                                <div className="font-medium">{callLog.phone_number}</div>
+                                <Badge variant="outline" className="text-xs capitalize mt-1">
+                                    {callLog.call_type}
+                                </Badge>
+                            </div>
+                        </div>
+                    );
+                },
+            },
+            {
+                accessorKey: 'call_date',
+                header: 'Date & Time',
+                cell: ({ row }) => (
+                    <div className="flex items-center gap-2">
+                        <Clock className="h-4 w-4 text-muted-foreground" />
+                        <span>{new Date(row.original.call_date).toLocaleString()}</span>
+                    </div>
+                ),
+            },
+            {
+                accessorKey: 'duration',
+                header: 'Duration',
+                cell: ({ row }) => (
+                    <div className="text-sm">{formatDuration(row.original.duration)}</div>
+                ),
+            },
+            {
+                accessorKey: 'status',
+                header: 'Status',
+                cell: ({ row }) => getStatusBadge(row.original.status),
+            },
+            {
+                accessorKey: 'notes',
+                header: 'Notes',
+                cell: ({ row }) => (
+                    <div className="max-w-md">
+                        {row.original.notes ? (
+                            <div className="text-sm truncate">{row.original.notes}</div>
+                        ) : (
+                            <span className="text-sm text-muted-foreground">No notes</span>
+                        )}
+                    </div>
+                ),
+            },
+            {
+                id: 'actions',
+                header: 'Actions',
+                cell: ({ row }) => {
+                    const callLog = row.original;
+                    return (
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" className="h-8 w-8 p-0">
+                                    <span className="sr-only">Open menu</span>
+                                    <MoreVertical className="h-4 w-4" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={() => handleViewDetails(callLog)}>
+                                    <Eye className="mr-2 h-4 w-4" />
+                                    View Details
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    );
+                },
+            },
+        ],
+        []
+    );
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Call Logs" />
-            <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-4">
+            <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-6">
                 <div className="flex items-center justify-between">
                     <div>
                         <h1 className="text-2xl font-semibold">Call Logs</h1>
@@ -91,59 +201,85 @@ export default function CallLogs({ callLogs }: Props) {
                     <CardContent>
                         {callLogs.length === 0 ? (
                             <div className="text-center py-8 text-muted-foreground">
-                                <Phone className="size-12 mx-auto mb-4 opacity-50" />
+                                <Phone className="h-12 w-12 mx-auto mb-4 opacity-50" />
                                 <p>No call logs found.</p>
                                 <p className="text-sm mt-2">Your call history will appear here.</p>
                             </div>
                         ) : (
-                            <div className="space-y-4">
-                                {callLogs.map((log) => (
-                                    <div
-                                        key={log.id}
-                                        className="rounded-lg border p-4 space-y-3"
-                                    >
-                                        <div className="flex items-start justify-between">
-                                            <div className="flex items-start gap-3 flex-1">
-                                                {getCallTypeIcon(log.call_type)}
-                                                <div className="space-y-1 flex-1">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="font-medium">{log.phone_number}</span>
-                                                        <Badge variant="outline" className="text-xs capitalize">
-                                                            {log.call_type}
-                                                        </Badge>
-                                                    </div>
-                                                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                                                        <span className="flex items-center gap-1">
-                                                            <Clock className="size-3" />
-                                                            {new Date(log.call_date).toLocaleString()}
-                                                        </span>
-                                                        {log.duration && (
-                                                            <span>Duration: {formatDuration(log.duration)}</span>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div>
-                                                {getStatusBadge(log.status)}
-                                            </div>
-                                        </div>
-                                        {log.notes && (
-                                            <div className="text-sm text-muted-foreground border-t pt-3">
-                                                <strong>Notes:</strong> {log.notes}
-                                            </div>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
+                            <DataTable columns={columns} data={callLogs} />
                         )}
                     </CardContent>
                 </Card>
+
+                {/* View Details Modal */}
+                <Dialog open={isViewModalOpen} onOpenChange={setIsViewModalOpen}>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Call Log Details</DialogTitle>
+                            <DialogDescription>
+                                Complete information about this call
+                            </DialogDescription>
+                        </DialogHeader>
+                        {selectedCallLog && (
+                            <div className="space-y-4">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="text-sm font-medium text-muted-foreground">
+                                            Phone Number
+                                        </label>
+                                        <div className="flex items-center gap-2 mt-1">
+                                            {getCallTypeIcon(selectedCallLog.call_type)}
+                                            <span className="font-medium">{selectedCallLog.phone_number}</span>
+                                            <Badge variant="outline" className="text-xs capitalize">
+                                                {selectedCallLog.call_type}
+                                            </Badge>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="text-sm font-medium text-muted-foreground">
+                                            Status
+                                        </label>
+                                        <div className="mt-1">{getStatusBadge(selectedCallLog.status)}</div>
+                                    </div>
+                                    <div>
+                                        <label className="text-sm font-medium text-muted-foreground">
+                                            Date & Time
+                                        </label>
+                                        <div className="flex items-center gap-2 mt-1">
+                                            <Clock className="h-4 w-4 text-muted-foreground" />
+                                            <span>{new Date(selectedCallLog.call_date).toLocaleString()}</span>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="text-sm font-medium text-muted-foreground">
+                                            Duration
+                                        </label>
+                                        <div className="mt-1">{formatDuration(selectedCallLog.duration)}</div>
+                                    </div>
+                                </div>
+                                {selectedCallLog.notes && (
+                                    <div>
+                                        <label className="text-sm font-medium text-muted-foreground">
+                                            Notes
+                                        </label>
+                                        <div className="mt-1 p-3 bg-muted rounded-md">
+                                            <p className="text-sm">{selectedCallLog.notes}</p>
+                                        </div>
+                                    </div>
+                                )}
+                                <div>
+                                    <label className="text-sm font-medium text-muted-foreground">
+                                        Created At
+                                    </label>
+                                    <div className="mt-1 text-sm">
+                                        {new Date(selectedCallLog.created_at).toLocaleString()}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </DialogContent>
+                </Dialog>
             </div>
         </AppLayout>
     );
 }
-
-
-
-
-

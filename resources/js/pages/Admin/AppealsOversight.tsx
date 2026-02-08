@@ -413,9 +413,9 @@ export default function AppealsOversight({ appeals, stats }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Appeals Management" />
 
-            <div className="space-y-6">
+            <div className="space-y-6 p-6">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight">Appeals Management</h1>
+                    <h1 className="text-2xl font-semibold">Appeals Management</h1>
                     <p className="text-muted-foreground">
                         Monitor and review all appeals from visitors.
                     </p>

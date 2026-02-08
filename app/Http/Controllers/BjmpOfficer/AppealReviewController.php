@@ -133,11 +133,17 @@ class AppealReviewController extends Controller
         NotificationService::createAppealStatusNotification($appeal);
 
         // Log appeal review for audit
-        AuditLogService::logAppealAction(
+        AuditLogService::logAction(
             'appeal_reviewed',
             $appeal,
-            "BJMP Officer {$request->status} appeal for {$appeal->appealable_type} #{$appeal->appealable_id}. Notes: ".substr($request->decision_notes, 0, 100),
-            $request
+            'Appeal Processing',
+            "Appeal #{$appeal->id} {$request->status} for {$appeal->appealable_type} #{$appeal->appealable_id}. Notes: ".substr($request->decision_notes, 0, 100),
+            $request,
+            [
+                'decision_notes' => $request->decision_notes,
+                'appealable_type' => class_basename($appeal->appealable),
+                'appealable_id' => $appeal->appealable_id,
+            ]
         );
 
         return redirect()->back()->with('success', "Appeal {$request->status} successfully.");

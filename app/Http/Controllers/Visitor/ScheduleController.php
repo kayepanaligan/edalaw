@@ -2,8 +2,11 @@
 
 namespace App\Http\Controllers\Visitor;
 
+use App\AppealStatus;
 use App\Http\Controllers\Controller;
+use App\Models\Appeal;
 use App\Models\Visit;
+use App\Services\AuditLogService;
 use App\Services\NotificationService;
 use App\VisitStatus;
 use App\VisitType;
@@ -25,6 +28,25 @@ class ScheduleController extends Controller
             ->orderBy('created_at', 'desc')
             ->get()
             ->map(function ($visit) {
+                $canAppeal = false;
+                $appealDeadline = null;
+                if ($visit->status === VisitStatus::Rejected) {
+                    $deadline = $visit->updated_at->copy()->addHours(48);
+                    $canAppeal = now()->isBefore($deadline);
+                    $appealDeadline = $deadline->format('Y-m-d H:i:s');
+
+                    // Check if already has a pending or approved appeal
+                    $hasActiveAppeal = Appeal::where('user_id', auth()->id())
+                        ->where('appealable_type', Visit::class)
+                        ->where('appealable_id', $visit->id)
+                        ->where('status', '!=', AppealStatus::Rejected)
+                        ->exists();
+
+                    if ($hasActiveAppeal) {
+                        $canAppeal = false;
+                    }
+                }
+
                 return [
                     'id' => $visit->id,
                     'scheduled_date' => $visit->scheduled_date->format('Y-m-d'),
@@ -36,7 +58,10 @@ class ScheduleController extends Controller
                     'status' => $visit->status->value,
                     'notes' => $visit->notes,
                     'meeting_link' => $visit->meeting_link,
+                    'rejection_reason' => $visit->rejection_reason,
                     'created_at' => $visit->created_at->format('Y-m-d H:i:s'),
+                    'can_appeal' => $canAppeal,
+                    'appeal_deadline' => $appealDeadline,
                 ];
             });
 
@@ -173,6 +198,22 @@ class ScheduleController extends Controller
         NotificationService::createVisitSubmittedNotification($visit);
         NotificationService::notifySuperAdminsAboutVisit($visit);
 
+        // Log the action
+        $inmateName = trim("{$visit->inmate_first_name} {$visit->inmate_middle_name} {$visit->inmate_last_name}");
+        AuditLogService::logAction(
+            'visit_submitted',
+            $visit,
+            'Schedule Management',
+            "Visit schedule submitted for {$inmateName}. Type: {$visit->visit_type->value}. Scheduled: {$visit->scheduled_date->format('M d, Y')} at {$visit->scheduled_time}",
+            $request,
+            [
+                'inmate_name' => $inmateName,
+                'visit_type' => $visit->visit_type->value,
+                'scheduled_date' => $visit->scheduled_date->format('Y-m-d'),
+                'scheduled_time' => $visit->scheduled_time,
+            ]
+        );
+
         return redirect()->back()->with('success', 'Visit schedule submitted successfully. Your application has been sent to the BJMP officer for review. Please wait for approval.');
     }
 
@@ -198,6 +239,21 @@ class ScheduleController extends Controller
 
         // Create notification
         NotificationService::createVisitNotification($visit, 'cancelled');
+
+        // Log the action
+        $inmateName = trim("{$visit->inmate_first_name} {$visit->inmate_middle_name} {$visit->inmate_last_name}");
+        AuditLogService::logAction(
+            'visit_cancelled',
+            $visit,
+            'Schedule Management',
+            "Visit schedule cancelled for {$inmateName}. Was scheduled for: {$visit->scheduled_date->format('M d, Y')} at {$visit->scheduled_time}",
+            $request,
+            [
+                'inmate_name' => $inmateName,
+                'scheduled_date' => $visit->scheduled_date->format('Y-m-d'),
+                'scheduled_time' => $visit->scheduled_time,
+            ]
+        );
 
         return redirect()->back()->with('success', 'Visit schedule cancelled successfully.');
     }
@@ -242,6 +298,9 @@ class ScheduleController extends Controller
                 ->withInput();
         }
 
+        $oldDate = $visit->scheduled_date->format('Y-m-d');
+        $oldTime = $visit->scheduled_time;
+
         // Update the visit status to pending after rescheduling
         $visit->update([
             'scheduled_date' => $request->scheduled_date,
@@ -252,6 +311,23 @@ class ScheduleController extends Controller
 
         // Create notification
         NotificationService::createVisitSubmittedNotification($visit);
+
+        // Log the action
+        $inmateName = trim("{$visit->inmate_first_name} {$visit->inmate_middle_name} {$visit->inmate_last_name}");
+        AuditLogService::logAction(
+            'visit_rescheduled',
+            $visit,
+            'Schedule Management',
+            "Visit schedule rescheduled for {$inmateName}. From: {$oldDate} {$oldTime} to {$request->scheduled_date} {$request->scheduled_time}",
+            $request,
+            [
+                'inmate_name' => $inmateName,
+                'old_date' => $oldDate,
+                'old_time' => $oldTime,
+                'new_date' => $request->scheduled_date,
+                'new_time' => $request->scheduled_time,
+            ]
+        );
 
         return redirect()->back()->with('success', 'Visit schedule rescheduled successfully. Your rescheduled request has been sent to the BJMP officer for review.');
     }

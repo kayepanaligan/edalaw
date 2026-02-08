@@ -2,11 +2,15 @@
 
 namespace App\Http\Controllers\Dashboard;
 
+use App\AppealStatus;
 use App\EburolStatus;
 use App\Http\Controllers\Controller;
+use App\Models\Appeal;
 use App\Models\CallLog;
 use App\Models\Eburol;
+use App\Models\Suggestion;
 use App\Models\Visit;
+use App\SuggestionStatus;
 use App\VisitStatus;
 use App\VisitType;
 use Inertia\Inertia;
@@ -137,6 +141,44 @@ class VisitorDashboardController extends Controller
                 ];
             });
 
+        // Appeals statistics
+        $totalAppeals = Appeal::where('user_id', $userId)->count();
+        $pendingAppeals = Appeal::where('user_id', $userId)
+            ->where('status', AppealStatus::Pending)
+            ->count();
+        $approvedAppeals = Appeal::where('user_id', $userId)
+            ->where('status', AppealStatus::Approved)
+            ->count();
+        $rejectedAppeals = Appeal::where('user_id', $userId)
+            ->where('status', AppealStatus::Rejected)
+            ->count();
+
+        // Feedback/Suggestions statistics
+        $totalFeedback = Suggestion::where('user_id', $userId)->count();
+        $pendingFeedback = Suggestion::where('user_id', $userId)
+            ->where('status', SuggestionStatus::Pending)
+            ->count();
+        $reviewedFeedback = Suggestion::where('user_id', $userId)
+            ->where('status', SuggestionStatus::Reviewed)
+            ->count();
+        $resolvedFeedback = Suggestion::where('user_id', $userId)
+            ->where('status', SuggestionStatus::Resolved)
+            ->count();
+        $inProgressFeedback = Suggestion::where('user_id', $userId)
+            ->where('status', SuggestionStatus::InProgress)
+            ->count();
+        $dismissedFeedback = Suggestion::where('user_id', $userId)
+            ->where('status', SuggestionStatus::Dismissed)
+            ->count();
+
+        // Feedback type distribution (complaints vs suggestions)
+        $complaintsCount = Suggestion::where('user_id', $userId)
+            ->where('type', 'complaint')
+            ->count();
+        $suggestionsCount = Suggestion::where('user_id', $userId)
+            ->where('type', 'suggestion')
+            ->count();
+
         return Inertia::render('Dashboard/Visitor', [
             'stats' => [
                 'total_schedules' => $totalSchedules,
@@ -167,6 +209,24 @@ class VisitorDashboardController extends Controller
                 'completed_eburols' => $completedEburols,
             ],
             'recent_eburols' => $recentEburols,
+            'appeals_stats' => [
+                'total_appeals' => $totalAppeals,
+                'pending_appeals' => $pendingAppeals,
+                'approved_appeals' => $approvedAppeals,
+                'rejected_appeals' => $rejectedAppeals,
+            ],
+            'feedback_stats' => [
+                'total_feedback' => $totalFeedback,
+                'pending_feedback' => $pendingFeedback,
+                'reviewed_feedback' => $reviewedFeedback,
+                'resolved_feedback' => $resolvedFeedback,
+                'in_progress_feedback' => $inProgressFeedback,
+                'dismissed_feedback' => $dismissedFeedback,
+            ],
+            'feedback_types' => [
+                'complaints' => $complaintsCount,
+                'suggestions' => $suggestionsCount,
+            ],
         ]);
     }
 }

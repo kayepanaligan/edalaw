@@ -89,6 +89,9 @@ class AppealController extends Controller
             })
             ->get()
             ->map(function ($visit) {
+                $deadline = $visit->updated_at->copy()->addHours(48);
+                $canAppeal = now()->isBefore($deadline);
+
                 return [
                     'id' => $visit->id,
                     'type' => 'visit',
@@ -98,6 +101,8 @@ class AppealController extends Controller
                     'visit_type' => $visit->visit_type->value,
                     'inmate_name' => trim("{$visit->inmate_first_name} {$visit->inmate_middle_name} {$visit->inmate_last_name}"),
                     'rejected_at' => $visit->updated_at->format('Y-m-d H:i:s'),
+                    'can_appeal' => $canAppeal,
+                    'appeal_deadline' => $deadline->format('Y-m-d H:i:s'),
                 ];
             });
 
@@ -108,6 +113,9 @@ class AppealController extends Controller
             })
             ->get()
             ->map(function ($eburol) {
+                $deadline = $eburol->updated_at->copy()->addHours(48);
+                $canAppeal = now()->isBefore($deadline);
+
                 return [
                     'id' => $eburol->id,
                     'type' => 'eburol',
@@ -117,6 +125,8 @@ class AppealController extends Controller
                     'wake_start_date' => $eburol->wake_start_date->format('Y-m-d'),
                     'wake_end_date' => $eburol->wake_end_date->format('Y-m-d'),
                     'rejected_at' => $eburol->updated_at->format('Y-m-d H:i:s'),
+                    'can_appeal' => $canAppeal,
+                    'appeal_deadline' => $deadline->format('Y-m-d H:i:s'),
                 ];
             });
 
@@ -211,11 +221,18 @@ class AppealController extends Controller
         NotificationService::notifySuperAdminsAboutAppeal($appeal);
 
         // Log appeal submission for audit
-        AuditLogService::logAppealAction(
+        $appealableType = $request->appealable_type === 'visit' ? 'Visit Schedule' : 'E-Burol Application';
+        AuditLogService::logAction(
             'appeal_submitted',
             $appeal,
-            "Visitor submitted appeal for {$request->appealable_type} #{$request->appealable_id}. Reason: ".substr($request->reason, 0, 100),
-            $request
+            'Appeal Management',
+            "Appeal submitted for {$appealableType} #{$request->appealable_id}. Reason: ".substr($request->reason, 0, 100),
+            $request,
+            [
+                'appealable_type' => $appealableType,
+                'appealable_id' => $request->appealable_id,
+                'reason_preview' => substr($request->reason, 0, 100),
+            ]
         );
 
         return redirect()->back()->with('success', 'Appeal submitted successfully. Your appeal has been sent to the BJMP officer for review. Thank you for taking the time to submit your appeal.');

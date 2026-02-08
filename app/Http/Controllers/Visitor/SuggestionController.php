@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Visitor;
 
 use App\Http\Controllers\Controller;
 use App\Models\Suggestion;
+use App\Services\AuditLogService;
 use App\SuggestionStatus;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -66,6 +67,22 @@ class SuggestionController extends Controller
 
         // Notify super admins
         \App\Services\NotificationService::notifySuperAdminsAboutSuggestion($suggestion);
+        // Notify visitor
+        \App\Services\NotificationService::createSuggestionSubmittedNotification($suggestion);
+
+        // Log the action
+        $typeLabel = $suggestion->type === 'suggestion' ? 'Suggestion' : 'Complaint';
+        AuditLogService::logAction(
+            'suggestion_submitted',
+            $suggestion,
+            'Feedback & Suggestions',
+            "{$typeLabel} submitted: {$suggestion->subject}",
+            $request,
+            [
+                'type' => $suggestion->type,
+                'subject' => $suggestion->subject,
+            ]
+        );
 
         return redirect()->back()->with('success', 'Your '.$request->type.' has been sent to the Super Admin for review. Thank you for taking the time to provide your feedback!');
     }

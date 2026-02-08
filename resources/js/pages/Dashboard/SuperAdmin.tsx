@@ -1,8 +1,30 @@
-import { Head, Link } from '@inertiajs/react';
-import { CheckCircle, Clock, UserX, Users, MessageSquare, AlertCircle, FileText, Scale } from 'lucide-react';
+import { Head, Link, router } from '@inertiajs/react';
+import { Users, MessageSquare, Scale, Heart } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import {
+    Bar,
+    BarChart,
+    CartesianGrid,
+    Cell,
+    Legend,
+    Pie,
+    PieChart,
+    ResponsiveContainer,
+    Tooltip,
+    XAxis,
+    YAxis,
+} from 'recharts';
 
 import { Badge } from '@/components/ui/badge';
-import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import {
     Table,
     TableBody,
@@ -66,7 +88,32 @@ type Props = {
         in_progress: number;
         dismissed: number;
     };
-};
+    eburol_stats: {
+        total: number;
+        pending: number;
+        approved: number;
+        rejected: number;
+        completed: number;
+    };
+    gender_distribution: Record<string, number>;
+    visit_type_distribution: {
+        physical: number;
+        virtual: number;
+    };
+    appeals_by_type: {
+        visit: number;
+        eburol: number;
+    };
+    feedback_by_type: {
+        suggestions: number;
+        complaints: number;
+    };
+    provinces: string[];
+    municipalities: string[];
+    barangays: string[];
+    location_distribution: Array<{ name: string; count: number }>;
+    age_distribution: Array<{ name: string; count: number }>;
+}
 
 function getFullName(user: User): string {
     const parts = [user.first_name, user.middle_name, user.last_name].filter(
@@ -109,16 +156,141 @@ function getRoleBadge(role: string | null) {
     );
 }
 
+const COLORS = ['#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#00ff00', '#ff00ff', '#00ffff'];
+
 export default function SuperAdminDashboard({
     stats,
     recent_users,
     appeals_stats,
     suggestions_stats,
+    eburol_stats,
+    gender_distribution,
+    visit_type_distribution,
+    appeals_by_type,
+    feedback_by_type,
+    provinces,
+    municipalities: initialMunicipalities,
+    barangays: initialBarangays,
+    location_distribution: initialLocationDistribution,
+    age_distribution,
 }: Props) {
+    const [selectedProvince, setSelectedProvince] = useState<string>('all');
+    const [selectedMunicipality, setSelectedMunicipality] = useState<string>('all');
+    const [selectedBarangay, setSelectedBarangay] = useState<string>('all');
+    const [locationDistribution, setLocationDistribution] = useState(initialLocationDistribution);
+    const [municipalities, setMunicipalities] = useState(initialMunicipalities);
+    const [barangays, setBarangays] = useState(initialBarangays);
+
+    // Gender distribution chart data
+    const genderChartData = useMemo(() => {
+        return Object.entries(gender_distribution).map(([name, value]) => ({
+            name: name || 'Not Specified',
+            value,
+        }));
+    }, [gender_distribution]);
+
+    // Visit type distribution chart data
+    const visitTypeChartData = useMemo(() => {
+        return [
+            { name: 'Physical', value: visit_type_distribution.physical },
+            { name: 'Virtual', value: visit_type_distribution.virtual },
+        ];
+    }, [visit_type_distribution]);
+
+    // Appeals by type chart data
+    const appealsByTypeChartData = useMemo(() => {
+        return [
+            { name: 'Visits', value: appeals_by_type.visit },
+            { name: 'E-Burol', value: appeals_by_type.eburol },
+        ];
+    }, [appeals_by_type]);
+
+    // Feedback by type chart data
+    const feedbackByTypeChartData = useMemo(() => {
+        return [
+            { name: 'Suggestions', value: feedback_by_type.suggestions },
+            { name: 'Complaints', value: feedback_by_type.complaints },
+        ];
+    }, [feedback_by_type]);
+
+    // Location distribution chart data
+    const locationChartData = useMemo(() => {
+        return locationDistribution;
+    }, [locationDistribution]);
+
+    const handleLocationFilterChange = () => {
+        router.get(
+            '/dashboard/super-admin',
+            {
+                province: selectedProvince !== 'all' ? selectedProvince : null,
+                municipality: selectedMunicipality !== 'all' ? selectedMunicipality : null,
+                barangay: selectedBarangay !== 'all' ? selectedBarangay : null,
+            },
+            {
+                only: ['location_distribution', 'municipalities', 'barangays'],
+                preserveScroll: true,
+                onSuccess: (page) => {
+                    const props = page.props as unknown as Props;
+                    setLocationDistribution(props.location_distribution);
+                    setMunicipalities(props.municipalities);
+                    setBarangays(props.barangays);
+                },
+            }
+        );
+    };
+
+    // Update municipalities when province changes
+    const handleProvinceChange = (value: string) => {
+        setSelectedProvince(value);
+        setSelectedMunicipality('all');
+        setSelectedBarangay('all');
+        if (value !== 'all') {
+            router.get(
+                '/dashboard/super-admin',
+                { province: value },
+                {
+                    only: ['municipalities'],
+                    preserveScroll: true,
+                    onSuccess: (page) => {
+                        const props = page.props as unknown as Props;
+                        setMunicipalities(props.municipalities);
+                    },
+                }
+            );
+        } else {
+            setMunicipalities(initialMunicipalities);
+        }
+    };
+
+    // Update barangays when municipality changes
+    const handleMunicipalityChange = (value: string) => {
+        setSelectedMunicipality(value);
+        setSelectedBarangay('all');
+        if (value !== 'all') {
+            router.get(
+                '/dashboard/super-admin',
+                {
+                    province: selectedProvince !== 'all' ? selectedProvince : null,
+                    municipality: value,
+                },
+                {
+                    only: ['barangays'],
+                    preserveScroll: true,
+                    onSuccess: (page) => {
+                        const props = page.props as unknown as Props;
+                        setBarangays(props.barangays);
+                    },
+                }
+            );
+        } else {
+            setBarangays(initialBarangays);
+        }
+    };
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Super Admin Dashboard" />
-            <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-4">
+            <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-6">
                 <div className="flex items-center justify-between">
                     <div>
                         <h1 className="text-2xl font-semibold">Super Admin Dashboard</h1>
@@ -126,68 +298,25 @@ export default function SuperAdminDashboard({
                     </div>
                 </div>
 
-                {/* User Statistics Cards */}
+                {/* KPI Cards */}
                 <div className="grid auto-rows-min gap-4 md:grid-cols-4">
+                    {/* First Card: Users */}
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                             <CardTitle className="text-sm font-medium">
-                                Total Users
+                                Number of Users
                             </CardTitle>
                             <Users className="h-4 w-4 text-muted-foreground" />
                         </CardHeader>
-                        <div className="px-6 pb-6">
+                        <CardContent>
                             <div className="text-2xl font-bold">{stats.total_users}</div>
-                            <p className="text-xs text-muted-foreground">
-                                All registered users
+                            <p className="text-xs text-muted-foreground mt-2">
+                                Pending: {stats.pending_users} • Approved: {stats.approved_users} • Rejected: {stats.rejected_users}
                             </p>
-                        </div>
+                        </CardContent>
                     </Card>
-                    <Card>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium">
-                                Pending
-                            </CardTitle>
-                            <Clock className="h-4 w-4 text-muted-foreground" />
-                        </CardHeader>
-                        <div className="px-6 pb-6">
-                            <div className="text-2xl font-bold">{stats.pending_users}</div>
-                            <p className="text-xs text-muted-foreground">
-                                Awaiting approval
-                            </p>
-                        </div>
-                    </Card>
-                    <Card>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium">
-                                Approved
-                            </CardTitle>
-                            <CheckCircle className="h-4 w-4 text-muted-foreground" />
-                        </CardHeader>
-                        <div className="px-6 pb-6">
-                            <div className="text-2xl font-bold">{stats.approved_users}</div>
-                            <p className="text-xs text-muted-foreground">
-                                Active users
-                            </p>
-                        </div>
-                    </Card>
-                    <Card>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium">
-                                Rejected
-                            </CardTitle>
-                            <UserX className="h-4 w-4 text-muted-foreground" />
-                        </CardHeader>
-                        <div className="px-6 pb-6">
-                            <div className="text-2xl font-bold">{stats.rejected_users}</div>
-                            <p className="text-xs text-muted-foreground">
-                                Rejected accounts
-                            </p>
-                        </div>
-                    </Card>
-                </div>
 
-                {/* Appeals Statistics Cards */}
-                <div className="grid auto-rows-min gap-4 md:grid-cols-4">
+                    {/* Second Card: Appeals */}
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                             <CardTitle className="text-sm font-medium">
@@ -195,221 +324,272 @@ export default function SuperAdminDashboard({
                             </CardTitle>
                             <Scale className="h-4 w-4 text-muted-foreground" />
                         </CardHeader>
-                        <div className="px-6 pb-6">
+                        <CardContent>
                             <div className="text-2xl font-bold">{appeals_stats.total}</div>
-                            <p className="text-xs text-muted-foreground">
-                                All appeal requests
+                            <p className="text-xs text-muted-foreground mt-2">
+                                Pending: {appeals_stats.pending} • Approved: {appeals_stats.approved} • Rejected: {appeals_stats.rejected}
                             </p>
-                        </div>
+                        </CardContent>
                     </Card>
-                    <Card>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium">
-                                Pending Appeals
-                            </CardTitle>
-                            <Clock className="h-4 w-4 text-yellow-500" />
-                        </CardHeader>
-                        <div className="px-6 pb-6">
-                            <div className="text-2xl font-bold">{appeals_stats.pending}</div>
-                            <p className="text-xs text-muted-foreground">
-                                Awaiting review
-                            </p>
-                        </div>
-                    </Card>
-                    <Card>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium">
-                                Approved Appeals
-                            </CardTitle>
-                            <CheckCircle className="h-4 w-4 text-green-500" />
-                        </CardHeader>
-                        <div className="px-6 pb-6">
-                            <div className="text-2xl font-bold">{appeals_stats.approved}</div>
-                            <p className="text-xs text-muted-foreground">
-                                Successfully approved
-                            </p>
-                        </div>
-                    </Card>
-                    <Card>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium">
-                                Rejected Appeals
-                            </CardTitle>
-                            <AlertCircle className="h-4 w-4 text-red-500" />
-                        </CardHeader>
-                        <div className="px-6 pb-6">
-                            <div className="text-2xl font-bold">{appeals_stats.rejected}</div>
-                            <p className="text-xs text-muted-foreground">
-                                Rejected appeals
-                            </p>
-                        </div>
-                    </Card>
-                </div>
 
-                {/* Appeals Breakdown */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Appeals by Type</CardTitle>
-                        <CardDescription>Breakdown of appeals by request type</CardDescription>
-                    </CardHeader>
-                    <div className="px-6 pb-6">
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="rounded-lg border p-4">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="text-sm font-medium text-muted-foreground">Visit Appeals</p>
-                                        <p className="text-2xl font-bold">{appeals_stats.by_type.visit}</p>
-                                    </div>
-                                    <FileText className="h-8 w-8 text-blue-500" />
-                                </div>
-                            </div>
-                            <div className="rounded-lg border p-4">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="text-sm font-medium text-muted-foreground">E-Burol Appeals</p>
-                                        <p className="text-2xl font-bold">{appeals_stats.by_type.eburol}</p>
-                                    </div>
-                                    <FileText className="h-8 w-8 text-purple-500" />
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </Card>
-
-                {/* Suggestions/Complaints Statistics Cards */}
-                <div className="grid auto-rows-min gap-4 md:grid-cols-4">
+                    {/* Third Card: Feedbacks */}
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                             <CardTitle className="text-sm font-medium">
-                                Total Feedback
+                                Number of Feedbacks
                             </CardTitle>
                             <MessageSquare className="h-4 w-4 text-muted-foreground" />
                         </CardHeader>
-                        <div className="px-6 pb-6">
+                        <CardContent>
                             <div className="text-2xl font-bold">{suggestions_stats.total}</div>
-                            <p className="text-xs text-muted-foreground">
-                                All feedback submissions
+                            <p className="text-xs text-muted-foreground mt-2">
+                                Pending: {suggestions_stats.pending} • Reviewed: {suggestions_stats.reviewed} • Resolved: {suggestions_stats.resolved} • In Progress: {suggestions_stats.in_progress} • Dismissed: {suggestions_stats.dismissed}
                             </p>
-                        </div>
+                        </CardContent>
                     </Card>
+
+                    {/* Fourth Card: E-Burol */}
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                             <CardTitle className="text-sm font-medium">
-                                Pending Feedback
+                                E-Burol Applications
                             </CardTitle>
-                            <Clock className="h-4 w-4 text-yellow-500" />
+                            <Heart className="h-4 w-4 text-muted-foreground" />
                         </CardHeader>
-                        <div className="px-6 pb-6">
-                            <div className="text-2xl font-bold">{suggestions_stats.pending}</div>
-                            <p className="text-xs text-muted-foreground">
-                                Awaiting review
+                        <CardContent>
+                            <div className="text-2xl font-bold">{eburol_stats.total}</div>
+                            <p className="text-xs text-muted-foreground mt-2">
+                                Pending: {eburol_stats.pending} • Approved: {eburol_stats.approved} • Rejected: {eburol_stats.rejected} • Completed: {eburol_stats.completed}
                             </p>
-                        </div>
-                    </Card>
-                    <Card>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium">
-                                Suggestions
-                            </CardTitle>
-                            <MessageSquare className="h-4 w-4 text-blue-500" />
-                        </CardHeader>
-                        <div className="px-6 pb-6">
-                            <div className="text-2xl font-bold">{suggestions_stats.suggestions}</div>
-                            <p className="text-xs text-muted-foreground">
-                                User suggestions
-                            </p>
-                        </div>
-                    </Card>
-                    <Card>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium">
-                                Complaints
-                            </CardTitle>
-                            <AlertCircle className="h-4 w-4 text-red-500" />
-                        </CardHeader>
-                        <div className="px-6 pb-6">
-                            <div className="text-2xl font-bold">{suggestions_stats.complaints}</div>
-                            <p className="text-xs text-muted-foreground">
-                                User complaints
-                            </p>
-                        </div>
+                        </CardContent>
                     </Card>
                 </div>
 
-                {/* Suggestions/Complaints Status Breakdown */}
+                {/* First Row: Gender and Visit Type Pie Charts */}
+                <div className="grid gap-4 md:grid-cols-2">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Gender Distribution</CardTitle>
+                            <CardDescription>
+                                Distribution of gender among all visitors
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <ResponsiveContainer width="100%" height={300}>
+                                <PieChart>
+                                    <Pie
+                                        data={genderChartData}
+                                        cx="50%"
+                                        cy="50%"
+                                        labelLine={false}
+                                        label={({ name, percent }) => `${name}: ${((percent ?? 0) * 100).toFixed(0)}%`}
+                                        outerRadius={80}
+                                        fill="#8884d8"
+                                        dataKey="value"
+                                    >
+                                        {genderChartData.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                        ))}
+                                    </Pie>
+                                    <Tooltip />
+                                    <Legend />
+                                </PieChart>
+                            </ResponsiveContainer>
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Visit Type Distribution</CardTitle>
+                            <CardDescription>
+                                Distribution of physical and virtual visits
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <ResponsiveContainer width="100%" height={300}>
+                                <PieChart>
+                                    <Pie
+                                        data={visitTypeChartData}
+                                        cx="50%"
+                                        cy="50%"
+                                        labelLine={false}
+                                        label={({ name, percent }) => `${name}: ${((percent ?? 0) * 100).toFixed(0)}%`}
+                                        outerRadius={80}
+                                        fill="#8884d8"
+                                        dataKey="value"
+                                    >
+                                        {visitTypeChartData.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                        ))}
+                                    </Pie>
+                                    <Tooltip />
+                                    <Legend />
+                                </PieChart>
+                            </ResponsiveContainer>
+                        </CardContent>
+                    </Card>
+                </div>
+
+                {/* Second Row: Appeals and Feedback Pie Charts */}
+                <div className="grid gap-4 md:grid-cols-2">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Appeals Distribution</CardTitle>
+                            <CardDescription>
+                                Distribution of appeals by type (E-Burol vs Visits)
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <ResponsiveContainer width="100%" height={300}>
+                                <PieChart>
+                                    <Pie
+                                        data={appealsByTypeChartData}
+                                        cx="50%"
+                                        cy="50%"
+                                        labelLine={false}
+                                        label={({ name, percent }) => `${name}: ${((percent ?? 0) * 100).toFixed(0)}%`}
+                                        outerRadius={80}
+                                        fill="#8884d8"
+                                        dataKey="value"
+                                    >
+                                        {appealsByTypeChartData.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                        ))}
+                                    </Pie>
+                                    <Tooltip />
+                                    <Legend />
+                                </PieChart>
+                            </ResponsiveContainer>
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Feedback Distribution</CardTitle>
+                            <CardDescription>
+                                Distribution of feedbacks (Suggestions vs Complaints)
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <ResponsiveContainer width="100%" height={300}>
+                                <PieChart>
+                                    <Pie
+                                        data={feedbackByTypeChartData}
+                                        cx="50%"
+                                        cy="50%"
+                                        labelLine={false}
+                                        label={({ name, percent }) => `${name}: ${((percent ?? 0) * 100).toFixed(0)}%`}
+                                        outerRadius={80}
+                                        fill="#8884d8"
+                                        dataKey="value"
+                                    >
+                                        {feedbackByTypeChartData.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                        ))}
+                                    </Pie>
+                                    <Tooltip />
+                                    <Legend />
+                                </PieChart>
+                            </ResponsiveContainer>
+                        </CardContent>
+                    </Card>
+                </div>
+
+                {/* Third Row: Location Bar Chart */}
                 <Card>
                     <CardHeader>
-                        <CardTitle>Feedback Status Breakdown</CardTitle>
-                        <CardDescription>Current status of all feedback submissions</CardDescription>
+                        <CardTitle>Visitor Location Distribution</CardTitle>
+                        <CardDescription>
+                            Distribution of visitors by their location (Barangay, Municipality, Province)
+                        </CardDescription>
                     </CardHeader>
-                    <div className="px-6 pb-6">
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            <div className="rounded-lg border p-4">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="text-sm font-medium text-muted-foreground">Resolved</p>
-                                        <p className="text-2xl font-bold">{suggestions_stats.resolved}</p>
-                                    </div>
-                                    <CheckCircle className="h-6 w-6 text-green-500" />
-                                </div>
-                            </div>
-                            <div className="rounded-lg border p-4">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="text-sm font-medium text-muted-foreground">Reviewed</p>
-                                        <p className="text-2xl font-bold">{suggestions_stats.reviewed}</p>
-                                    </div>
-                                    <MessageSquare className="h-6 w-6 text-blue-500" />
-                                </div>
-                            </div>
-                            <div className="rounded-lg border p-4">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="text-sm font-medium text-muted-foreground">In Progress</p>
-                                        <p className="text-2xl font-bold">{suggestions_stats.in_progress}</p>
-                                    </div>
-                                    <Clock className="h-6 w-6 text-orange-500" />
-                                </div>
-                            </div>
-                            <div className="rounded-lg border p-4">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="text-sm font-medium text-muted-foreground">Dismissed</p>
-                                        <p className="text-2xl font-bold">{suggestions_stats.dismissed}</p>
-                                    </div>
-                                    <AlertCircle className="h-6 w-6 text-gray-500" />
-                                </div>
-                            </div>
+                    <CardContent>
+                        <div className="flex items-center gap-4 mb-4">
+                            <Select value={selectedProvince} onValueChange={handleProvinceChange}>
+                                <SelectTrigger className="w-[200px]">
+                                    <SelectValue placeholder="Select Province" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Provinces</SelectItem>
+                                    {provinces.map((province) => (
+                                        <SelectItem key={province} value={province}>
+                                            {province}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+
+                            <Select value={selectedMunicipality} onValueChange={handleMunicipalityChange}>
+                                <SelectTrigger className="w-[200px]">
+                                    <SelectValue placeholder="Select Municipality" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Municipalities</SelectItem>
+                                    {municipalities.map((municipality: string) => (
+                                        <SelectItem key={municipality} value={municipality}>
+                                            {municipality}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+
+                            <Select value={selectedBarangay} onValueChange={setSelectedBarangay}>
+                                <SelectTrigger className="w-[200px]">
+                                    <SelectValue placeholder="Select Barangay" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Barangays</SelectItem>
+                                    {barangays.map((barangay: string) => (
+                                        <SelectItem key={barangay} value={barangay}>
+                                            {barangay}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+
+                            <Button onClick={handleLocationFilterChange}>
+                                Apply Filters
+                            </Button>
                         </div>
-                    </div>
+                        <ResponsiveContainer width="100%" height={400}>
+                            <BarChart data={locationChartData}>
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis
+                                    dataKey="name"
+                                    angle={-45}
+                                    textAnchor="end"
+                                    height={100}
+                                />
+                                <YAxis />
+                                <Tooltip />
+                                <Legend />
+                                <Bar dataKey="count" fill="#8884d8" name="Number of Visitors" />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </CardContent>
                 </Card>
 
-                {/* Quick Actions */}
-                <div className="grid auto-rows-min gap-4 md:grid-cols-3">
-                    <Card className="cursor-pointer hover:bg-accent transition-colors">
-                        <CardHeader>
-                            <CardTitle className="text-lg">System Overview</CardTitle>
-                            <CardDescription>View system statistics and metrics</CardDescription>
-                        </CardHeader>
-                    </Card>
-                    <Card className="cursor-pointer hover:bg-accent transition-colors">
-                        <Link href="/admin/users" className="block">
-                            <CardHeader>
-                                <div className="flex items-center gap-2">
-                                    <Users className="size-5" />
-                                    <CardTitle className="text-lg">User Management</CardTitle>
-                                </div>
-                                <CardDescription>View and manage all user accounts</CardDescription>
-                            </CardHeader>
-                        </Link>
-                    </Card>
-                    <Card className="cursor-pointer hover:bg-accent transition-colors">
-                        <CardHeader>
-                            <CardTitle className="text-lg">Settings</CardTitle>
-                            <CardDescription>Configure system settings</CardDescription>
-                        </CardHeader>
-                    </Card>
-                </div>
+                {/* Fourth Row: Age Distribution Histogram */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Visitor Age Distribution</CardTitle>
+                        <CardDescription>
+                            Distribution of visitors by age groups
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <ResponsiveContainer width="100%" height={400}>
+                            <BarChart data={age_distribution}>
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis dataKey="name" />
+                                <YAxis />
+                                <Tooltip />
+                                <Legend />
+                                <Bar dataKey="count" fill="#82ca9d" name="Number of Visitors" />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </CardContent>
+                </Card>
 
                 {/* Recent Users Table */}
                 <Card>
@@ -428,7 +608,7 @@ export default function SuperAdminDashboard({
                             </Link>
                         </div>
                     </CardHeader>
-                    <div className="px-6 pb-6">
+                    <CardContent>
                         <div className="rounded-lg border">
                             <Table>
                                 <TableHeader>
@@ -474,10 +654,9 @@ export default function SuperAdminDashboard({
                                 </TableBody>
                             </Table>
                         </div>
-                    </div>
+                    </CardContent>
                 </Card>
             </div>
         </AppLayout>
     );
 }
-

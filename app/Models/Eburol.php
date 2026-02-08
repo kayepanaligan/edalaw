@@ -36,6 +36,13 @@ class Eburol extends Model
         'relationship_proof_path',
         'status',
         'admin_notes',
+        'rejection_reason',
+        'daily_co_room_id',
+        'daily_co_room_name',
+        'daily_co_room_url',
+        'daily_co_config',
+        'inmate_token',
+        'room_created_at',
     ];
 
     /**
@@ -50,6 +57,8 @@ class Eburol extends Model
             'wake_start_date' => 'date',
             'wake_end_date' => 'date',
             'status' => EburolStatus::class,
+            'daily_co_config' => 'array',
+            'room_created_at' => 'datetime',
         ];
     }
 

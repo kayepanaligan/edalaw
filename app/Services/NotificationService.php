@@ -210,6 +210,79 @@ class NotificationService
     }
 
     /**
+     * Create a notification for visitor when they submit a suggestion/feedback.
+     */
+    public static function createSuggestionSubmittedNotification(Suggestion $suggestion): void
+    {
+        $typeLabel = $suggestion->type === 'suggestion' ? 'Suggestion' : 'Complaint';
+
+        Notification::create([
+            'user_id' => $suggestion->user_id,
+            'type' => $suggestion->type === 'suggestion' ? 'suggestion_feedback' : 'complaint_feedback',
+            'title' => "{$typeLabel} Submitted",
+            'message' => "Your {$suggestion->type} has been sent to the BJMP for review. Thank you for taking the time to provide your feedback!",
+            'notifiable_id' => $suggestion->id,
+            'notifiable_type' => Suggestion::class,
+        ]);
+    }
+
+    /**
+     * Create a notification for visitor when their suggestion/feedback status is updated.
+     */
+    public static function createSuggestionStatusNotification(Suggestion $suggestion, string $status): void
+    {
+        $typeLabel = $suggestion->type === 'suggestion' ? 'Suggestion' : 'Complaint';
+
+        $statusMessages = [
+            'reviewed' => "Your {$typeLabel} has been reviewed by the administrator.",
+            'in_progress' => "Your {$typeLabel} is now being processed.",
+            'resolved' => "Your {$typeLabel} has been resolved.",
+            'dismissed' => "Your {$typeLabel} has been dismissed.",
+        ];
+
+        $titles = [
+            'reviewed' => "{$typeLabel} Reviewed",
+            'in_progress' => "{$typeLabel} In Progress",
+            'resolved' => "{$typeLabel} Resolved",
+            'dismissed' => "{$typeLabel} Dismissed",
+        ];
+
+        $message = $statusMessages[$status] ?? "Your {$typeLabel} status has been updated to {$status}.";
+
+        // Add admin response if available
+        if ($suggestion->admin_response) {
+            $responsePreview = strlen($suggestion->admin_response) > 150
+                ? substr($suggestion->admin_response, 0, 150).'...'
+                : $suggestion->admin_response;
+            $message .= " Response: {$responsePreview}";
+        }
+
+        Notification::create([
+            'user_id' => $suggestion->user_id,
+            'type' => $suggestion->type === 'suggestion' ? 'suggestion_feedback' : 'complaint_feedback',
+            'title' => $titles[$status] ?? "{$typeLabel} Status Updated",
+            'message' => $message,
+            'notifiable_id' => $suggestion->id,
+            'notifiable_type' => Suggestion::class,
+        ]);
+    }
+
+    /**
+     * Create a notification for device login warning.
+     */
+    public static function createDeviceLoginWarningNotification(User $user, string $deviceInfo, string $location): void
+    {
+        Notification::create([
+            'user_id' => $user->id,
+            'type' => 'device_warning',
+            'title' => 'Security Alert: New Device Login Detected',
+            'message' => "A login attempt was detected from a new device ({$deviceInfo}) at {$location}. If this wasn't you, please secure your account immediately.",
+            'notifiable_id' => $user->id,
+            'notifiable_type' => User::class,
+        ]);
+    }
+
+    /**
      * Notify all super admins about a new user registration.
      */
     public static function notifySuperAdminsAboutNewUser(User $user): void

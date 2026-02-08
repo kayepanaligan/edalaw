@@ -1,16 +1,25 @@
 import { Head, router } from '@inertiajs/react';
+import type { ColumnDef } from '@tanstack/react-table';
 import { Bell, Check, CheckCheck, Clock } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
+import { DataTable } from '@/components/data-table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
 
 type Notification = {
     id: number;
-    type: 'visit_status' | 'eburol_status';
+    type: 'visit_status' | 'eburol_status' | 'appeal_status' | 'suggestion_feedback' | 'complaint_feedback' | 'device_warning';
     title: string;
     message: string;
     is_read: boolean;
@@ -36,39 +45,64 @@ const breadcrumbs: BreadcrumbItem[] = [
     },
 ];
 
-function getNotificationIcon(type: string) {
+function getNotificationTypeLabel(type: string): string {
     switch (type) {
         case 'visit_status':
-            return '📅';
+            return 'Visit';
         case 'eburol_status':
-            return '💐';
+            return 'E-Burol';
+        case 'appeal_status':
+            return 'Appeal Feedback';
+        case 'suggestion_feedback':
+            return 'Suggestion Feedback';
+        case 'complaint_feedback':
+            return 'Complaint Feedback';
+        case 'device_warning':
+            return 'Warning';
         default:
-            return '🔔';
+            return 'Notification';
     }
 }
 
 function getNotificationBadge(type: string) {
-    switch (type) {
-        case 'visit_status':
-            return (
-                <Badge variant="outline" className="text-xs">
-                    Visit
-                </Badge>
-            );
-        case 'eburol_status':
-            return (
-                <Badge variant="outline" className="text-xs">
-                    E-Burol
-                </Badge>
-            );
-        default:
-            return null;
+    const typeColors: Record<string, string> = {
+        visit_status: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20',
+        eburol_status: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20',
+        appeal_status: 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20',
+        suggestion_feedback: 'bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20',
+        complaint_feedback: 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20',
+        device_warning: 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border-yellow-500/20',
+    };
+
+    const className = typeColors[type] || 'bg-gray-500/10 text-gray-600 dark:text-gray-400 border-gray-500/20';
+
+    return (
+        <Badge variant="secondary" className={className}>
+            {getNotificationTypeLabel(type)}
+        </Badge>
+    );
+}
+
+function getStatusBadge(isRead: boolean) {
+    if (isRead) {
+        return (
+            <Badge variant="outline" className="bg-gray-500/10 text-gray-600 dark:text-gray-400">
+                Read
+            </Badge>
+        );
     }
+    return (
+        <Badge variant="default" className="bg-blue-500 hover:bg-blue-600">
+            Unread
+        </Badge>
+    );
 }
 
 export default function Notifications({ notifications, unread_count }: Props) {
     const [markingAsRead, setMarkingAsRead] = useState<number | null>(null);
     const [markingAllAsRead, setMarkingAllAsRead] = useState(false);
+    const [typeFilter, setTypeFilter] = useState<string>('all');
+    const [statusFilter, setStatusFilter] = useState<string>('all');
 
     const handleMarkAsRead = (notificationId: number) => {
         setMarkingAsRead(notificationId);
@@ -86,39 +120,139 @@ export default function Notifications({ notifications, unread_count }: Props) {
         });
     };
 
-    const unreadNotifications = notifications.filter((n) => !n.is_read);
-    const readNotifications = notifications.filter((n) => n.is_read);
+    const filteredNotifications = useMemo(() => {
+        return notifications.filter((notification) => {
+            const matchesType = typeFilter === 'all' || notification.type === typeFilter;
+            const matchesStatus = statusFilter === 'all' || 
+                (statusFilter === 'read' && notification.is_read) ||
+                (statusFilter === 'unread' && !notification.is_read);
+            return matchesType && matchesStatus;
+        });
+    }, [notifications, typeFilter, statusFilter]);
+
+    const columns: ColumnDef<Notification>[] = useMemo(() => [
+        {
+            accessorKey: 'type',
+            header: 'Type',
+            cell: ({ row }) => getNotificationBadge(row.original.type),
+        },
+        {
+            accessorKey: 'title',
+            header: 'Title',
+            cell: ({ row }) => (
+                <div className="font-medium">{row.original.title}</div>
+            ),
+        },
+        {
+            accessorKey: 'message',
+            header: 'Message',
+            cell: ({ row }) => (
+                <div className="max-w-md text-sm text-muted-foreground">
+                    {row.original.message}
+                </div>
+            ),
+        },
+        {
+            accessorKey: 'is_read',
+            header: 'Status',
+            cell: ({ row }) => getStatusBadge(row.original.is_read),
+        },
+        {
+            accessorKey: 'created_at',
+            header: 'Date',
+            cell: ({ row }) => (
+                <div className="text-sm text-muted-foreground">
+                    {new Date(row.original.created_at).toLocaleString()}
+                </div>
+            ),
+        },
+        {
+            id: 'actions',
+            header: 'Actions',
+            cell: ({ row }) => {
+                const notification = row.original;
+                if (notification.is_read) {
+                    return <span className="text-sm text-muted-foreground">-</span>;
+                }
+                return (
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleMarkAsRead(notification.id)}
+                        disabled={markingAsRead === notification.id}
+                    >
+                        {markingAsRead === notification.id ? (
+                            <Clock className="h-4 w-4 animate-spin" />
+                        ) : (
+                            <Check className="h-4 w-4" />
+                        )}
+                    </Button>
+                );
+            },
+        },
+    ], [markingAsRead]);
+
+    const headerActions = (
+        <div className="flex items-center gap-2">
+            <Select value={typeFilter} onValueChange={setTypeFilter}>
+                <SelectTrigger className="w-[200px]">
+                    <SelectValue placeholder="Filter by type" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="all">All Types</SelectItem>
+                    <SelectItem value="visit_status">Visit</SelectItem>
+                    <SelectItem value="eburol_status">E-Burol</SelectItem>
+                    <SelectItem value="appeal_status">Appeal Feedback</SelectItem>
+                    <SelectItem value="suggestion_feedback">Suggestion Feedback</SelectItem>
+                    <SelectItem value="complaint_feedback">Complaint Feedback</SelectItem>
+                    <SelectItem value="device_warning">Warning</SelectItem>
+                </SelectContent>
+            </Select>
+
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-[150px]">
+                    <SelectValue placeholder="Filter by status" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="all">All Statuses</SelectItem>
+                    <SelectItem value="unread">Unread</SelectItem>
+                    <SelectItem value="read">Read</SelectItem>
+                </SelectContent>
+            </Select>
+
+            {unread_count > 0 && (
+                <Button
+                    onClick={handleMarkAllAsRead}
+                    disabled={markingAllAsRead}
+                    variant="outline"
+                >
+                    {markingAllAsRead ? (
+                        <>
+                            <Clock className="mr-2 h-4 w-4 animate-spin" />
+                            Marking...
+                        </>
+                    ) : (
+                        <>
+                            <CheckCheck className="mr-2 h-4 w-4" />
+                            Mark All as Read
+                        </>
+                    )}
+                </Button>
+            )}
+        </div>
+    );
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Notifications" />
-            <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-4">
+            <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-6">
                 <div className="flex items-center justify-between">
                     <div>
                         <h1 className="text-2xl font-semibold">Notifications</h1>
                         <p className="text-muted-foreground">
-                            Stay updated on your visit schedules and e-burol applications
+                            Stay updated on your visit schedules, e-burol applications, appeals, and system alerts
                         </p>
                     </div>
-                    {unread_count > 0 && (
-                        <Button
-                            onClick={handleMarkAllAsRead}
-                            disabled={markingAllAsRead}
-                            variant="outline"
-                        >
-                            {markingAllAsRead ? (
-                                <>
-                                    <Clock className="mr-2 h-4 w-4 animate-spin" />
-                                    Marking...
-                                </>
-                            ) : (
-                                <>
-                                    <CheckCheck className="mr-2 h-4 w-4" />
-                                    Mark All as Read
-                                </>
-                            )}
-                        </Button>
-                    )}
                 </div>
 
                 {notifications.length === 0 ? (
@@ -129,129 +263,30 @@ export default function Notifications({ notifications, unread_count }: Props) {
                                 No notifications yet
                             </p>
                             <p className="text-sm text-muted-foreground mt-2">
-                                You'll be notified when your visit schedules or e-burol applications are updated.
+                                You'll be notified when your visit schedules, e-burol applications, or appeals are updated.
                             </p>
                         </CardContent>
                     </Card>
                 ) : (
-                    <div className="space-y-6">
-                        {/* Unread Notifications */}
-                        {unreadNotifications.length > 0 && (
-                            <div className="space-y-4">
-                                <div className="flex items-center gap-2">
-                                    <h2 className="text-lg font-semibold">Unread</h2>
-                                    <Badge variant="default" className="bg-blue-500 hover:bg-blue-600">
-                                        {unreadNotifications.length}
-                                    </Badge>
-                                </div>
-                                <div className="space-y-3">
-                                    {unreadNotifications.map((notification) => (
-                                        <Card
-                                            key={notification.id}
-                                            className={`border-l-4 ${
-                                                notification.type === 'visit_status'
-                                                    ? 'border-l-blue-500'
-                                                    : 'border-l-purple-500'
-                                            } ${!notification.is_read ? 'bg-blue-50/50 dark:bg-blue-950/20' : ''}`}
-                                        >
-                                            <CardContent className="pt-6">
-                                                <div className="flex items-start justify-between gap-4">
-                                                    <div className="flex-1 space-y-2">
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="text-2xl">
-                                                                {getNotificationIcon(notification.type)}
-                                                            </span>
-                                                            <div className="flex-1">
-                                                                <div className="flex items-center gap-2">
-                                                                    <h3 className="font-semibold">
-                                                                        {notification.title}
-                                                                    </h3>
-                                                                    {getNotificationBadge(notification.type)}
-                                                                </div>
-                                                                <p className="text-sm text-muted-foreground mt-1">
-                                                                    {notification.message}
-                                                                </p>
-                                                                <p className="text-xs text-muted-foreground mt-2">
-                                                                    {new Date(notification.created_at).toLocaleString()}
-                                                                </p>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <Button
-                                                        size="sm"
-                                                        variant="ghost"
-                                                        onClick={() => handleMarkAsRead(notification.id)}
-                                                        disabled={markingAsRead === notification.id}
-                                                        className="shrink-0"
-                                                    >
-                                                        {markingAsRead === notification.id ? (
-                                                            <Clock className="h-4 w-4 animate-spin" />
-                                                        ) : (
-                                                            <Check className="h-4 w-4" />
-                                                        )}
-                                                    </Button>
-                                                </div>
-                                            </CardContent>
-                                        </Card>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Read Notifications */}
-                        {readNotifications.length > 0 && (
-                            <div className="space-y-4">
-                                <div className="flex items-center gap-2">
-                                    <h2 className="text-lg font-semibold">Read</h2>
-                                    <Badge variant="secondary">
-                                        {readNotifications.length}
-                                    </Badge>
-                                </div>
-                                <div className="space-y-3">
-                                    {readNotifications.map((notification) => (
-                                        <Card
-                                            key={notification.id}
-                                            className="opacity-75"
-                                        >
-                                            <CardContent className="pt-6">
-                                                <div className="flex items-start justify-between gap-4">
-                                                    <div className="flex-1 space-y-2">
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="text-2xl">
-                                                                {getNotificationIcon(notification.type)}
-                                                            </span>
-                                                            <div className="flex-1">
-                                                                <div className="flex items-center gap-2">
-                                                                    <h3 className="font-semibold">
-                                                                        {notification.title}
-                                                                    </h3>
-                                                                    {getNotificationBadge(notification.type)}
-                                                                </div>
-                                                                <p className="text-sm text-muted-foreground mt-1">
-                                                                    {notification.message}
-                                                                </p>
-                                                                <p className="text-xs text-muted-foreground mt-2">
-                                                                    {new Date(notification.created_at).toLocaleString()}
-                                                                    {notification.read_at && (
-                                                                        <span className="ml-2">
-                                                                            • Read {new Date(notification.read_at).toLocaleString()}
-                                                                        </span>
-                                                                    )}
-                                                                </p>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </CardContent>
-                                        </Card>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-                    </div>
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>All Notifications</CardTitle>
+                            <CardDescription>
+                                {filteredNotifications.length} of {notifications.length} notification{notifications.length !== 1 ? 's' : ''}
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <DataTable
+                                columns={columns}
+                                data={filteredNotifications}
+                                enableGlobalFilter={true}
+                                searchPlaceholder="Search notifications by title or message..."
+                                headerActions={headerActions}
+                            />
+                        </CardContent>
+                    </Card>
                 )}
             </div>
         </AppLayout>
     );
 }
-

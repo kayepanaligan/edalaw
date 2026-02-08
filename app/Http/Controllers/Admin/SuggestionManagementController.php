@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Suggestion;
+use App\Services\NotificationService;
 use App\SuggestionStatus;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -67,12 +68,22 @@ class SuggestionManagementController extends Controller
                 ->withInput();
         }
 
+        $oldStatus = $suggestion->status->value;
+
         $suggestion->update([
             'status' => SuggestionStatus::from($request->status),
             'reviewed_by' => auth()->id(),
             'reviewed_at' => now(),
             'admin_response' => $request->admin_response,
         ]);
+
+        // Refresh the model to get updated admin_response
+        $suggestion->refresh();
+
+        // Notify the visitor if status changed
+        if ($oldStatus !== $request->status) {
+            NotificationService::createSuggestionStatusNotification($suggestion, $request->status);
+        }
 
         return redirect()->back()->with('success', 'Suggestion updated successfully.');
     }

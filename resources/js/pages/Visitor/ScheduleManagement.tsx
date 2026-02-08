@@ -1,5 +1,5 @@
 import { Head, router, useForm, usePage } from '@inertiajs/react';
-import { Calendar, Clock, Plus, User, Video, X, CalendarClock } from 'lucide-react';
+import { Calendar, Clock, Plus, Scale, User, Video, X, CalendarClock } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { ColumnDef } from '@tanstack/react-table';
@@ -45,7 +45,10 @@ type Visit = {
     status: 'pending' | 'approved' | 'rejected' | 'missed' | 'completed' | 'cancelled';
     notes: string | null;
     meeting_link: string | null;
+    rejection_reason: string | null;
     created_at: string;
+    can_appeal?: boolean;
+    appeal_deadline?: string | null;
 };
 
 type Props = {
@@ -122,7 +125,9 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
     const { props } = usePage<{ bookedTimeSlots?: string[] }>();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isRescheduleModalOpen, setIsRescheduleModalOpen] = useState(false);
+    const [isAppealModalOpen, setIsAppealModalOpen] = useState(false);
     const [selectedVisitForReschedule, setSelectedVisitForReschedule] = useState<Visit | null>(null);
+    const [selectedVisitForAppeal, setSelectedVisitForAppeal] = useState<Visit | null>(null);
     useToast();
     const [visitType, setVisitType] = useState<string>('');
     const [selectedDate, setSelectedDate] = useState<string>('');
@@ -147,6 +152,13 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
     const rescheduleForm = useForm({
         scheduled_date: '',
         scheduled_time: '',
+    });
+
+    const appealForm = useForm({
+        appealable_type: 'visit',
+        appealable_id: 0,
+        reason: '',
+        documents: [] as File[],
     });
 
     // Update booked slots when props change
@@ -277,6 +289,49 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
         });
     };
 
+    const handleOpenAppealModal = (visit: Visit) => {
+        if (!visit.can_appeal) {
+            toast.error('The deadline for submitting an appeal has passed (48 hours after rejection).');
+            return;
+        }
+        setSelectedVisitForAppeal(visit);
+        appealForm.setData({
+            appealable_type: 'visit',
+            appealable_id: visit.id,
+            reason: '',
+            documents: [],
+        });
+        setIsAppealModalOpen(true);
+    };
+
+    const handleAppealModalClose = () => {
+        setIsAppealModalOpen(false);
+        setSelectedVisitForAppeal(null);
+        appealForm.reset();
+    };
+
+    const handleAppealSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        appealForm.post('/visitor/appeals', {
+            preserveScroll: true,
+            forceFormData: true,
+            onSuccess: () => {
+                appealForm.reset();
+                setIsAppealModalOpen(false);
+                setSelectedVisitForAppeal(null);
+                toast.success('Appeal submitted successfully.');
+            },
+            onError: () => {
+                toast.error('Failed to submit appeal. Please check the form and try again.');
+            },
+        });
+    };
+
+    const handleAppealFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const files = Array.from(e.target.files || []);
+        appealForm.setData('documents', files);
+    };
+
     // Fetch booked slots for reschedule date
     useEffect(() => {
         if (rescheduleDate && rescheduleDate !== selectedVisitForReschedule?.scheduled_date) {
@@ -360,6 +415,21 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
             accessorKey: 'status',
             header: 'Status',
             cell: ({ row }) => getStatusBadge(row.original.status),
+        },
+        {
+            accessorKey: 'rejection_reason',
+            header: 'Rejection Reason',
+            cell: ({ row }) => {
+                const visit = row.original;
+                if (visit.status === 'rejected' && visit.rejection_reason) {
+                    return (
+                        <div className="max-w-md">
+                            <p className="text-sm text-destructive">{visit.rejection_reason}</p>
+                        </div>
+                    );
+                }
+                return <span className="text-sm text-muted-foreground">-</span>;
+            },
         },
         {
             accessorKey: 'meeting_link',
@@ -461,10 +531,22 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
                         </div>
                     );
                 }
+                if (visit.status === 'rejected' && visit.can_appeal) {
+                    return (
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleOpenAppealModal(visit)}
+                        >
+                            <Scale className="mr-2 h-4 w-4" />
+                            Appeal
+                        </Button>
+                    );
+                }
                 return <span className="text-sm text-muted-foreground">-</span>;
             },
         },
-    ], [handleCancelVisit, handleOpenRescheduleModal]);
+    ], [handleCancelVisit, handleOpenRescheduleModal, handleOpenAppealModal]);
 
     const currentVisitType = visitType || form.data.visit_type || '';
 
@@ -813,6 +895,89 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
                                     ) : (
                                         'Reschedule Visit'
                                     )}
+                                </Button>
+                            </DialogFooter>
+                        </form>
+                    </DialogContent>
+                </Dialog>
+
+                {/* Appeal Modal */}
+                <Dialog open={isAppealModalOpen} onOpenChange={setIsAppealModalOpen}>
+                    <DialogContent className="max-w-2xl">
+                        <DialogHeader>
+                            <DialogTitle>Submit Appeal</DialogTitle>
+                            <DialogDescription>
+                                Provide a reason for your appeal and optionally attach supporting documents.
+                                Appeals must be submitted within 48 hours after rejection.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <form onSubmit={handleAppealSubmit}>
+                            <div className="space-y-4">
+                                {selectedVisitForAppeal && (
+                                    <div className="rounded-lg bg-muted p-4">
+                                        <Label className="text-sm font-semibold">Appealing:</Label>
+                                        <p className="text-sm mt-1">
+                                            Visit Schedule - Inmate: {selectedVisitForAppeal.inmate_first_name} {selectedVisitForAppeal.inmate_middle_name} {selectedVisitForAppeal.inmate_last_name}
+                                        </p>
+                                        <p className="text-sm text-muted-foreground">
+                                            Scheduled: {selectedVisitForAppeal.scheduled_date} {selectedVisitForAppeal.scheduled_time && `at ${selectedVisitForAppeal.scheduled_time}`}
+                                        </p>
+                                        {selectedVisitForAppeal.rejection_reason && (
+                                            <p className="text-sm text-destructive mt-2">
+                                                <strong>Rejection Reason:</strong> {selectedVisitForAppeal.rejection_reason}
+                                            </p>
+                                        )}
+                                    </div>
+                                )}
+
+                                <div className="grid gap-2">
+                                    <Label htmlFor="appeal_reason">
+                                        Appeal Reason <span className="text-destructive">*</span>
+                                    </Label>
+                                    <Textarea
+                                        id="appeal_reason"
+                                        required
+                                        rows={6}
+                                        value={appealForm.data.reason}
+                                        onChange={(e) => appealForm.setData('reason', e.target.value)}
+                                        placeholder="Please provide a detailed reason for your appeal. Explain why you believe the rejection should be reconsidered..."
+                                        minLength={10}
+                                        maxLength={2000}
+                                    />
+                                    <InputError message={appealForm.errors.reason} />
+                                    <p className="text-xs text-muted-foreground">
+                                        Minimum 10 characters, maximum 2000 characters
+                                    </p>
+                                </div>
+
+                                <div className="grid gap-2">
+                                    <Label htmlFor="appeal_documents">
+                                        Supporting Documents (Optional)
+                                    </Label>
+                                    <Input
+                                        id="appeal_documents"
+                                        type="file"
+                                        multiple
+                                        accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                                        onChange={handleAppealFileChange}
+                                    />
+                                    <InputError message={appealForm.errors.documents} />
+                                    <p className="text-xs text-muted-foreground">
+                                        You can upload up to 5 files (PDF, DOC, DOCX, JPG, JPEG, PNG). Max 5MB per file.
+                                    </p>
+                                    {appealForm.data.documents.length > 0 && (
+                                        <div className="text-sm text-muted-foreground">
+                                            Selected: {appealForm.data.documents.length} file(s)
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                            <DialogFooter className="mt-6">
+                                <Button type="button" variant="outline" onClick={handleAppealModalClose}>
+                                    Cancel
+                                </Button>
+                                <Button type="submit" disabled={appealForm.processing}>
+                                    {appealForm.processing ? 'Submitting...' : 'Submit Appeal'}
                                 </Button>
                             </DialogFooter>
                         </form>

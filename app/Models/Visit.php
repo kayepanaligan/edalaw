@@ -29,6 +29,13 @@ class Visit extends Model
         'status',
         'notes',
         'meeting_link',
+        'rejection_reason',
+        'daily_co_room_id',
+        'daily_co_room_name',
+        'daily_co_room_url',
+        'daily_co_config',
+        'inmate_token',
+        'room_created_at',
     ];
 
     /**
@@ -42,6 +49,8 @@ class Visit extends Model
             'scheduled_date' => 'date',
             'visit_type' => VisitType::class,
             'status' => VisitStatus::class,
+            'daily_co_config' => 'array',
+            'room_created_at' => 'datetime',
         ];
     }
 

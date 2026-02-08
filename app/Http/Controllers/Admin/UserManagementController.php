@@ -33,14 +33,20 @@ class UserManagementController extends Controller
                     'first_name' => $user->first_name,
                     'middle_name' => $user->middle_name,
                     'last_name' => $user->last_name,
+                    'dob' => $user->dob?->format('Y-m-d'),
+                    'gender' => $user->gender,
+                    'street' => $user->street,
+                    'brgy' => $user->brgy,
+                    'municipality' => $user->municipality,
+                    'province' => $user->province,
+                    'postal_code' => $user->postal_code,
                     'email' => $user->email,
+                    'contact_number' => $user->contact_number,
                     'role' => $user->role?->slug,
                     'role_name' => $user->role?->name,
                     'approval_status' => $user->approval_status,
                     'email_verified_at' => $user->email_verified_at?->format('Y-m-d H:i:s'),
                     'created_at' => $user->created_at->format('Y-m-d H:i:s'),
-                    'municipality' => $user->municipality,
-                    'province' => $user->province,
                     'is_active' => $hasActiveSession,
                 ];
             });
@@ -95,5 +101,57 @@ class UserManagementController extends Controller
 
         return redirect()->route('admin.users.index')
             ->with('success', 'User status updated successfully.');
+    }
+
+    /**
+     * Update user information.
+     */
+    public function update(Request $request, User $user): RedirectResponse
+    {
+        $request->validate([
+            'first_name' => ['required', 'string', 'max:255'],
+            'middle_name' => ['nullable', 'string', 'max:255'],
+            'last_name' => ['required', 'string', 'max:255'],
+            'dob' => ['nullable', 'date', 'before:today'],
+            'gender' => ['nullable', 'string', 'in:male,female,other'],
+            'street' => ['nullable', 'string', 'max:255'],
+            'brgy' => ['nullable', 'string', 'max:255'],
+            'municipality' => ['nullable', 'string', 'max:255'],
+            'province' => ['nullable', 'string', 'max:255'],
+            'postal_code' => ['nullable', 'string', 'max:10'],
+            'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email,'.$user->id],
+            'contact_number' => ['nullable', 'string', 'max:20'],
+            'role_id' => ['required', 'exists:roles,id'],
+        ]);
+
+        $user->update([
+            'first_name' => $request->first_name,
+            'middle_name' => $request->middle_name,
+            'last_name' => $request->last_name,
+            'dob' => $request->dob,
+            'gender' => $request->gender,
+            'street' => $request->street,
+            'brgy' => $request->brgy,
+            'municipality' => $request->municipality,
+            'province' => $request->province,
+            'postal_code' => $request->postal_code,
+            'email' => $request->email,
+            'contact_number' => $request->contact_number,
+            'role_id' => $request->role_id,
+        ]);
+
+        return redirect()->route('admin.users.index')
+            ->with('success', 'User updated successfully.');
+    }
+
+    /**
+     * Delete a user.
+     */
+    public function destroy(User $user): RedirectResponse
+    {
+        $user->delete();
+
+        return redirect()->route('admin.users.index')
+            ->with('success', 'User deleted successfully.');
     }
 }
