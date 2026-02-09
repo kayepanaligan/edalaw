@@ -5,6 +5,7 @@ namespace App\Models;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
@@ -35,6 +36,7 @@ class User extends Authenticatable
         'contact_number',
         'role_id',
         'approval_status',
+        'rejection_reason',
         'email_verified_at',
         'id_document_1_path',
         'id_document_2_path',
@@ -77,5 +79,15 @@ class User extends Authenticatable
     public function role(): BelongsTo
     {
         return $this->belongsTo(Role::class);
+    }
+
+    /**
+     * Get the appeals for the user.
+     *
+     * @return HasMany<Appeal>
+     */
+    public function appeals(): HasMany
+    {
+        return $this->hasMany(Appeal::class);
     }
 }

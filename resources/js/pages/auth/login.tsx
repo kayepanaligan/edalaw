@@ -1,5 +1,5 @@
-import { Head, useForm } from '@inertiajs/react';
-import { useRef, useState } from 'react';
+import { Head, router, useForm } from '@inertiajs/react';
+import { useEffect, useRef, useState } from 'react';
 import ReCAPTCHA from 'react-google-recaptcha';
 
 import InputError from '@/components/input-error';
@@ -9,6 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
+import { useAppearance } from '@/hooks/use-appearance';
 import AuthLayout from '@/layouts/auth-layout';
 import { register } from '@/routes';
 import { store } from '@/routes/login';
@@ -27,6 +28,7 @@ export default function Login({
     canRegister,
     recaptchaSiteKey,
 }: Props) {
+    const { resolvedAppearance } = useAppearance();
     const form = useForm({
         email: '',
         password: '',
@@ -36,35 +38,66 @@ export default function Login({
     const formRef = useRef<HTMLFormElement>(null);
     const recaptchaRef = useRef<ReCAPTCHA>(null);
     const [recaptchaError, setRecaptchaError] = useState<string>('');
+    const [recaptchaToken, setRecaptchaToken] = useState<string>('');
+    const [isRecaptchaReady, setIsRecaptchaReady] = useState<boolean>(false);
+    const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+
+    // Keep form data in sync with token state
+    useEffect(() => {
+        if (recaptchaToken) {
+            form.setData('recaptcha_token', recaptchaToken);
+        }
+    }, [recaptchaToken]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setRecaptchaError('');
 
+        let tokenToSend = '';
+
         if (recaptchaSiteKey) {
-            const token = recaptchaRef.current?.getValue();
-            if (!token) {
+            if (!isRecaptchaReady || !recaptchaRef.current) {
+                setRecaptchaError('reCAPTCHA is still loading. Please wait a moment and try again.');
+                return;
+            }
+
+            tokenToSend = recaptchaToken || recaptchaRef.current?.getValue() || form.data.recaptcha_token || '';
+
+            if (!tokenToSend || tokenToSend.trim() === '') {
                 setRecaptchaError('Please complete the reCAPTCHA verification.');
                 return;
             }
-            form.setData('recaptcha_token', token);
         }
 
-        form.post(store().url, {
+        // Submit with explicit payload so recaptcha_token is always included (avoids form state timing issues)
+        const payload = {
+            email: form.data.email,
+            password: form.data.password,
+            remember: form.data.remember,
+            recaptcha_token: tokenToSend,
+        };
+
+        setIsSubmitting(true);
+        router.post(store().url, payload, {
             preserveScroll: true,
-            onFinish: () => {
-                form.setData('recaptcha_token', '');
-                recaptchaRef.current?.reset();
-            },
-            onError: (errors) => {
-                // If OTP is required (visitor login), redirect to OTP verification page
-                // Check if session has login.user_id (set by backend when OTP is sent)
-                if (errors.otp || Object.keys(errors).length === 0) {
-                    // Check session for OTP requirement
+            onFinish: () => setIsSubmitting(false),
+            onError: (errors: Record<string, string>) => {
+                form.setError({ ...form.errors, ...errors } as typeof form.errors);
+                if (errors.recaptcha) {
+                    setRecaptchaToken('');
+                    form.setData('recaptcha_token', '');
+                    recaptchaRef.current?.reset();
+                }
+                if (errors.otp || (Object.keys(errors).length === 0 && !errors.recaptcha)) {
                     setTimeout(() => {
                         window.location.href = '/otp-verification';
                     }, 100);
                 }
+            },
+            onSuccess: () => {
+                setRecaptchaToken('');
+                form.setData('recaptcha_token', '');
+                recaptchaRef.current?.reset();
             },
         });
     };
@@ -143,39 +176,61 @@ export default function Login({
                             <ReCAPTCHA
                                 ref={recaptchaRef}
                                 sitekey={recaptchaSiteKey}
+                                theme={resolvedAppearance}
+                                onLoad={() => {
+                                    // reCAPTCHA widget has loaded
+                                    setIsRecaptchaReady(true);
+                                }}
                                 onChange={(token) => {
                                     if (token) {
                                         setRecaptchaError('');
+                                        // Store token in state and form data
+                                        setRecaptchaToken(token);
                                         form.setData('recaptcha_token', token);
+                                        setIsRecaptchaReady(true);
+                                    } else {
+                                        // Token was cleared
+                                        setRecaptchaToken('');
+                                        form.setData('recaptcha_token', '');
                                     }
                                 }}
                                 onExpired={() => {
                                     setRecaptchaError('reCAPTCHA expired. Please verify again.');
+                                    setRecaptchaToken('');
                                     form.setData('recaptcha_token', '');
+                                    setIsRecaptchaReady(false);
+                                    // Reset the widget so user can try again
+                                    recaptchaRef.current?.reset();
                                 }}
                                 onError={() => {
                                     setRecaptchaError('reCAPTCHA error. Please try again.');
+                                    setRecaptchaToken('');
                                     form.setData('recaptcha_token', '');
+                                    setIsRecaptchaReady(false);
                                 }}
                             />
                         ) : (
-                            <p className="text-sm text-muted-foreground">reCAPTCHA not configured</p>
+                            <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-3 dark:border-yellow-900/50 dark:bg-yellow-900/10">
+                                <p className="text-sm text-yellow-800 dark:text-yellow-400">
+                                    <strong>Note:</strong> reCAPTCHA is not configured. Please contact the administrator if you encounter login issues.
+                                </p>
+                            </div>
                         )}
                     </div>
 
                     {recaptchaError && (
                         <div className="text-sm text-red-600">{recaptchaError}</div>
                     )}
-                    <InputError message={form.errors.recaptcha} />
+                    <InputError message={(form.errors as Record<string, string>).recaptcha} />
 
                     <Button
                         type="submit"
                         className="mt-4 w-full"
                         tabIndex={4}
-                        disabled={form.processing}
+                        disabled={form.processing || isSubmitting}
                         data-test="login-button"
                     >
-                        {form.processing && <Spinner />}
+                        {(form.processing || isSubmitting) && <Spinner />}
                         Log in
                     </Button>
                 </div>

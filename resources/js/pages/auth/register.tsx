@@ -15,6 +15,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
+import { useAppearance } from '@/hooks/use-appearance';
 import AuthLayout from '@/layouts/auth-layout';
 import { login } from '@/routes';
 import { store } from '@/routes/register';
@@ -25,6 +26,7 @@ type Props = {
 };
 
 export default function Register({ recaptchaSiteKey, roles = [] }: Props) {
+    const { resolvedAppearance } = useAppearance();
     const [selectedRole, setSelectedRole] = useState<string>('');
     const form = useForm({
         role_id: '',
@@ -54,13 +56,24 @@ export default function Register({ recaptchaSiteKey, roles = [] }: Props) {
         e.preventDefault();
         setRecaptchaError('');
 
+        // Only require reCAPTCHA if it's configured
         if (recaptchaSiteKey) {
+            // Wait a bit for reCAPTCHA to be ready if it's still loading
+            if (!recaptchaRef.current) {
+                setRecaptchaError('reCAPTCHA is still loading. Please wait a moment and try again.');
+                return;
+            }
+
             const token = recaptchaRef.current?.getValue();
             if (!token) {
                 setRecaptchaError('Please complete the reCAPTCHA verification.');
                 return;
             }
+            // Set the token before submitting
             form.setData('recaptcha_token', token);
+        } else {
+            // Clear any existing token if reCAPTCHA is not configured
+            form.setData('recaptcha_token', '');
         }
 
         form.post(store().url, {
@@ -69,6 +82,13 @@ export default function Register({ recaptchaSiteKey, roles = [] }: Props) {
             onFinish: () => {
                 form.setData('recaptcha_token', '');
                 recaptchaRef.current?.reset();
+            },
+            onError: () => {
+                // Reset reCAPTCHA on error
+                if (recaptchaRef.current) {
+                    recaptchaRef.current.reset();
+                }
+                form.setData('recaptcha_token', '');
             },
         });
     };
@@ -372,6 +392,7 @@ export default function Register({ recaptchaSiteKey, roles = [] }: Props) {
                             <ReCAPTCHA
                                 ref={recaptchaRef}
                                 sitekey={recaptchaSiteKey}
+                                theme={resolvedAppearance}
                                 onChange={(token) => {
                                     if (token) {
                                         setRecaptchaError('');
@@ -388,7 +409,11 @@ export default function Register({ recaptchaSiteKey, roles = [] }: Props) {
                                 }}
                             />
                         ) : (
-                            <p className="text-sm text-muted-foreground">reCAPTCHA not configured</p>
+                            <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-3 dark:border-yellow-900/50 dark:bg-yellow-900/10">
+                                <p className="text-sm text-yellow-800 dark:text-yellow-400">
+                                    <strong>Note:</strong> reCAPTCHA is not configured. Please contact the administrator if you encounter registration issues.
+                                </p>
+                            </div>
                         )}
                     </div>
 

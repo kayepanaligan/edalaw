@@ -132,10 +132,15 @@ class ScheduleManagementController extends Controller
                     'error' => $roomResult['error'] ?? 'Unknown error',
                 ]);
 
-                // Show warning message
-                return redirect()->back()
-                    ->with('warning', 'Schedule approved, but video room creation failed: '.($roomResult['error'] ?? 'Unknown error').'. Please add meeting link manually.')
-                    ->withInput();
+                // If VideoSDK fails, check if manual meeting link was provided
+                if ($request->filled('meeting_link')) {
+                    $updateData['meeting_link'] = $request->meeting_link;
+                } else {
+                    // Show warning message
+                    return redirect()->back()
+                        ->with('warning', 'Schedule approved, but video room creation failed: '.($roomResult['error'] ?? 'Unknown error').'. Please add meeting link manually.')
+                        ->withInput();
+                }
             }
         }
 

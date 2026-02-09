@@ -44,6 +44,7 @@ class RecaptchaService
             if (! isset($data['success']) || ! $data['success']) {
                 Log::warning('reCAPTCHA verification failed.', [
                     'error_codes' => $data['error-codes'] ?? [],
+                    'response_data' => $data,
                 ]);
 
                 return [
@@ -52,6 +53,7 @@ class RecaptchaService
                     'action' => $action,
                     'challenge_ts' => $data['challenge_ts'] ?? '',
                     'hostname' => $data['hostname'] ?? '',
+                    'error_codes' => $data['error-codes'] ?? [],
                 ];
             }
 

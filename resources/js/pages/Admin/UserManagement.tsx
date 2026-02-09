@@ -1,6 +1,6 @@
 import { Head, router, useForm } from '@inertiajs/react';
 import type { ColumnDef } from '@tanstack/react-table';
-import { Plus, MoreVertical, Eye, Edit, Trash2, RefreshCw, Circle } from 'lucide-react';
+import { Plus, MoreVertical, Eye, Edit, Trash2, RefreshCw, Circle, X } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -66,6 +66,7 @@ type User = {
     role: string | null;
     role_name: string | null;
     approval_status: 'pending' | 'approved' | 'rejected';
+    rejection_reason: string | null;
     email_verified_at: string | null;
     created_at: string;
     is_active: boolean;
@@ -139,11 +140,17 @@ export default function UserManagement({ users: initialUsers = [], roles: initia
     const [isViewModalOpen, setIsViewModalOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isUpdateStatusDialogOpen, setIsUpdateStatusDialogOpen] = useState(false);
+    const [isRejectDialogOpen, setIsRejectDialogOpen] = useState(false);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [isAddUserDialogOpen, setIsAddUserDialogOpen] = useState(false);
 
     const updateStatusForm = useForm({
         approval_status: 'pending' as 'pending' | 'approved' | 'rejected',
+        rejection_reason: '',
+    });
+
+    const rejectForm = useForm({
+        rejection_reason: '',
     });
 
     const createForm = useForm({
@@ -219,9 +226,18 @@ export default function UserManagement({ users: initialUsers = [], roles: initia
 
     const handleUpdateStatus = useCallback((user: User) => {
         setSelectedUser(user);
-        updateStatusForm.setData('approval_status', user.approval_status);
+        updateStatusForm.setData({
+            approval_status: user.approval_status,
+            rejection_reason: user.rejection_reason || '',
+        });
         setIsUpdateStatusDialogOpen(true);
     }, [updateStatusForm]);
+
+    const handleReject = useCallback((user: User) => {
+        setSelectedUser(user);
+        rejectForm.setData('rejection_reason', '');
+        setIsRejectDialogOpen(true);
+    }, [rejectForm]);
 
     const handleDelete = useCallback((user: User) => {
         setSelectedUser(user);
@@ -233,15 +249,54 @@ export default function UserManagement({ users: initialUsers = [], roles: initia
             return;
         }
 
+        const data: { approval_status: string; rejection_reason?: string } = {
+            approval_status: updateStatusForm.data.approval_status,
+        };
+
+        if (updateStatusForm.data.approval_status === 'rejected') {
+            if (!updateStatusForm.data.rejection_reason || updateStatusForm.data.rejection_reason.trim().length < 10) {
+                toast.error('Rejection reason is required (minimum 10 characters)');
+                return;
+            }
+            data.rejection_reason = updateStatusForm.data.rejection_reason;
+        }
+
         updateStatusForm.post(`/admin/users/${selectedUser.id}/update-status`, {
             preserveScroll: true,
+            data,
             onSuccess: () => {
                 toast.success('User status updated successfully');
                 setIsUpdateStatusDialogOpen(false);
                 setSelectedUser(null);
+                updateStatusForm.reset();
             },
             onError: (errors) => {
                 toast.error('Failed to update user status');
+                console.error(errors);
+            },
+        });
+    };
+
+    const submitReject = () => {
+        if (!selectedUser) {
+            return;
+        }
+
+        if (!rejectForm.data.rejection_reason || rejectForm.data.rejection_reason.trim().length < 10) {
+            toast.error('Rejection reason is required (minimum 10 characters)');
+            return;
+        }
+
+        rejectForm.post(`/admin/users/${selectedUser.id}/reject`, {
+            preserveScroll: true,
+            onSuccess: () => {
+                toast.success('User rejected successfully');
+                setIsRejectDialogOpen(false);
+                setSelectedUser(null);
+                rejectForm.reset();
+            },
+            onError: (errors) => {
+                toast.error('Failed to reject user');
                 console.error(errors);
             },
         });
@@ -422,6 +477,15 @@ export default function UserManagement({ users: initialUsers = [], roles: initia
                                     <RefreshCw className="mr-2 h-4 w-4" />
                                     Edit Status
                                 </DropdownMenuItem>
+                                {user.approval_status === 'pending' && (
+                                    <DropdownMenuItem
+                                        onClick={() => handleReject(user)}
+                                        className="text-destructive focus:text-destructive"
+                                    >
+                                        <X className="mr-2 h-4 w-4" />
+                                        Reject
+                                    </DropdownMenuItem>
+                                )}
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem
                                     onClick={() => handleDelete(user)}
@@ -802,6 +866,26 @@ export default function UserManagement({ users: initialUsers = [], roles: initia
                                     </SelectContent>
                                 </Select>
                             </div>
+                            {updateStatusForm.data.approval_status === 'rejected' && (
+                                <div className="space-y-2">
+                                    <Label htmlFor="rejection_reason">
+                                        Rejection Reason <span className="text-destructive">*</span>
+                                    </Label>
+                                    <Textarea
+                                        id="rejection_reason"
+                                        rows={4}
+                                        placeholder="Please provide a detailed reason for rejection (minimum 10 characters)..."
+                                        value={updateStatusForm.data.rejection_reason}
+                                        onChange={(e) => updateStatusForm.setData('rejection_reason', e.target.value)}
+                                        minLength={10}
+                                        maxLength={1000}
+                                    />
+                                    <InputError message={updateStatusForm.errors.rejection_reason} />
+                                    <p className="text-xs text-muted-foreground">
+                                        Minimum 10 characters, maximum 1000 characters.
+                                    </p>
+                                </div>
+                            )}
                         </div>
                         <DialogFooter>
                             <Button
@@ -817,6 +901,55 @@ export default function UserManagement({ users: initialUsers = [], roles: initia
                                 {updateStatusForm.processing ? 'Updating...' : 'Update Status'}
                             </Button>
                         </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+
+                {/* Reject User Dialog */}
+                <Dialog open={isRejectDialogOpen} onOpenChange={setIsRejectDialogOpen}>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Reject User Account</DialogTitle>
+                            <DialogDescription>
+                                Reject the account for {selectedUser?.first_name} {selectedUser?.last_name}. Please provide a reason for rejection.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <form onSubmit={(e) => { e.preventDefault(); submitReject(); }} className="space-y-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="reject_rejection_reason">
+                                    Rejection Reason <span className="text-destructive">*</span>
+                                </Label>
+                                <Textarea
+                                    id="reject_rejection_reason"
+                                    rows={5}
+                                    placeholder="Please provide a detailed reason for rejection (minimum 10 characters)..."
+                                    value={rejectForm.data.rejection_reason}
+                                    onChange={(e) => rejectForm.setData('rejection_reason', e.target.value)}
+                                    required
+                                    minLength={10}
+                                    maxLength={1000}
+                                />
+                                <InputError message={rejectForm.errors.rejection_reason} />
+                                <p className="text-xs text-muted-foreground">
+                                    Minimum 10 characters, maximum 1000 characters. This reason will be visible to the user.
+                                </p>
+                            </div>
+                            <DialogFooter>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => {
+                                        setIsRejectDialogOpen(false);
+                                        setSelectedUser(null);
+                                        rejectForm.reset();
+                                    }}
+                                >
+                                    Cancel
+                                </Button>
+                                <Button type="submit" variant="destructive" disabled={rejectForm.processing}>
+                                    {rejectForm.processing ? 'Rejecting...' : 'Reject User'}
+                                </Button>
+                            </DialogFooter>
+                        </form>
                     </DialogContent>
                 </Dialog>
 

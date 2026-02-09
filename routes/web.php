@@ -45,6 +45,16 @@ Route::middleware('guest')->group(function () {
         ->name('otp-verification.resend');
 });
 
+// Account status routes (auth required but may be pending/rejected)
+Route::middleware('auth')->group(function () {
+    Route::get('account-pending', [\App\Http\Controllers\Auth\AccountStatusController::class, 'showPending'])
+        ->name('account-pending');
+    Route::get('account-rejected', [\App\Http\Controllers\Auth\AccountStatusController::class, 'showRejected'])
+        ->name('account-rejected');
+    Route::post('account-appeal', [\App\Http\Controllers\Auth\AccountAppealController::class, 'store'])
+        ->name('account-appeal.store');
+});
+
 Route::middleware(['auth', 'verified', 'approved'])->group(function () {
     Route::get('dashboard', function () {
         $user = auth()->user();
@@ -224,6 +234,10 @@ Route::middleware(['auth', 'verified', 'approved'])->group(function () {
             ->name('appeals.review');
         Route::put('appeals/{appeal}/update-status', [\App\Http\Controllers\Admin\AppealsOversightController::class, 'updateStatus'])
             ->name('appeals.update-status');
+        Route::get('account-appeals', [\App\Http\Controllers\Admin\AccountAppealReviewController::class, 'index'])
+            ->name('account-appeals.index');
+        Route::post('account-appeals/{appeal}/review', [\App\Http\Controllers\Admin\AccountAppealReviewController::class, 'review'])
+            ->name('account-appeals.review');
         Route::get('suggestions', [\App\Http\Controllers\Admin\SuggestionManagementController::class, 'index'])
             ->name('suggestions.index');
         Route::put('suggestions/{suggestion}', [\App\Http\Controllers\Admin\SuggestionManagementController::class, 'update'])

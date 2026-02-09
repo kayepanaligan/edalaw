@@ -33,9 +33,13 @@ class VideoSdkService
     public function createRoom(string $name, array $options = []): array
     {
         if (! $this->apiKey || ! $this->apiEndpoint || ! $this->token) {
-            Log::error('VideoSDK API key, endpoint, or token not configured');
+            Log::error('VideoSDK API key, endpoint, or token not configured', [
+                'has_api_key' => ! empty($this->apiKey),
+                'has_endpoint' => ! empty($this->apiEndpoint),
+                'has_token' => ! empty($this->token),
+            ]);
 
-            return ['success' => false, 'error' => 'VideoSDK service not configured'];
+            return ['success' => false, 'error' => 'VideoSDK service not configured. Please check your environment variables: VIDEOSDK_API_KEY, VIDEOSDK_API_ENDPOINT, and VIDEOSDK_TOKEN.'];
         }
 
         try {
@@ -49,7 +53,12 @@ class VideoSdkService
                 $requestBody = array_merge($requestBody, $options);
             }
 
-            $response = Http::withHeaders([
+            Log::info('Creating VideoSDK room', [
+                'room_name' => $name,
+                'endpoint' => $this->apiEndpoint,
+            ]);
+
+            $response = Http::timeout(30)->withHeaders([
                 'Authorization' => "Bearer {$this->token}",
                 'Content-Type' => 'application/json',
             ])->post($this->apiEndpoint, $requestBody);
@@ -89,12 +98,15 @@ class VideoSdkService
 
             if (is_array($errorBody)) {
                 $errorMessage = $errorBody['error']['message'] ?? $errorBody['message'] ?? $errorBody['error'] ?? $errorMessage;
+            } else {
+                $errorMessage = $response->body() ?: $errorMessage;
             }
 
             Log::error('Failed to create VideoSDK room', [
                 'response' => $response->body(),
                 'status' => $response->status(),
                 'error' => $errorMessage,
+                'request_body' => $requestBody,
             ]);
 
             return [

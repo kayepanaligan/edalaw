@@ -6,6 +6,7 @@ use App\ApprovalStatus;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\UserSession;
+use App\Services\AuditLogService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -45,6 +46,7 @@ class UserManagementController extends Controller
                     'role' => $user->role?->slug,
                     'role_name' => $user->role?->name,
                     'approval_status' => $user->approval_status,
+                    'rejection_reason' => $user->rejection_reason,
                     'email_verified_at' => $user->email_verified_at?->format('Y-m-d H:i:s'),
                     'created_at' => $user->created_at->format('Y-m-d H:i:s'),
                     'is_active' => $hasActiveSession,
@@ -63,11 +65,25 @@ class UserManagementController extends Controller
     /**
      * Approve a pending user.
      */
-    public function approve(User $user): RedirectResponse
+    public function approve(Request $request, User $user): RedirectResponse
     {
         $user->update([
             'approval_status' => ApprovalStatus::Approved,
         ]);
+
+        // Log the action
+        AuditLogService::logAction(
+            'user_approved',
+            $user,
+            'User Management',
+            "Approved user account: {$user->email} ({$user->first_name} {$user->last_name})",
+            $request,
+            [
+                'user_email' => $user->email,
+                'user_name' => trim("{$user->first_name} {$user->middle_name} {$user->last_name}"),
+                'user_role' => $user->role?->slug,
+            ]
+        );
 
         return redirect()->route('admin.users.index')
             ->with('success', 'User approved successfully.');
@@ -76,11 +92,34 @@ class UserManagementController extends Controller
     /**
      * Reject a pending user.
      */
-    public function reject(User $user): RedirectResponse
+    public function reject(Request $request, User $user): RedirectResponse
     {
+        $request->validate([
+            'rejection_reason' => ['required', 'string', 'min:10', 'max:1000'],
+        ]);
+
         $user->update([
             'approval_status' => ApprovalStatus::Rejected,
+            'rejection_reason' => $request->rejection_reason,
         ]);
+
+        // Send notification to user about rejection
+        \App\Services\NotificationService::createAccountRejectionNotification($user);
+
+        // Log the action
+        AuditLogService::logAction(
+            'user_rejected',
+            $user,
+            'User Management',
+            "Rejected user account: {$user->email} ({$user->first_name} {$user->last_name}). Reason: ".substr($request->rejection_reason, 0, 100),
+            $request,
+            [
+                'user_email' => $user->email,
+                'user_name' => trim("{$user->first_name} {$user->middle_name} {$user->last_name}"),
+                'user_role' => $user->role?->slug,
+                'rejection_reason' => $request->rejection_reason,
+            ]
+        );
 
         return redirect()->route('admin.users.index')
             ->with('success', 'User rejected successfully.');
@@ -93,11 +132,44 @@ class UserManagementController extends Controller
     {
         $request->validate([
             'approval_status' => 'required|in:pending,approved,rejected',
+            'rejection_reason' => ['required_if:approval_status,rejected', 'string', 'min:10', 'max:1000'],
         ]);
 
-        $user->update([
+        $updateData = [
             'approval_status' => $request->approval_status,
-        ]);
+        ];
+
+        if ($request->approval_status === ApprovalStatus::Rejected->value) {
+            $updateData['rejection_reason'] = $request->rejection_reason;
+        } else {
+            $updateData['rejection_reason'] = null;
+        }
+
+        $oldStatus = $user->approval_status;
+        $user->update($updateData);
+
+        // Send notification if rejected
+        if ($request->approval_status === ApprovalStatus::Rejected->value) {
+            \App\Services\NotificationService::createAccountRejectionNotification($user);
+        }
+
+        // Log the action
+        $statusChange = "Status changed from {$oldStatus->value} to {$request->approval_status}";
+        AuditLogService::logAction(
+            'user_status_updated',
+            $user,
+            'User Management',
+            "Updated user status for {$user->email} ({$user->first_name} {$user->last_name}): {$statusChange}",
+            $request,
+            [
+                'user_email' => $user->email,
+                'user_name' => trim("{$user->first_name} {$user->middle_name} {$user->last_name}"),
+                'user_role' => $user->role?->slug,
+                'old_status' => $oldStatus->value,
+                'new_status' => $request->approval_status,
+                'rejection_reason' => $request->rejection_reason ?? null,
+            ]
+        );
 
         return redirect()->route('admin.users.index')
             ->with('success', 'User status updated successfully.');
@@ -144,6 +216,22 @@ class UserManagementController extends Controller
             'email_verified_at' => now(),
         ]);
 
+        // Log the action
+        $role = \App\Models\Role::find($request->role_id);
+        AuditLogService::logAction(
+            'user_created',
+            $user,
+            'User Management',
+            "Created new user account: {$user->email} ({$user->first_name} {$user->last_name}) with role: {$role?->name}",
+            $request,
+            [
+                'user_email' => $user->email,
+                'user_name' => trim("{$user->first_name} {$user->middle_name} {$user->last_name}"),
+                'user_role' => $role?->slug,
+                'created_by_admin' => true,
+            ]
+        );
+
         return redirect()->route('admin.users.index')
             ->with('success', 'User created successfully.');
     }
@@ -169,6 +257,11 @@ class UserManagementController extends Controller
             'role_id' => ['required', 'exists:roles,id'],
         ]);
 
+        // Store old values for logging
+        $oldEmail = $user->email;
+        $oldRole = $user->role?->slug;
+        $oldName = trim("{$user->first_name} {$user->middle_name} {$user->last_name}");
+
         $user->update([
             'first_name' => $request->first_name,
             'middle_name' => $request->middle_name,
@@ -185,6 +278,41 @@ class UserManagementController extends Controller
             'role_id' => $request->role_id,
         ]);
 
+        // Refresh to get updated role
+        $user->refresh();
+        $newRole = $user->role?->slug;
+        $newName = trim("{$user->first_name} {$user->middle_name} {$user->last_name}");
+
+        // Log the action
+        $changes = [];
+        if ($oldEmail !== $user->email) {
+            $changes[] = "Email: {$oldEmail} → {$user->email}";
+        }
+        if ($oldRole !== $newRole) {
+            $changes[] = "Role: {$oldRole} → {$newRole}";
+        }
+        if ($oldName !== $newName) {
+            $changes[] = "Name: {$oldName} → {$newName}";
+        }
+
+        $changeDescription = ! empty($changes) ? ' Changes: '.implode(', ', $changes) : '';
+
+        AuditLogService::logAction(
+            'user_updated',
+            $user,
+            'User Management',
+            "Updated user account: {$user->email} ({$user->first_name} {$user->last_name}).{$changeDescription}",
+            $request,
+            [
+                'user_email' => $user->email,
+                'user_name' => $newName,
+                'user_role' => $newRole,
+                'old_email' => $oldEmail,
+                'old_role' => $oldRole,
+                'old_name' => $oldName,
+            ]
+        );
+
         return redirect()->route('admin.users.index')
             ->with('success', 'User updated successfully.');
     }
@@ -192,8 +320,29 @@ class UserManagementController extends Controller
     /**
      * Delete a user.
      */
-    public function destroy(User $user): RedirectResponse
+    public function destroy(Request $request, User $user): RedirectResponse
     {
+        // Store user info before deletion for logging
+        $userEmail = $user->email;
+        $userName = trim("{$user->first_name} {$user->middle_name} {$user->last_name}");
+        $userRole = $user->role?->slug;
+        $userId = $user->id;
+
+        // Log the action before deletion
+        AuditLogService::logAction(
+            'user_deleted',
+            $user,
+            'User Management',
+            "Deleted user account: {$userEmail} ({$userName})",
+            $request,
+            [
+                'user_email' => $userEmail,
+                'user_name' => $userName,
+                'user_role' => $userRole,
+                'deleted_user_id' => $userId,
+            ]
+        );
+
         $user->delete();
 
         return redirect()->route('admin.users.index')

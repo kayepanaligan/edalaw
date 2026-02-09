@@ -507,4 +507,50 @@ class NotificationService
             ]);
         }
     }
+
+    /**
+     * Notify all super admins about an account appeal.
+     */
+    public static function notifySuperAdminsAboutAccountAppeal(Appeal $appeal): void
+    {
+        $superAdminRole = Role::where('slug', 'super_admin')->first();
+        if (! $superAdminRole) {
+            return;
+        }
+
+        $superAdmins = User::where('role_id', $superAdminRole->id)->get();
+        $userName = trim("{$appeal->user->first_name} {$appeal->user->last_name}");
+
+        foreach ($superAdmins as $admin) {
+            Notification::create([
+                'user_id' => $admin->id,
+                'type' => 'admin_notification',
+                'title' => 'New Account Appeal Submitted',
+                'message' => "{$userName} ({$appeal->user->email}) has submitted an appeal for account reconsideration. Reason: ".substr($appeal->reason, 0, 100).'...',
+                'notifiable_id' => $appeal->id,
+                'notifiable_type' => Appeal::class,
+            ]);
+        }
+    }
+
+    /**
+     * Create a notification when a user account is rejected.
+     */
+    public static function createAccountRejectionNotification(User $user): void
+    {
+        $userName = trim("{$user->first_name} {$user->middle_name} {$user->last_name}");
+        $rejectionReason = $user->rejection_reason ? substr($user->rejection_reason, 0, 200) : 'No reason provided.';
+
+        Notification::create([
+            'user_id' => $user->id,
+            'type' => 'account_status',
+            'title' => 'Account Rejected',
+            'message' => "Your account has been rejected. Reason: {$rejectionReason}".($user->rejection_reason && strlen($user->rejection_reason) > 200 ? '...' : '').' You may submit an appeal for reconsideration.',
+            'notifiable_id' => $user->id,
+            'notifiable_type' => User::class,
+        ]);
+
+        // Send SMS to visitor if they have a contact number
+        self::sendSmsToVisitor($user, 'Account Rejected', "Your account has been rejected. Reason: {$rejectionReason}");
+    }
 }

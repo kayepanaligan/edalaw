@@ -53,7 +53,7 @@ class FortifyServiceProvider extends ServiceProvider
             'canResetPassword' => Features::enabled(Features::resetPasswords()),
             'canRegister' => Features::enabled(Features::registration()),
             'status' => $request->session()->get('status'),
-            'recaptchaSiteKey' => config('services.recaptcha.site_key'),
+            'recaptchaSiteKey' => ! empty(trim((string) config('services.recaptcha.site_key'))) ? config('services.recaptcha.site_key') : null,
         ]));
 
         Fortify::resetPasswordView(fn (Request $request) => Inertia::render('auth/reset-password', [
@@ -70,7 +70,7 @@ class FortifyServiceProvider extends ServiceProvider
         ]));
 
         Fortify::registerView(fn () => Inertia::render('auth/register', [
-            'recaptchaSiteKey' => config('services.recaptcha.site_key'),
+            'recaptchaSiteKey' => ! empty(trim((string) config('services.recaptcha.site_key'))) ? config('services.recaptcha.site_key') : null,
             'roles' => \App\Models\Role::whereIn('slug', ['visitor', 'bjmp_officer', 'monitoring_officer'])->get(['id', 'name', 'slug']),
         ]));
 

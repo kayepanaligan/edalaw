@@ -1,5 +1,5 @@
 import { Link, usePage } from '@inertiajs/react';
-import { AlertTriangle, Bell, Calendar, FileText, LayoutGrid, MessageSquare, Phone, Scale, Shield, Users, Heart, Monitor, Video, Camera, Flag, Settings } from 'lucide-react';
+import { AlertTriangle, Bell, Calendar, FileText, LayoutGrid, MessageSquare, Phone, Scale, Shield, Users, Heart, Monitor, Video, Camera, Flag, Settings, Sliders } from 'lucide-react';
 
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
@@ -28,8 +28,9 @@ export function AppSidebar() {
 
     const mainNavItems: NavItem[] = [];
     
-    // Only add Dashboard to mainNavItems for non-visitor roles
-    if (userRole !== 'visitor') {
+    // Only add Dashboard to mainNavItems for non-visitor and non-super_admin roles
+    // (super_admin uses groups, visitor uses groups)
+    if (userRole !== 'visitor' && userRole !== 'super_admin') {
         mainNavItems.push({
             title: 'Dashboard',
             href: '/dashboard',
@@ -37,33 +38,89 @@ export function AppSidebar() {
         });
     }
 
-    // Add User Management and Schedule Management for super admin
+    // Super Admin navigation with categories
+    let superAdminNavGroups: Array<{ label: string; items: NavItem[] }> | undefined;
     if (userRole === 'super_admin') {
-        mainNavItems.push({
-            title: 'Users',
-            href: '/admin/users',
-            icon: Users,
-        });
-        mainNavItems.push({
-            title: 'Schedules',
-            href: '/admin/schedules',
-            icon: Calendar,
-        });
-        mainNavItems.push({
-            title: 'Appeals',
-            href: '/admin/appeals',
-            icon: Scale,
-        });
-        mainNavItems.push({
-            title: 'Sessions',
-            href: '/admin/sessions',
-            icon: Monitor,
-        });
-        mainNavItems.push({
-            title: 'E-Burol Management',
-            href: '/admin/eburols',
-            icon: Heart,
-        });
+        const unreadAdminCount = typeof page.props.unreadAdminNotificationCount === 'number' ? page.props.unreadAdminNotificationCount : 0;
+        
+        superAdminNavGroups = [
+            {
+                label: 'Main',
+                items: [
+                    {
+                        title: 'Dashboard',
+                        href: '/dashboard',
+                        icon: LayoutGrid,
+                    },
+                    {
+                        title: 'Notification',
+                        href: '/admin/notifications',
+                        icon: Bell,
+                        badge: unreadAdminCount > 0 ? unreadAdminCount : undefined,
+                    },
+                ],
+            },
+            {
+                label: 'Services',
+                items: [
+                    {
+                        title: 'Visit',
+                        href: '/admin/schedules',
+                        icon: Calendar,
+                    },
+                    {
+                        title: 'E-Burol',
+                        href: '/admin/eburols',
+                        icon: Heart,
+                    },
+                    {
+                        title: 'Appeals',
+                        href: '/admin/appeals',
+                        icon: Scale,
+                    },
+                ],
+            },
+            {
+                label: 'Monitoring',
+                items: [
+                    {
+                        title: 'Users',
+                        href: '/admin/users',
+                        icon: Users,
+                    },
+                    {
+                        title: 'Sessions',
+                        href: '/admin/sessions',
+                        icon: Monitor,
+                    },
+                ],
+            },
+            {
+                label: 'Administration',
+                items: [
+                    {
+                        title: 'Configuration',
+                        href: '/settings/time-slot-capacity',
+                        icon: Sliders,
+                    },
+                    {
+                        title: 'System History',
+                        href: '/admin/audit-logs',
+                        icon: FileText,
+                    },
+                    {
+                        title: 'Settings',
+                        href: '/settings',
+                        icon: Settings,
+                    },
+                    {
+                        title: 'Feedback',
+                        href: '/admin/suggestions',
+                        icon: MessageSquare,
+                    },
+                ],
+            },
+        ];
     }
 
     // Visitor navigation with categories
@@ -224,31 +281,6 @@ export function AppSidebar() {
         });
     }
 
-    // Super Admin navigation
-    if (userRole === 'super_admin') {
-        const unreadAdminCount = typeof page.props.unreadAdminNotificationCount === 'number' ? page.props.unreadAdminNotificationCount : 0;
-        mainNavItems.push({
-            title: 'Notifications',
-            href: '/admin/notifications',
-            icon: Bell,
-            badge: unreadAdminCount > 0 ? unreadAdminCount : undefined,
-        });
-        mainNavItems.push({
-            title: 'Feedback',
-            href: '/admin/suggestions',
-            icon: MessageSquare,
-        });
-        mainNavItems.push({
-            title: 'System History',
-            href: '/admin/audit-logs',
-            icon: FileText,
-        });
-        mainNavItems.push({
-            title: 'Settings',
-            href: '/settings',
-            icon: Settings,
-        });
-    }
 
     return (
         <Sidebar collapsible="icon" variant="inset">
@@ -267,6 +299,8 @@ export function AppSidebar() {
             <SidebarContent>
                 {userRole === 'visitor' && visitorNavGroups ? (
                     <NavMain groups={visitorNavGroups} />
+                ) : userRole === 'super_admin' && superAdminNavGroups ? (
+                    <NavMain groups={superAdminNavGroups} />
                 ) : (
                     <NavMain items={mainNavItems} />
                 )}
