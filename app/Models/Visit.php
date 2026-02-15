@@ -80,6 +80,29 @@ class Visit extends Model
     }
 
     /**
+     * Whether the scheduled date and time have passed (no longer valid for approval or joining).
+     */
+    public function isScheduleInPast(): bool
+    {
+        $end = $this->scheduled_date->copy();
+        if ($this->scheduled_time) {
+            [$h, $m] = explode(':', $this->scheduled_time);
+            $end->setTime((int) $h, (int) $m);
+        } else {
+            $end->endOfDay();
+
+            return now()->isAfter($end);
+        }
+        if ($this->visit_type === VisitType::Virtual) {
+            $end->addMinutes(10);
+        } else {
+            $end->addHour();
+        }
+
+        return now()->isAfter($end);
+    }
+
+    /**
      * Check if the access key is valid (exists and not expired).
      */
     public function isAccessKeyValid(): bool

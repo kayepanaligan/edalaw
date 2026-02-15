@@ -49,7 +49,7 @@ return [
     'videosdk' => [
         'api_key' => env('VIDEOSDK_API_KEY'),
         'secret_key' => env('VIDEOSDK_SECRET_KEY'),
-        'api_endpoint' => env('VIDEOSDK_API_ENDPOINT', 'https://api.videosdk.live/v2/rooms'),
+        'api_endpoint' => env('VIDEOSDK_API_ENDPOINT', 'https://api.videosdk.live/v1/meetings'),
         'token' => env('VIDEOSDK_TOKEN'),
     ],
 

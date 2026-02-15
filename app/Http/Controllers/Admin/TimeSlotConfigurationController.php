@@ -16,44 +16,42 @@ class TimeSlotConfigurationController extends Controller
      */
     public function index(): Response
     {
-        // Generate all time slots from 7:00 AM to 5:50 PM in 10-minute intervals
-        $timeSlots = [];
-
-        // AM slots: 7:00 AM to 11:50 AM
-        for ($hour = 7; $hour < 12; $hour++) {
+        // Virtual: 10-minute slots 7:00–17:50. Physical: hourly slots 07:00–17:00
+        $virtualSlots = [];
+        for ($hour = 7; $hour < 18; $hour++) {
             for ($minute = 0; $minute < 60; $minute += 10) {
-                $timeSlots[] = sprintf('%02d:%02d', $hour, $minute);
+                $virtualSlots[] = sprintf('%02d:%02d', $hour, $minute);
             }
         }
-
-        // PM slots: 12:00 PM to 5:50 PM
-        for ($hour = 12; $hour < 18; $hour++) {
-            for ($minute = 0; $minute < 60; $minute += 10) {
-                $timeSlots[] = sprintf('%02d:%02d', $hour, $minute);
-            }
+        $physicalSlots = [];
+        for ($hour = 7; $hour < 18; $hour++) {
+            $physicalSlots[] = sprintf('%02d:00', $hour);
         }
 
-        $visitTypes = ['physical', 'virtual'];
-
-        // Get all existing capacities
         $capacities = TimeSlotCapacity::all()->keyBy(function ($capacity) {
             return $capacity->time_slot.'_'.$capacity->visit_type;
         });
 
-        // Organize data for the frontend
         $capacityData = [];
-        foreach ($timeSlots as $timeSlot) {
-            foreach ($visitTypes as $visitType) {
-                $key = $timeSlot.'_'.$visitType;
-                $capacity = $capacities->get($key);
-
-                $capacityData[] = [
-                    'id' => $capacity?->id,
-                    'time_slot' => $timeSlot,
-                    'visit_type' => $visitType,
-                    'max_capacity' => $capacity?->max_capacity ?? 4,
-                ];
-            }
+        foreach ($virtualSlots as $timeSlot) {
+            $key = $timeSlot.'_virtual';
+            $capacity = $capacities->get($key);
+            $capacityData[] = [
+                'id' => $capacity?->id,
+                'time_slot' => $timeSlot,
+                'visit_type' => 'virtual',
+                'max_capacity' => $capacity?->max_capacity ?? 4,
+            ];
+        }
+        foreach ($physicalSlots as $timeSlot) {
+            $key = $timeSlot.'_physical';
+            $capacity = $capacities->get($key);
+            $capacityData[] = [
+                'id' => $capacity?->id,
+                'time_slot' => $timeSlot,
+                'visit_type' => 'physical',
+                'max_capacity' => $capacity?->max_capacity ?? 4,
+            ];
         }
 
         // Check if request is from settings route

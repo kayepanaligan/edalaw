@@ -4,6 +4,7 @@ import { Calendar, Video, MoreVertical, Eye, Check, X, RefreshCw, CalendarClock,
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
+import { formatVisitSchedule } from '@/lib/formatVisitSchedule';
 import { DataTable } from '@/components/data-table';
 import InputError from '@/components/input-error';
 import { Badge } from '@/components/ui/badge';
@@ -67,6 +68,8 @@ type Visit = {
     monitoring_officer_name: string | null;
     access_key: string | null;
     created_at: string;
+    schedule_ended?: boolean;
+    visit_session_id?: number | null;
 };
 
 type MonitoringOfficer = {
@@ -148,12 +151,12 @@ export default function ScheduleManagement({ visits, stats, monitoringOfficers }
     const [visitTypeFilter, setVisitTypeFilter] = useState<string>('all');
     useToast();
     const page = usePage();
-    const flash = (page.props as { flash?: { warning?: string } }).flash;
+    const flash = (page.props as { flash?: { success?: string; warning?: string; error?: string } }).flash;
     useEffect(() => {
-        if (flash?.warning) {
-            toast.warning(flash.warning);
-        }
-    }, [flash?.warning]);
+        if (flash?.warning) toast.warning(flash.warning);
+        if (flash?.error) toast.error(flash.error);
+        if (flash?.success) toast.success(flash.success);
+    }, [flash?.warning, flash?.error, flash?.success]);
 
     const rejectForm = useForm({
         rejection_reason: '',
@@ -304,22 +307,15 @@ export default function ScheduleManagement({ visits, stats, monitoringOfficers }
             header: 'Date / Time',
             cell: ({ row }) => {
                 const visit = row.original;
-                const scheduledDate = new Date(visit.scheduled_date);
+                const { dateLabel, timeLabel } = formatVisitSchedule(
+                    visit.scheduled_date,
+                    visit.scheduled_time ?? null,
+                    visit.visit_type
+                );
                 return (
                     <div className="space-y-1">
-                        <div className="font-medium">
-                            {scheduledDate.toLocaleDateString('en-US', {
-                                weekday: 'short',
-                                year: 'numeric',
-                                month: 'short',
-                                day: 'numeric',
-                            })}
-                        </div>
-                        {visit.scheduled_time && (
-                            <div className="text-sm text-muted-foreground">
-                                {visit.scheduled_time}
-                            </div>
-                        )}
+                        <div className="font-medium">{dateLabel}</div>
+                        <div className="text-sm text-muted-foreground">{timeLabel}</div>
                     </div>
                 );
             },
@@ -426,18 +422,31 @@ export default function ScheduleManagement({ visits, stats, monitoringOfficers }
                         </Button>
                     );
                 }
-                if (visit.visit_type === 'virtual' && visit.status === 'approved' && visit.meeting_link) {
-                    return (
-                        <a
-                            href={visit.meeting_link}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-green-600 text-white hover:bg-green-700"
-                            title="Join video call"
-                        >
-                            <VideoIcon className="h-4 w-4" />
-                        </a>
-                    );
+                if (visit.visit_type === 'virtual' && visit.status === 'approved') {
+                    const canJoin = visit.visit_session_id && !visit.schedule_ended;
+                    if (canJoin) {
+                        return (
+                            <a
+                                href={`/bjmp-officer/visit-session/${visit.visit_session_id}/join`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-green-600 text-white hover:bg-green-700"
+                                title="Join video call"
+                            >
+                                <VideoIcon className="h-4 w-4" />
+                            </a>
+                        );
+                    }
+                    if (visit.schedule_ended) {
+                        return (
+                            <span
+                                className="inline-flex h-9 w-9 cursor-not-allowed items-center justify-center rounded-md bg-muted text-muted-foreground"
+                                title="Schedule has ended"
+                            >
+                                <VideoIcon className="h-4 w-4" />
+                            </span>
+                        );
+                    }
                 }
                 return <span className="text-sm text-muted-foreground">—</span>;
             },
@@ -684,19 +693,30 @@ export default function ScheduleManagement({ visits, stats, monitoringOfficers }
                                         <Label className="text-muted-foreground">Scheduled Time</Label>
                                         <p className="font-medium">{selectedVisit.scheduled_time || 'N/A'}</p>
                                     </div>
-                                    {selectedVisit.visit_type === 'virtual' && selectedVisit.meeting_link && (
+                                    {selectedVisit.visit_type === 'virtual' && selectedVisit.status === 'approved' && (
                                         <div className="col-span-2">
                                             <Label className="text-muted-foreground">Join video call</Label>
                                             <p className="mt-1">
-                                                <a
-                                                    href={selectedVisit.meeting_link}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="inline-flex h-10 w-10 items-center justify-center rounded-md bg-green-600 text-white hover:bg-green-700"
-                                                    title="Join video call"
-                                                >
-                                                    <VideoIcon className="h-5 w-5" />
-                                                </a>
+                                                {selectedVisit.visit_session_id && !selectedVisit.schedule_ended
+                                                    ? (
+                                                            <a
+                                                                href={`/bjmp-officer/visit-session/${selectedVisit.visit_session_id}/join`}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="inline-flex h-10 w-10 items-center justify-center rounded-md bg-green-600 text-white hover:bg-green-700"
+                                                                title="Join video call"
+                                                            >
+                                                                <VideoIcon className="h-5 w-5" />
+                                                            </a>
+                                                        )
+                                                    : (
+                                                            <span
+                                                                className="inline-flex h-10 w-10 cursor-not-allowed items-center justify-center rounded-md bg-muted text-muted-foreground"
+                                                                title={selectedVisit.schedule_ended ? 'Schedule has ended' : 'Not available'}
+                                                            >
+                                                                <VideoIcon className="h-5 w-5" />
+                                                            </span>
+                                                        )}
                                             </p>
                                         </div>
                                     )}

@@ -33,18 +33,43 @@ export function TimeSlotPicker({
 }: TimeSlotPickerProps) {
     const [activeTab, setActiveTab] = useState<'AM' | 'PM'>('AM');
 
-    // Generate time slots with 10-minute intervals
+    // Helper to format time for display
+    const formatTime = (hour: number, minute: number, period: 'AM' | 'PM'): string => {
+        const displayHour = hour === 0 ? 12 : (hour > 12 ? hour - 12 : hour);
+        const displayMinute = `:${minute.toString().padStart(2, '0')}`;
+        return `${displayHour}${displayMinute} ${period}`;
+    };
+
+    // Generate time slots: 10-minute intervals for virtual, hourly for physical
     const generateTimeSlots = (): TimeSlot[] => {
         const slots: TimeSlot[] = [];
-        
-        // Helper function to format time for display
-        const formatTime = (hour: number, minute: number, period: 'AM' | 'PM'): string => {
-            const displayHour = hour === 0 ? 12 : (hour > 12 ? hour - 12 : hour);
-            const displayMinute = `:${minute.toString().padStart(2, '0')}`;
-            return `${displayHour}${displayMinute} ${period}`;
-        };
-        
-        // Helper function to calculate end time
+        const isHourly = visitType === 'physical';
+
+        if (isHourly) {
+            // Physical: hourly slots 7:00–8:00, 8:00–9:00, … 17:00–18:00
+            for (let hour = 7; hour < 18; hour++) {
+                const time24 = `${hour.toString().padStart(2, '0')}:00`;
+                const period: 'AM' | 'PM' = hour < 12 ? 'AM' : 'PM';
+                const endHour = hour + 1;
+                const endPeriod: 'AM' | 'PM' = endHour < 12 ? 'AM' : 'PM';
+                const startLabel = formatTime(hour, 0, period);
+                const endLabel = formatTime(endHour, 0, endPeriod);
+                const rangeLabel = `${startLabel} - ${endLabel}`;
+                const capacity = slotCapacities[time24] || { current: 0, max: 4, isFull: false };
+                slots.push({
+                    value: time24,
+                    label: rangeLabel,
+                    rangeLabel: rangeLabel,
+                    period: hour < 12 ? 'AM' : 'PM',
+                    currentBookings: capacity.current,
+                    maxCapacity: capacity.max,
+                    isFull: capacity.isFull,
+                });
+            }
+            return slots;
+        }
+
+        // Virtual: 10-minute intervals
         const getEndTime = (hour: number, minute: number): { hour: number; minute: number } => {
             let endMinute = minute + 10;
             let endHour = hour;
@@ -54,20 +79,15 @@ export function TimeSlotPicker({
             }
             return { hour: endHour, minute: endMinute };
         };
-        
-        // AM slots: 7:00 AM to 11:50 AM
+
         for (let hour = 7; hour < 12; hour++) {
             for (let minute = 0; minute < 60; minute += 10) {
                 const time24 = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
                 const startLabel = formatTime(hour, minute, 'AM');
-                
-                // Calculate end time
                 const endTime = getEndTime(hour, minute);
                 const endLabel = formatTime(endTime.hour, endTime.minute, endTime.hour < 12 ? 'AM' : 'PM');
-                
                 const rangeLabel = `${startLabel} - ${endLabel}`;
                 const capacity = slotCapacities[time24] || { current: 0, max: 4, isFull: false };
-                
                 slots.push({
                     value: time24,
                     label: rangeLabel,
@@ -79,20 +99,14 @@ export function TimeSlotPicker({
                 });
             }
         }
-        
-        // PM slots: 12:00 PM to 5:50 PM
         for (let hour = 12; hour < 18; hour++) {
             for (let minute = 0; minute < 60; minute += 10) {
                 const time24 = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
                 const startLabel = formatTime(hour, minute, 'PM');
-                
-                // Calculate end time
                 const endTime = getEndTime(hour, minute);
                 const endLabel = formatTime(endTime.hour, endTime.minute, endTime.hour < 12 ? 'AM' : 'PM');
-                
                 const rangeLabel = `${startLabel} - ${endLabel}`;
                 const capacity = slotCapacities[time24] || { current: 0, max: 4, isFull: false };
-                
                 slots.push({
                     value: time24,
                     label: rangeLabel,
@@ -104,7 +118,6 @@ export function TimeSlotPicker({
                 });
             }
         }
-        
         return slots;
     };
 
@@ -167,7 +180,7 @@ export function TimeSlotPicker({
                                             disabled && 'opacity-40 cursor-not-allowed hover:opacity-40',
                                             !disabled && !isSelected && 'hover:bg-accent'
                                         )}
-                                        title={disabled ? `This time slot is full (${slot.currentBookings}/${slot.maxCapacity} visitors)` : slot.rangeLabel}
+                                        title={disabled ? `This time slot is full` : `${slot.rangeLabel} — ${Math.max(0, (slot.maxCapacity ?? 0) - (slot.currentBookings ?? 0))}/${slot.maxCapacity} available`}
                                     >
                                         <div className="flex flex-col items-center gap-1">
                                             <span>{slot.label}</span>
@@ -176,7 +189,7 @@ export function TimeSlotPicker({
                                                     'text-[10px]',
                                                     slot.isFull ? 'text-destructive' : 'text-muted-foreground'
                                                 )}>
-                                                    {slot.currentBookings || 0}/{slot.maxCapacity}
+                                                    {Math.max(0, (slot.maxCapacity ?? 0) - (slot.currentBookings ?? 0))}/{slot.maxCapacity} available
                                                 </span>
                                             )}
                                         </div>
@@ -212,7 +225,7 @@ export function TimeSlotPicker({
                                             disabled && 'opacity-40 cursor-not-allowed hover:opacity-40',
                                             !disabled && !isSelected && 'hover:bg-accent'
                                         )}
-                                        title={disabled ? `This time slot is full (${slot.currentBookings}/${slot.maxCapacity} visitors)` : slot.rangeLabel}
+                                        title={disabled ? `This time slot is full` : `${slot.rangeLabel} — ${Math.max(0, (slot.maxCapacity ?? 0) - (slot.currentBookings ?? 0))}/${slot.maxCapacity} available`}
                                     >
                                         <div className="flex flex-col items-center gap-1">
                                             <span>{slot.label}</span>
@@ -221,7 +234,7 @@ export function TimeSlotPicker({
                                                     'text-[10px]',
                                                     slot.isFull ? 'text-destructive' : 'text-muted-foreground'
                                                 )}>
-                                                    {slot.currentBookings || 0}/{slot.maxCapacity}
+                                                    {Math.max(0, (slot.maxCapacity ?? 0) - (slot.currentBookings ?? 0))}/{slot.maxCapacity} available
                                                 </span>
                                             )}
                                         </div>

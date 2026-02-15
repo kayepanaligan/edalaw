@@ -45,8 +45,6 @@ class NotificationService
             'rejected' => 'Your visit schedule has been rejected.',
             'completed' => 'Your visit has been marked as completed.',
             'missed' => 'Your visit has been marked as missed.',
-            'pending' => 'Your visit schedule has been set back to pending.',
-            'cancelled' => 'Your visit schedule has been cancelled.',
         ];
 
         $titles = [
@@ -54,8 +52,6 @@ class NotificationService
             'rejected' => 'Visit Schedule Rejected',
             'completed' => 'Visit Completed',
             'missed' => 'Visit Missed',
-            'pending' => 'Visit Schedule Pending',
-            'cancelled' => 'Visit Schedule Cancelled',
         ];
 
         $inmateName = trim("{$visit->inmate_first_name} {$visit->inmate_middle_name} {$visit->inmate_last_name}");

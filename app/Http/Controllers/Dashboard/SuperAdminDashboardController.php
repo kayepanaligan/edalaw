@@ -19,14 +19,62 @@ use App\Models\Visit;
 use App\SuggestionStatus;
 use App\VisitType;
 use Carbon\Carbon;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class SuperAdminDashboardController extends Controller
 {
-    public function __invoke(): Response
+    /**
+     * Resolve date range from preset or custom inputs.
+     *
+     * @return array{0: Carbon, 1: Carbon}
+     */
+    private function resolveDateRange(Request $request): array
     {
+        $preset = $request->input('date_preset', 'last_30_days');
+        $from = $request->input('date_from');
+        $to = $request->input('date_to');
+        if ($from && $to && $preset === 'custom') {
+            $start = Carbon::parse($from)->startOfDay();
+            $end = Carbon::parse($to)->endOfDay();
+
+            return [$start, $end];
+        }
+        $end = Carbon::now()->endOfDay();
+        $start = match ($preset) {
+            'today' => Carbon::now()->startOfDay(),
+            'yesterday' => Carbon::yesterday()->startOfDay(),
+            'last_7_days' => Carbon::now()->subDays(6)->startOfDay(),
+            'last_30_days' => Carbon::now()->subDays(29)->startOfDay(),
+            'this_month' => Carbon::now()->startOfMonth(),
+            'last_month' => Carbon::now()->subMonth()->startOfMonth(),
+            'this_year' => Carbon::now()->startOfYear(),
+            default => Carbon::now()->subDays(29)->startOfDay(),
+        };
+        if ($preset === 'yesterday') {
+            $end = Carbon::yesterday()->endOfDay();
+        } elseif ($preset === 'last_month') {
+            $end = Carbon::now()->subMonth()->endOfMonth();
+        }
+
+        return [$start, $end];
+    }
+
+    public function __invoke(Request $request): Response
+    {
+        [$dateFrom, $dateTo] = $this->resolveDateRange($request);
+        $dateFromStr = $dateFrom->format('Y-m-d');
+        $dateToStr = $dateTo->format('Y-m-d');
+        $visitTypeFilter = $request->input('visit_type'); // all, virtual, physical, eburol
+        $statusFilter = $request->input('status'); // all, pending, approved, etc.
+        $timeGrouping = $request->input('time_grouping', 'daily'); // daily, weekly, monthly, quarterly, yearly
+        $recordingFilter = $request->input('recording_compliance', 'all'); // all, recorded_only, not_recorded
+        $violationFilter = $request->input('violation', 'all'); // all, flagged_only, terminated_only
+        $monitoringOfficerId = $request->input('monitoring_officer_id');
+        $inmateSearch = $request->input('inmate');
+
         $totalUsers = User::count();
         $pendingUsers = User::where('approval_status', ApprovalStatus::Pending)->count();
         $approvedUsers = User::where('approval_status', ApprovalStatus::Approved)->count();
@@ -102,10 +150,12 @@ class SuperAdminDashboardController extends Controller
             ->map(fn ($group) => $group->count())
             ->toArray();
 
-        // Visit type distribution
+        // Visit type distribution (with optional filters)
+        $visitBase = Visit::whereBetween('scheduled_date', [$dateFromStr, $dateToStr]);
+        $this->applyVisitFilters($visitBase, $visitTypeFilter, $statusFilter, $inmateSearch, $monitoringOfficerId);
         $visitTypeDistribution = [
-            'physical' => Visit::where('visit_type', VisitType::Physical)->count(),
-            'virtual' => Visit::where('visit_type', VisitType::Virtual)->count(),
+            'physical' => (clone $visitBase)->where('visit_type', VisitType::Physical)->count(),
+            'virtual' => (clone $visitBase)->where('visit_type', VisitType::Virtual)->count(),
         ];
 
         // Appeals by type (already calculated above)
@@ -228,17 +278,17 @@ class SuperAdminDashboardController extends Controller
             ['name' => '65+', 'count' => $ageDistribution['65+'] ?? 0],
         ];
 
-        // Visit Volume Over Time (last 30 days, grouped by day)
-        $visitVolumeData = $this->getVisitVolumeOverTime();
+        // Visit Volume Over Time (filtered by date range and grouping)
+        $visitVolumeData = $this->getVisitVolumeOverTime($dateFrom, $dateTo, $timeGrouping, $visitTypeFilter, $statusFilter);
 
-        // Peak Usage Hours (sessions per hour/day)
-        $peakUsageData = $this->getPeakUsageHours();
+        // Peak Usage Hours (sessions per hour/day, in date range)
+        $peakUsageData = $this->getPeakUsageHours($dateFrom, $dateTo);
 
         // Incident Reports Summary
         $incidentReportsData = $this->getIncidentReportsSummary();
 
-        // Flagged Chat Messages Over Time
-        $flaggedMessagesData = $this->getFlaggedChatMessagesOverTime();
+        // Flagged Chat Messages Over Time (date range)
+        $flaggedMessagesData = $this->getFlaggedChatMessagesOverTime($dateFrom, $dateTo);
 
         // Session Enforcement Actions
         $enforcementActionsData = $this->getSessionEnforcementActions();
@@ -246,10 +296,32 @@ class SuperAdminDashboardController extends Controller
         // Physical Visit Key Usage
         $keyUsageData = $this->getPhysicalVisitKeyUsage();
 
-        // Complaints & Reviews Trend
-        $complaintsTrendData = $this->getComplaintsAndReviewsTrend();
+        // Complaints & Reviews Trend (date range)
+        $complaintsTrendData = $this->getComplaintsAndReviewsTrend($dateFrom, $dateTo);
+
+        $filters = [
+            'date_preset' => $request->input('date_preset', 'last_30_days'),
+            'date_from' => $dateFromStr,
+            'date_to' => $dateToStr,
+            'time_grouping' => $timeGrouping,
+            'visit_type' => $visitTypeFilter,
+            'status' => $statusFilter,
+            'recording_compliance' => $recordingFilter,
+            'violation' => $violationFilter,
+            'monitoring_officer_id' => $monitoringOfficerId,
+            'inmate' => $inmateSearch,
+        ];
+
+        $monitoringOfficersForFilter = User::whereHas('role', fn ($q) => $q->where('slug', 'monitoring_officer'))
+            ->orderBy('first_name')
+            ->get(['id', 'first_name', 'last_name'])
+            ->map(fn ($u) => ['id' => $u->id, 'name' => trim($u->first_name.' '.$u->last_name)])
+            ->values()
+            ->toArray();
 
         return Inertia::render('Dashboard/SuperAdmin', [
+            'filters' => $filters,
+            'monitoring_officers' => $monitoringOfficersForFilter,
             'stats' => [
                 'total_users' => $totalUsers,
                 'pending_users' => $pendingUsers,
@@ -281,51 +353,97 @@ class SuperAdminDashboardController extends Controller
     }
 
     /**
-     * Get visit volume over time (last 30 days, grouped by day, separated by visit type).
+     * Apply global visit filters to a Visit query builder.
      */
-    private function getVisitVolumeOverTime(): array
+    private function applyVisitFilters($query, ?string $visitType, ?string $status, ?string $inmateSearch, $monitoringOfficerId): void
     {
-        $startDate = Carbon::now()->subDays(30);
-        $endDate = Carbon::now();
-
-        $visits = Visit::whereBetween('created_at', [$startDate, $endDate])
-            ->get()
-            ->groupBy(function ($visit) {
-                return $visit->created_at->format('Y-m-d');
-            });
-
-        $data = [];
-        $currentDate = $startDate->copy();
-
-        while ($currentDate <= $endDate) {
-            $dateKey = $currentDate->format('Y-m-d');
-            $dayVisits = $visits->get($dateKey, collect());
-
-            $data[] = [
-                'date' => $currentDate->format('M d'),
-                'physical' => $dayVisits->where('visit_type', VisitType::Physical)->count(),
-                'virtual' => $dayVisits->where('visit_type', VisitType::Virtual)->count(),
-            ];
-
-            $currentDate->addDay();
+        if ($visitType && $visitType !== 'all' && in_array($visitType, ['virtual', 'physical'], true)) {
+            $query->where('visit_type', $visitType);
         }
-
-        return $data;
+        if ($status && $status !== 'all') {
+            $query->where('status', $status);
+        }
+        if ($inmateSearch) {
+            $query->where(function ($q) use ($inmateSearch) {
+                $q->where('inmate_first_name', 'like', "%{$inmateSearch}%")
+                    ->orWhere('inmate_last_name', 'like', "%{$inmateSearch}%");
+            });
+        }
+        if ($monitoringOfficerId) {
+            $query->where('monitoring_officer_id', $monitoringOfficerId);
+        }
     }
 
     /**
-     * Get peak usage hours (sessions per hour/day).
+     * Get visit volume over time (filtered, grouped by time_grouping).
      */
-    private function getPeakUsageHours(): array
+    private function getVisitVolumeOverTime(Carbon $startDate, Carbon $endDate, string $timeGrouping, ?string $visitTypeFilter, ?string $statusFilter): array
     {
-        $sessions = MonitoringSession::whereNotNull('started_at')
-            ->get();
+        $query = Visit::whereBetween('scheduled_date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')]);
+        $this->applyVisitFilters($query, $visitTypeFilter, $statusFilter, null, null);
+        $visits = $query->get()->groupBy(function ($visit) use ($timeGrouping) {
+            $d = $visit->scheduled_date instanceof Carbon ? $visit->scheduled_date->copy() : Carbon::parse($visit->scheduled_date);
 
-        $hourlyData = [];
-        for ($hour = 0; $hour < 24; $hour++) {
-            $hourlyData[$hour] = 0;
+            return match ($timeGrouping) {
+                'weekly' => $d->startOfWeek()->format('Y-m-d'),
+                'monthly' => $d->format('Y-m'),
+                'quarterly' => $d->quarter.'-'.$d->format('Y'),
+                'yearly' => $d->format('Y'),
+                default => $d->format('Y-m-d'),
+            };
+        });
+
+        $periods = [];
+        $current = $startDate->copy();
+        while ($current <= $endDate) {
+            $key = match ($timeGrouping) {
+                'weekly' => $current->copy()->startOfWeek()->format('Y-m-d'),
+                'monthly' => $current->format('Y-m'),
+                'quarterly' => $current->quarter.'-'.$current->format('Y'),
+                'yearly' => $current->format('Y'),
+                default => $current->format('Y-m-d'),
+            };
+            if (! isset($periods[$key])) {
+                $periods[$key] = match ($timeGrouping) {
+                    'weekly' => 'Week '.$current->format('M j'),
+                    'monthly' => $current->format('M Y'),
+                    'quarterly' => 'Q'.$current->quarter.' '.$current->format('Y'),
+                    'yearly' => $current->format('Y'),
+                    default => $current->format('M d'),
+                };
+            }
+            $current = match ($timeGrouping) {
+                'weekly' => $current->addWeek(),
+                'monthly' => $current->addMonth(),
+                'quarterly' => $current->addQuarter(),
+                'yearly' => $current->addYear(),
+                default => $current->addDay(),
+            };
         }
 
+        $data = [];
+        foreach ($periods as $key => $label) {
+            $bucket = $visits->get($key, collect());
+            $data[] = [
+                'date' => $label,
+                'physical' => $bucket->where('visit_type', VisitType::Physical)->count(),
+                'virtual' => $bucket->where('visit_type', VisitType::Virtual)->count(),
+            ];
+        }
+
+        return array_slice($data, 0, 60);
+    }
+
+    /**
+     * Get peak usage hours (sessions per hour/day) in date range.
+     */
+    private function getPeakUsageHours(Carbon $dateFrom, Carbon $dateTo): array
+    {
+        $sessions = MonitoringSession::whereNotNull('started_at')
+            ->whereBetween('started_at', [$dateFrom, $dateTo])
+            ->get();
+
+        $hourlyData = array_fill(0, 24, 0);
         foreach ($sessions as $session) {
             $hour = (int) $session->started_at->format('H');
             $hourlyData[$hour]++;
@@ -361,31 +479,22 @@ class SuperAdminDashboardController extends Controller
     }
 
     /**
-     * Get flagged chat messages over time (last 30 days).
+     * Get flagged chat messages over time (date range).
      */
-    private function getFlaggedChatMessagesOverTime(): array
+    private function getFlaggedChatMessagesOverTime(Carbon $startDate, Carbon $endDate): array
     {
-        $startDate = Carbon::now()->subDays(30);
-        $endDate = Carbon::now();
-
         $flags = ChatFlag::whereBetween('created_at', [$startDate, $endDate])
             ->get()
-            ->groupBy(function ($flag) {
-                return $flag->created_at->format('Y-m-d');
-            });
+            ->groupBy(fn ($flag) => $flag->created_at->format('Y-m-d'));
 
         $data = [];
         $currentDate = $startDate->copy();
-
         while ($currentDate <= $endDate) {
             $dateKey = $currentDate->format('Y-m-d');
-            $count = $flags->get($dateKey, collect())->count();
-
             $data[] = [
                 'date' => $currentDate->format('M d'),
-                'count' => $count,
+                'count' => $flags->get($dateKey, collect())->count(),
             ];
-
             $currentDate->addDay();
         }
 
@@ -438,42 +547,30 @@ class SuperAdminDashboardController extends Controller
     }
 
     /**
-     * Get complaints and reviews trend (last 30 days).
+     * Get complaints and reviews trend (date range).
      */
-    private function getComplaintsAndReviewsTrend(): array
+    private function getComplaintsAndReviewsTrend(Carbon $startDate, Carbon $endDate): array
     {
-        $startDate = Carbon::now()->subDays(30);
-        $endDate = Carbon::now();
-
         $complaints = Suggestion::where('type', 'complaint')
             ->whereBetween('created_at', [$startDate, $endDate])
             ->get()
-            ->groupBy(function ($complaint) {
-                return $complaint->created_at->format('Y-m-d');
-            });
+            ->groupBy(fn ($c) => $c->created_at->format('Y-m-d'));
 
         $resolved = Suggestion::where('type', 'complaint')
             ->where('status', SuggestionStatus::Resolved)
             ->whereBetween('updated_at', [$startDate, $endDate])
             ->get()
-            ->groupBy(function ($complaint) {
-                return $complaint->updated_at->format('Y-m-d');
-            });
+            ->groupBy(fn ($c) => $c->updated_at->format('Y-m-d'));
 
         $data = [];
         $currentDate = $startDate->copy();
-
         while ($currentDate <= $endDate) {
             $dateKey = $currentDate->format('Y-m-d');
-            $submitted = $complaints->get($dateKey, collect())->count();
-            $resolvedCount = $resolved->get($dateKey, collect())->count();
-
             $data[] = [
                 'date' => $currentDate->format('M d'),
-                'submitted' => $submitted,
-                'resolved' => $resolvedCount,
+                'submitted' => $complaints->get($dateKey, collect())->count(),
+                'resolved' => $resolved->get($dateKey, collect())->count(),
             ];
-
             $currentDate->addDay();
         }
 

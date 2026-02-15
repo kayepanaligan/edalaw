@@ -252,38 +252,71 @@ export function AppSidebar() {
         });
     }
 
-    // Monitoring Officer navigation (Dashboard = analytics; only these 6 modules)
+    // Monitoring Officer navigation with categories
+    let monitoringOfficerNavGroups: Array<{ label: string; items: NavItem[] }> | undefined;
     if (userRole === 'monitoring_officer') {
-        mainNavItems.push({
-            title: 'Assigned Sessions',
-            href: '/monitoring-officer/assigned-sessions',
-            icon: Video,
-        });
-        mainNavItems.push({
-            title: 'Video Recordings',
-            href: '/monitoring-officer/video-recordings',
-            icon: Film,
-        });
-        mainNavItems.push({
-            title: 'Chat Recordings',
-            href: '/monitoring-officer/chat-recordings',
-            icon: MessageCircle,
-        });
-        mainNavItems.push({
-            title: 'History',
-            href: '/monitoring-officer/history',
-            icon: FileText,
-        });
-        mainNavItems.push({
-            title: 'Incident Reporting',
-            href: '/monitoring-officer/incidents',
-            icon: Flag,
-        });
-        mainNavItems.push({
-            title: 'Inmate Tunnels',
-            href: '/monitoring-officer/inmate-tunnels',
-            icon: Link2,
-        });
+        monitoringOfficerNavGroups = [
+            {
+                label: 'Main',
+                items: [
+                    {
+                        title: 'Dashboard',
+                        href: '/dashboard/monitoring-officer',
+                        icon: LayoutGrid,
+                    },
+                    {
+                        title: 'Assigned Sessions',
+                        href: '/monitoring-officer/assigned-sessions',
+                        icon: Video,
+                    },
+                ],
+            },
+            {
+                label: 'Archives',
+                items: [
+                    {
+                        title: 'History',
+                        href: '/monitoring-officer/history',
+                        icon: FileText,
+                    },
+                    {
+                        title: 'Video Recordings',
+                        href: '/monitoring-officer/video-recordings',
+                        icon: Film,
+                    },
+                    {
+                        title: 'Chat Recordings',
+                        href: '/monitoring-officer/chat-recordings',
+                        icon: MessageCircle,
+                    },
+                ],
+            },
+            {
+                label: 'Security',
+                items: [
+                    {
+                        title: 'Incident Reporting',
+                        href: '/monitoring-officer/incidents',
+                        icon: Flag,
+                    },
+                    {
+                        title: 'Inmate Tunnel',
+                        href: '/monitoring-officer/inmate-tunnels',
+                        icon: Link2,
+                    },
+                ],
+            },
+            {
+                label: 'Configuration',
+                items: [
+                    {
+                        title: 'Settings',
+                        href: '/settings',
+                        icon: Settings,
+                    },
+                ],
+            },
+        ];
     }
 
 
@@ -306,6 +339,8 @@ export function AppSidebar() {
                     <NavMain groups={visitorNavGroups} />
                 ) : userRole === 'super_admin' && superAdminNavGroups ? (
                     <NavMain groups={superAdminNavGroups} />
+                ) : userRole === 'monitoring_officer' && monitoringOfficerNavGroups ? (
+                    <NavMain groups={monitoringOfficerNavGroups} />
                 ) : (
                     <NavMain items={mainNavItems} />
                 )}

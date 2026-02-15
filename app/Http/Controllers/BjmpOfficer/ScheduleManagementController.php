@@ -23,11 +23,14 @@ class ScheduleManagementController extends Controller
      */
     public function index(): Response
     {
-        $visits = Visit::with(['user', 'monitoringOfficer'])
+        $visits = Visit::with(['user', 'monitoringOfficer', 'visitSessions' => fn ($q) => $q->orderBy('scheduled_start', 'desc')->limit(1)])
             ->orderBy('scheduled_date', 'desc')
             ->orderBy('created_at', 'desc')
             ->get()
             ->map(function ($visit) {
+                $latestSession = $visit->visitSessions->first();
+                $scheduleEnded = $visit->isScheduleInPast();
+
                 return [
                     'id' => $visit->id,
                     'user_id' => $visit->user_id,
@@ -49,6 +52,8 @@ class ScheduleManagementController extends Controller
                     'monitoring_officer_name' => $visit->monitoringOfficer ? trim("{$visit->monitoringOfficer->first_name} {$visit->monitoringOfficer->middle_name} {$visit->monitoringOfficer->last_name}") : null,
                     'rejection_reason' => $visit->rejection_reason,
                     'created_at' => $visit->created_at->format('Y-m-d H:i:s'),
+                    'schedule_ended' => $scheduleEnded,
+                    'visit_session_id' => $latestSession?->id,
                 ];
             });
 
@@ -88,6 +93,16 @@ class ScheduleManagementController extends Controller
      */
     public function approve(Request $request, Visit $visit): RedirectResponse
     {
+        if ($visit->isScheduleInPast()) {
+            $visit->update([
+                'status' => VisitStatus::Rejected,
+                'rejection_reason' => 'This scheduled time has passed. Please submit a new visit schedule.',
+            ]);
+
+            return redirect()->route('bjmp-officer.schedules.index')
+                ->with('error', 'This schedule has passed and could not be approved. The application has been marked as not reviewed. Please ask the visitor to submit a new schedule.');
+        }
+
         $rules = [
             'monitoring_officer_id' => ['nullable', 'exists:users,id'],
         ];
@@ -103,8 +118,7 @@ class ScheduleManagementController extends Controller
         ];
 
         $roomId = null;
-        $approvalWarning = null;
-        // If virtual visit, create VideoSDK room (system-generated; no manual link required)
+        // If virtual visit, create VideoSDK room (required for approval)
         if ($visit->visit_type === VisitType::Virtual) {
             $videoSdkService = new VideoSdkService;
             $roomName = "visit-{$visit->id}-".uniqid();
@@ -131,7 +145,12 @@ class ScheduleManagementController extends Controller
                     'visit_id' => $visit->id,
                     'error' => $roomResult['error'] ?? 'Unknown error',
                 ]);
-                $approvalWarning = 'Video room creation failed: '.($roomResult['error'] ?? 'Unknown error').'. Please try again later or contact support.';
+
+                return redirect()->back()
+                    ->withInput($request->only('monitoring_officer_id'))
+                    ->withErrors([
+                        'meeting_link' => 'Video room creation failed: '.($roomResult['error'] ?? 'Unknown error').'. A meeting link is required for virtual visits. Please check VideoSDK configuration and try again.',
+                    ]);
             }
         }
 
@@ -171,13 +190,8 @@ class ScheduleManagementController extends Controller
             $request
         );
 
-        $redirect = redirect()->route('bjmp-officer.schedules.index')
+        return redirect()->route('bjmp-officer.schedules.index')
             ->with('success', 'Schedule approved successfully.');
-        if ($approvalWarning) {
-            $redirect->with('warning', $approvalWarning);
-        }
-
-        return $redirect;
     }
 
     /**
@@ -214,7 +228,9 @@ class ScheduleManagementController extends Controller
      */
     public function updateStatus(Request $request, Visit $visit): RedirectResponse
     {
-        if ($request->has('monitoring_officer_id') && $request->monitoring_officer_id === '') {
+        // Normalize empty or invalid monitoring_officer_id so validation and update work when changing to pending/rejected
+        $moId = $request->input('monitoring_officer_id');
+        if ($moId === '' || $moId === null || (is_string($moId) && trim($moId) === '')) {
             $request->merge(['monitoring_officer_id' => null]);
         }
 
@@ -243,7 +259,7 @@ class ScheduleManagementController extends Controller
             $updateData['monitoring_officer_id'] = null;
         }
 
-        // When approving virtual visit, auto-generate meeting link if not already set
+        // When approving virtual visit, auto-generate meeting link if not already set (required)
         if ($request->status === 'approved' && $visit->visit_type === VisitType::Virtual && ! $visit->meeting_link) {
             $videoSdkService = new VideoSdkService;
             $roomName = "visit-{$visit->id}-".uniqid();
@@ -255,6 +271,16 @@ class ScheduleManagementController extends Controller
                 $updateData['daily_co_room_name'] = $roomResult['room_name'] ?? $roomName;
                 $updateData['daily_co_room_url'] = $roomResult['room_url'] ?? null;
                 $updateData['room_created_at'] = now();
+            } else {
+                \Illuminate\Support\Facades\Log::error('VideoSDK room creation failed during status update', [
+                    'visit_id' => $visit->id,
+                    'error' => $roomResult['error'] ?? 'Unknown error',
+                ]);
+
+                return redirect()->back()
+                    ->withErrors([
+                        'meeting_link' => 'Video room creation failed: '.($roomResult['error'] ?? 'Unknown error').'. A meeting link is required for virtual visits.',
+                    ]);
             }
         }
 

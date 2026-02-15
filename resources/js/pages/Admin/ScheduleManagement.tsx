@@ -1,5 +1,7 @@
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 import { Calendar, Clock, Plus, User, Video, Check, X, MoreVertical, Eye, Edit, Trash2, Key, RefreshCw, FileOutput, VideoIcon } from 'lucide-react';
+
+import { formatVisitSchedule } from '@/lib/formatVisitSchedule';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { ColumnDef } from '@tanstack/react-table';
@@ -71,6 +73,8 @@ type Visit = {
     monitoring_officer_id: number | null;
     monitoring_officer_name: string | null;
     created_at: string;
+    schedule_ended?: boolean;
+    visit_session_id?: number | null;
 };
 
 type Visitor = {
@@ -89,6 +93,7 @@ type Props = {
     visits: Visit[];
     visitors: Visitor[];
     monitoringOfficers?: MonitoringOfficer[];
+    today_unavailable?: boolean;
 };
 
 function getStatusBadge(status: string) {
@@ -159,14 +164,15 @@ export default function ScheduleManagement({ visits, visitors, monitoringOfficer
     const [selectedDate, setSelectedDate] = useState<string>('');
     const [bookedSlots, setBookedSlots] = useState<string[]>([]);
     const [loadingSlots, setLoadingSlots] = useState(false);
+    const [isDayUnavailable, setIsDayUnavailable] = useState(false);
     useToast();
     const page = usePage();
     const flash = (page.props as { flash?: { success?: string; warning?: string; error?: string } }).flash;
     useEffect(() => {
-        if (flash?.warning) {
-            toast.warning(flash.warning);
-        }
-    }, [flash?.warning]);
+        if (flash?.warning) toast.warning(flash.warning);
+        if (flash?.error) toast.error(flash.error);
+        if (flash?.success) toast.success(flash.success);
+    }, [flash?.warning, flash?.error, flash?.success]);
 
     const rejectForm = useForm({
         rejection_reason: '',
@@ -194,7 +200,11 @@ export default function ScheduleManagement({ visits, visitors, monitoringOfficer
         meeting_link: '',
     });
 
-    const today = new Date().toISOString().split('T')[0];
+    const todayDate = new Date();
+    const today = todayDate.toISOString().split('T')[0];
+    const tomorrow = new Date(todayDate);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const minScheduleDate = (usePage().props as Props).today_unavailable ? tomorrow.toISOString().split('T')[0] : today;
 
     const form = useForm({
         user_id: '',
@@ -269,14 +279,20 @@ export default function ScheduleManagement({ visits, visitors, monitoringOfficer
     const fetchBookedSlots = async (date: string) => {
         if (!date) {
             setBookedSlots([]);
+            setIsDayUnavailable(false);
             return;
         }
 
         setLoadingSlots(true);
+        setIsDayUnavailable(false);
         try {
-            const response = await fetch(`/visitor/schedule/booked-slots?date=${date}`);
+            const visitType = form.data.visit_type || 'virtual';
+            const response = await fetch(`/visitor/schedule/booked-slots?date=${date}&visit_type=${visitType}`);
             const data = await response.json();
             setBookedSlots(data.booked_slots || []);
+            if (data.isDayUnavailable === true) {
+                setIsDayUnavailable(true);
+            }
         } catch (error) {
             console.error('Error fetching booked slots:', error);
             setBookedSlots([]);
@@ -392,31 +408,15 @@ export default function ScheduleManagement({ visits, visitors, monitoringOfficer
                 header: 'Date / Time',
                 cell: ({ row }) => {
                     const visit = row.original;
-                    const scheduledDate = new Date(visit.scheduled_date);
-                    const [hours, minutes] = (visit.scheduled_time || '00:00').split(':').map(Number);
-                    let endHours = hours;
-                    let endMinutes = minutes + 10;
-                    if (endMinutes >= 60) {
-                        endMinutes = 0;
-                        endHours += 1;
-                    }
-                    const endTime = `${endHours.toString().padStart(2, '0')}:${endMinutes.toString().padStart(2, '0')}`;
-
+                    const { dateLabel, timeLabel } = formatVisitSchedule(
+                        visit.scheduled_date,
+                        visit.scheduled_time ?? null,
+                        visit.visit_type
+                    );
                     return (
                         <div className="space-y-1">
-                            <div className="font-medium">
-                                {scheduledDate.toLocaleDateString('en-US', {
-                                    weekday: 'short',
-                                    year: 'numeric',
-                                    month: 'short',
-                                    day: 'numeric',
-                                })}
-                            </div>
-                            {visit.scheduled_time && (
-                                <div className="text-sm text-muted-foreground">
-                                    {visit.scheduled_time} - {endTime}
-                                </div>
-                            )}
+                            <div className="font-medium">{dateLabel}</div>
+                            <div className="text-sm text-muted-foreground">{timeLabel}</div>
                         </div>
                     );
                 },
@@ -525,18 +525,31 @@ export default function ScheduleManagement({ visits, visitors, monitoringOfficer
                             </Button>
                         );
                     }
-                    if (visit.visit_type === 'virtual' && visit.status === 'approved' && visit.meeting_link) {
-                        return (
-                            <a
-                                href={visit.meeting_link}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-green-600 text-white hover:bg-green-700"
-                                title="Join video call"
-                            >
-                                <VideoIcon className="h-4 w-4" />
-                            </a>
-                        );
+                    if (visit.visit_type === 'virtual' && visit.status === 'approved') {
+                        const canJoin = visit.visit_session_id && !visit.schedule_ended;
+                        if (canJoin) {
+                            return (
+                                <a
+                                    href={`/admin/visit-session/${visit.visit_session_id}/join`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-green-600 text-white hover:bg-green-700"
+                                    title="Join video call"
+                                >
+                                    <VideoIcon className="h-4 w-4" />
+                                </a>
+                            );
+                        }
+                        if (visit.schedule_ended) {
+                            return (
+                                <span
+                                    className="inline-flex h-9 w-9 cursor-not-allowed items-center justify-center rounded-md bg-muted text-muted-foreground"
+                                    title="Schedule has ended"
+                                >
+                                    <VideoIcon className="h-4 w-4" />
+                                </span>
+                            );
+                        }
                     }
                     return <span className="text-sm text-muted-foreground">—</span>;
                 },
@@ -778,7 +791,7 @@ export default function ScheduleManagement({ visits, visitors, monitoringOfficer
                                         id="scheduled_date"
                                         type="date"
                                         required
-                                        min={today}
+                                        min={minScheduleDate}
                                         value={form.data.scheduled_date}
                                         onChange={(e) => handleDateChange(e.target.value)}
                                     />
@@ -790,12 +803,18 @@ export default function ScheduleManagement({ visits, visitors, monitoringOfficer
                                         Scheduled Time <span className="text-destructive">*</span>
                                     </Label>
                                     {form.data.scheduled_date ? (
-                                        <TimeSlotPicker
-                                            selectedTime={form.data.scheduled_time}
-                                            onTimeSelect={(time) => form.setData('scheduled_time', time)}
-                                            bookedSlots={bookedSlots}
-                                            loading={loadingSlots}
-                                        />
+                                        isDayUnavailable ? (
+                                            <div className="rounded-lg border border-amber-500/50 bg-amber-500/10 p-4 text-center text-sm text-amber-800 dark:text-amber-200">
+                                                <strong>Unavailable.</strong> Schedule times for this day end at 5:50 PM. Please select another date.
+                                            </div>
+                                        ) : (
+                                            <TimeSlotPicker
+                                                selectedTime={form.data.scheduled_time}
+                                                onTimeSelect={(time) => form.setData('scheduled_time', time)}
+                                                bookedSlots={bookedSlots}
+                                                loading={loadingSlots}
+                                            />
+                                        )
                                     ) : (
                                         <Input
                                             id="scheduled_time"
@@ -1228,19 +1247,30 @@ export default function ScheduleManagement({ visits, visitors, monitoringOfficer
                                             {`${selectedVisit.inmate_first_name} ${selectedVisit.inmate_middle_name || ''} ${selectedVisit.inmate_last_name}`.trim()}
                                         </p>
                                     </div>
-                                    {selectedVisit.meeting_link && (
+                                    {selectedVisit.visit_type === 'virtual' && selectedVisit.status === 'approved' && (
                                         <div className="col-span-2">
                                             <Label className="text-muted-foreground">Join video call</Label>
                                             <p className="mt-1">
-                                                <a
-                                                    href={selectedVisit.meeting_link}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="inline-flex h-10 w-10 items-center justify-center rounded-md bg-green-600 text-white hover:bg-green-700"
-                                                    title="Join video call"
-                                                >
-                                                    <VideoIcon className="h-5 w-5" />
-                                                </a>
+                                                {selectedVisit.visit_session_id && !selectedVisit.schedule_ended
+                                                    ? (
+                                                            <a
+                                                                href={`/admin/visit-session/${selectedVisit.visit_session_id}/join`}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="inline-flex h-10 w-10 items-center justify-center rounded-md bg-green-600 text-white hover:bg-green-700"
+                                                                title="Join video call"
+                                                            >
+                                                                <VideoIcon className="h-5 w-5" />
+                                                            </a>
+                                                        )
+                                                    : (
+                                                            <span
+                                                                className="inline-flex h-10 w-10 cursor-not-allowed items-center justify-center rounded-md bg-muted text-muted-foreground"
+                                                                title={selectedVisit.schedule_ended ? 'Schedule has ended' : 'Not available'}
+                                                            >
+                                                                <VideoIcon className="h-5 w-5" />
+                                                            </span>
+                                                        )}
                                             </p>
                                         </div>
                                     )}
@@ -1315,7 +1345,7 @@ export default function ScheduleManagement({ visits, visitors, monitoringOfficer
                                             id="edit_scheduled_date"
                                             type="date"
                                             required
-                                            min={today}
+                                            min={minScheduleDate}
                                             value={editForm.data.scheduled_date}
                                             onChange={(e) => editForm.setData('scheduled_date', e.target.value)}
                                         />

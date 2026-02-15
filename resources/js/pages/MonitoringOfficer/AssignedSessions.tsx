@@ -4,6 +4,7 @@ import { Link2, Lock, Play, Square, Unlock } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
+import { formatVisitSchedule, formatSessionSchedule } from '@/lib/formatVisitSchedule';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -33,6 +34,10 @@ type Session = {
     type: string;
     scheduled_start: string;
     scheduled_end: string;
+    scheduled_date: string | null;
+    scheduled_time: string | null;
+    visit_type: string | null;
+    schedule_ended: boolean;
     status: string;
     recording_status: string;
     started_at: string | null;
@@ -167,11 +172,18 @@ export default function AssignedSessions({ sessions, filters: initialFilters }: 
         {
             accessorKey: 'scheduled_start',
             header: 'Schedule',
-            cell: ({ row }) => (
-                <span className="text-sm">
-                    {new Date(row.original.scheduled_start).toLocaleString()} – {new Date(row.original.scheduled_end).toLocaleTimeString()}
-                </span>
-            ),
+            cell: ({ row }) => {
+                const s = row.original;
+                const { dateLabel, timeLabel } = s.scheduled_date && s.scheduled_time && s.visit_type
+                    ? formatVisitSchedule(s.scheduled_date, s.scheduled_time, s.visit_type as 'virtual' | 'physical')
+                    : formatSessionSchedule(s.scheduled_start, s.scheduled_end);
+                return (
+                    <div className="space-y-1">
+                        <div className="font-medium">{dateLabel}</div>
+                        <div className="text-sm text-muted-foreground">{timeLabel}</div>
+                    </div>
+                );
+            },
         },
         { accessorKey: 'status', header: 'Status', cell: ({ row }) => getStatusBadge(row.original.status) },
         {
@@ -190,7 +202,8 @@ export default function AssignedSessions({ sessions, filters: initialFilters }: 
                                     size="sm"
                                     variant="outline"
                                     onClick={() => handleGenerateTunnel(s.id)}
-                                    disabled={generatingTunnelFor === s.id}
+                                    disabled={generatingTunnelFor === s.id || s.schedule_ended}
+                                    title={s.schedule_ended ? 'Session has ended' : undefined}
                                 >
                                     <Link2 className="mr-1 h-4 w-4" />
                                     {generatingTunnelFor === s.id ? '...' : 'Inmate Link'}

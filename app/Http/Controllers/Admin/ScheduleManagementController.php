@@ -22,11 +22,14 @@ class ScheduleManagementController extends Controller
      */
     public function index(Request $request): Response
     {
-        $visits = Visit::with(['user', 'monitoringOfficer'])
+        $visits = Visit::with(['user', 'monitoringOfficer', 'visitSessions' => fn ($q) => $q->orderBy('scheduled_start', 'desc')->limit(1)])
             ->orderBy('scheduled_date', 'desc')
             ->orderBy('created_at', 'desc')
             ->get()
             ->map(function ($visit) {
+                $latestSession = $visit->visitSessions->first();
+                $scheduleEnded = $visit->isScheduleInPast();
+
                 return [
                     'id' => $visit->id,
                     'user_id' => $visit->user_id,
@@ -47,6 +50,8 @@ class ScheduleManagementController extends Controller
                     'monitoring_officer_id' => $visit->monitoring_officer_id,
                     'monitoring_officer_name' => $visit->monitoringOfficer ? trim("{$visit->monitoringOfficer->first_name} {$visit->monitoringOfficer->middle_name} {$visit->monitoringOfficer->last_name}") : null,
                     'created_at' => $visit->created_at->format('Y-m-d H:i:s'),
+                    'schedule_ended' => $scheduleEnded,
+                    'visit_session_id' => $latestSession?->id,
                 ];
             });
 
@@ -84,6 +89,7 @@ class ScheduleManagementController extends Controller
             'visits' => $visits,
             'visitors' => $visitors,
             'monitoringOfficers' => $monitoringOfficers,
+            'today_unavailable' => now()->format('H:i') >= '21:50',
         ]);
     }
 
@@ -92,6 +98,16 @@ class ScheduleManagementController extends Controller
      */
     public function approve(Request $request, Visit $visit): RedirectResponse
     {
+        if ($visit->isScheduleInPast()) {
+            $visit->update([
+                'status' => VisitStatus::Rejected,
+                'rejection_reason' => 'This scheduled time has passed. Please submit a new visit schedule.',
+            ]);
+
+            return redirect()->route('admin.schedules.index')
+                ->with('error', 'This schedule has passed and could not be approved. The application has been marked as not reviewed. Please ask the visitor to submit a new schedule.');
+        }
+
         $rules = [
             'monitoring_officer_id' => ['nullable', 'exists:users,id'],
             'access_key' => ['nullable', 'string', 'regex:/^[A-Z0-9]{8,12}$/'],
@@ -109,8 +125,7 @@ class ScheduleManagementController extends Controller
         ];
 
         $roomId = null;
-        $approvalWarning = null;
-        // Create VideoSDK room for virtual visits
+        // Create VideoSDK room for virtual visits (required for approval)
         if ($visit->visit_type === \App\VisitType::Virtual) {
             $videoSdkService = new \App\Services\VideoSdkService;
             $roomName = "visit-{$visit->id}-".uniqid();
@@ -138,11 +153,12 @@ class ScheduleManagementController extends Controller
                     'visit_id' => $visit->id,
                     'error' => $roomResult['error'] ?? 'Unknown error',
                 ]);
-                if ($request->filled('meeting_link')) {
-                    $updateData['meeting_link'] = $request->meeting_link;
-                } else {
-                    $approvalWarning = 'Video room creation failed: '.($roomResult['error'] ?? 'Unknown error').'. Please add meeting link manually.';
-                }
+
+                return redirect()->back()
+                    ->withInput($request->only('monitoring_officer_id', 'access_key'))
+                    ->withErrors([
+                        'meeting_link' => 'Video room creation failed: '.($roomResult['error'] ?? 'Unknown error').'. A meeting link is required for virtual visits. Please check VideoSDK configuration and try again.',
+                    ]);
             }
         }
 
@@ -192,13 +208,8 @@ class ScheduleManagementController extends Controller
             $request
         );
 
-        $redirect = redirect()->route('admin.schedules.index')
+        return redirect()->route('admin.schedules.index')
             ->with('success', 'Schedule approved successfully.');
-        if ($approvalWarning) {
-            $redirect->with('warning', $approvalWarning);
-        }
-
-        return $redirect;
     }
 
     /**
@@ -233,7 +244,9 @@ class ScheduleManagementController extends Controller
      */
     public function updateStatus(Request $request, Visit $visit): RedirectResponse
     {
-        if ($request->has('monitoring_officer_id') && $request->monitoring_officer_id === '') {
+        // Normalize empty or invalid monitoring_officer_id so validation and update work when changing to pending/rejected
+        $moId = $request->input('monitoring_officer_id');
+        if ($moId === '' || $moId === null || (is_string($moId) && trim($moId) === '')) {
             $request->merge(['monitoring_officer_id' => null]);
         }
 
@@ -286,6 +299,16 @@ class ScheduleManagementController extends Controller
                         'status' => 'pending',
                         'started_at' => now(),
                     ]);
+                } else {
+                    \Illuminate\Support\Facades\Log::error('VideoSDK room creation failed during status update', [
+                        'visit_id' => $visit->id,
+                        'error' => $roomResult['error'] ?? 'Unknown error',
+                    ]);
+
+                    return redirect()->back()
+                        ->withErrors([
+                            'meeting_link' => 'Video room creation failed: '.($roomResult['error'] ?? 'Unknown error').'. A meeting link is required for virtual visits.',
+                        ]);
                 }
             }
         }
@@ -380,6 +403,12 @@ class ScheduleManagementController extends Controller
                 ->withInput();
         }
 
+        if (\Carbon\Carbon::parse($request->scheduled_date)->isToday() && now()->format('H:i') >= '21:50') {
+            return redirect()->back()
+                ->withErrors(['scheduled_date' => 'This day is no longer available for scheduling (cutoff 9:50 PM). Please select another date.'])
+                ->withInput();
+        }
+
         // Check if the user is a visitor
         $user = User::findOrFail($request->user_id);
         if ($user->role?->slug !== 'visitor') {
@@ -447,6 +476,12 @@ class ScheduleManagementController extends Controller
         if ($validator->fails()) {
             return redirect()->back()
                 ->withErrors($validator)
+                ->withInput();
+        }
+
+        if (\Carbon\Carbon::parse($request->scheduled_date)->isToday() && now()->format('H:i') >= '21:50') {
+            return redirect()->back()
+                ->withErrors(['scheduled_date' => 'This day is no longer available for scheduling (cutoff 9:50 PM). Please select another date.'])
                 ->withInput();
         }
 

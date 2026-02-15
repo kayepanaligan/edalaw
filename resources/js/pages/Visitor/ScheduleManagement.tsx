@@ -1,5 +1,7 @@
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 import { Calendar, Clock, Plus, Scale, User, Video, X, CalendarClock, FileText, MoreVertical, FileOutput, VideoIcon } from 'lucide-react';
+
+import { formatVisitSchedule } from '@/lib/formatVisitSchedule';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { ColumnDef } from '@tanstack/react-table';
@@ -77,6 +79,7 @@ type Visit = {
 type Props = {
     visits: Visit[];
     bookedTimeSlots?: string[];
+    today_unavailable?: boolean;
 };
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -159,6 +162,8 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
     const [rescheduleBookedSlots, setRescheduleBookedSlots] = useState<string[]>([]);
     const [slotCapacities, setSlotCapacities] = useState<Record<string, { current: number; max: number; isFull: boolean }>>({});
     const [rescheduleSlotCapacities, setRescheduleSlotCapacities] = useState<Record<string, { current: number; max: number; isFull: boolean }>>({});
+    const [isDayUnavailable, setIsDayUnavailable] = useState(false);
+    const [rescheduleDayUnavailable, setRescheduleDayUnavailable] = useState(false);
     const [loadingSlots, setLoadingSlots] = useState(false);
     const [statusFilter, setStatusFilter] = useState<string>('all');
     const [visitTypeFilter, setVisitTypeFilter] = useState<string>('all');
@@ -166,7 +171,11 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
     const [selectedSessionForVideo, setSelectedSessionForVideo] = useState<{ sessionId: number; visit: Visit } | null>(null);
     const [videoTermsAccepted, setVideoTermsAccepted] = useState(false);
     const [acceptingTerms, setAcceptingTerms] = useState(false);
-    const today = new Date().toISOString().split('T')[0];
+    const todayDate = new Date();
+    const today = todayDate.toISOString().split('T')[0];
+    const tomorrow = new Date(todayDate);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const minScheduleDate = (usePage().props as Props).today_unavailable ? tomorrow.toISOString().split('T')[0] : today;
 
     const form = useForm({
         scheduled_date: '',
@@ -211,11 +220,15 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
 
         const fetchSlotCapacities = async () => {
             setLoadingSlots(true);
+            setIsDayUnavailable(false);
             try {
                 const response = await fetch(`/visitor/schedules/booked-slots?date=${selectedDate}&visit_type=${visitType}`);
                 const data = await response.json();
                 if (data.slotCapacities) {
                     setSlotCapacities(data.slotCapacities);
+                }
+                if (data.isDayUnavailable === true) {
+                    setIsDayUnavailable(true);
                 }
             } catch (error) {
                 console.error('Error fetching slot capacities:', error);
@@ -427,12 +440,16 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
 
         const fetchRescheduleSlotCapacities = async () => {
             setLoadingSlots(true);
+            setRescheduleDayUnavailable(false);
             try {
                 const visitType = selectedVisitForReschedule.visit_type;
                 const response = await fetch(`/visitor/schedules/booked-slots?date=${rescheduleDate}&visit_type=${visitType}`);
                 const data = await response.json();
                 if (data.slotCapacities) {
                     setRescheduleSlotCapacities(data.slotCapacities);
+                }
+                if (data.isDayUnavailable === true) {
+                    setRescheduleDayUnavailable(true);
                 }
             } catch (error) {
                 console.error('Error fetching reschedule slot capacities:', error);
@@ -458,31 +475,15 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
             header: 'Date / Time',
             cell: ({ row }) => {
                 const visit = row.original;
+                const { dateLabel, timeLabel } = formatVisitSchedule(
+                    visit.scheduled_date,
+                    visit.scheduled_time ?? null,
+                    visit.visit_type
+                );
                 return (
                     <div className="space-y-1">
-                        <div className="font-medium">
-                            {new Date(visit.scheduled_date).toLocaleDateString('en-US', {
-                                weekday: 'short',
-                                year: 'numeric',
-                                month: 'short',
-                                day: 'numeric',
-                            })}
-                        </div>
-                        {visit.scheduled_time && (() => {
-                            const [hours, minutes] = visit.scheduled_time.split(':').map(Number);
-                            let endHours = hours;
-                            let endMinutes = minutes + 10;
-                            if (endMinutes >= 60) {
-                                endMinutes = 0;
-                                endHours += 1;
-                            }
-                            const endTime = `${endHours.toString().padStart(2, '0')}:${endMinutes.toString().padStart(2, '0')}`;
-                            return (
-                                <div className="text-sm text-muted-foreground">
-                                    {visit.scheduled_time} - {endTime}
-                                </div>
-                            );
-                        })()}
+                        <div className="font-medium">{dateLabel}</div>
+                        <div className="text-sm text-muted-foreground">{timeLabel}</div>
                     </div>
                 );
             },
@@ -818,7 +819,7 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
                                             id="scheduled_date"
                                             type="date"
                                             required
-                                            min={today}
+                                            min={minScheduleDate}
                                             name="scheduled_date"
                                             className="pl-10"
                                             value={form.data.scheduled_date || ''}
@@ -855,15 +856,21 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
                                                     Loading booked slots...
                                                 </div>
                                             )}
-                                            <TimeSlotPicker
-                                                selectedTime={form.data.scheduled_time || ''}
-                                                bookedSlots={bookedSlots}
-                                                slotCapacities={slotCapacities}
-                                                visitType={form.data.visit_type as 'physical' | 'virtual'}
-                                                onTimeSelect={(time) => {
-                                                    form.setData('scheduled_time', time);
-                                                }}
-                                            />
+                                            {isDayUnavailable ? (
+                                                <div className="rounded-lg border border-amber-500/50 bg-amber-500/10 p-4 text-center text-sm text-amber-800 dark:text-amber-200">
+                                                    <strong>Unavailable.</strong> Schedule times for this day end at 5:50 PM. Please select another date.
+                                                </div>
+                                            ) : (
+                                                <TimeSlotPicker
+                                                    selectedTime={form.data.scheduled_time || ''}
+                                                    bookedSlots={bookedSlots}
+                                                    slotCapacities={slotCapacities}
+                                                    visitType={form.data.visit_type as 'physical' | 'virtual'}
+                                                    onTimeSelect={(time) => {
+                                                        form.setData('scheduled_time', time);
+                                                    }}
+                                                />
+                                            )}
                                             <input
                                                 type="hidden"
                                                 name="scheduled_time"
@@ -1043,7 +1050,7 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
                                             id="reschedule_date"
                                             type="date"
                                             required
-                                            min={today}
+                                            min={minScheduleDate}
                                             name="scheduled_date"
                                             className="pl-10"
                                             value={rescheduleForm.data.scheduled_date || ''}
@@ -1080,15 +1087,21 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
                                                     Loading booked slots...
                                                 </div>
                                             )}
-                                            <TimeSlotPicker
-                                                selectedTime={rescheduleForm.data.scheduled_time || ''}
-                                                onTimeSelect={(time) => {
-                                                    rescheduleForm.setData('scheduled_time', time);
-                                                }}
-                                                bookedSlots={rescheduleBookedSlots}
-                                                slotCapacities={rescheduleSlotCapacities}
-                                                visitType={selectedVisitForReschedule?.visit_type as 'physical' | 'virtual'}
-                                            />
+                                            {rescheduleDayUnavailable ? (
+                                                <div className="rounded-lg border border-amber-500/50 bg-amber-500/10 p-4 text-center text-sm text-amber-800 dark:text-amber-200">
+                                                    <strong>Unavailable.</strong> Schedule times for this day end at 5:50 PM. Please select another date.
+                                                </div>
+                                            ) : (
+                                                <TimeSlotPicker
+                                                    selectedTime={rescheduleForm.data.scheduled_time || ''}
+                                                    onTimeSelect={(time) => {
+                                                        rescheduleForm.setData('scheduled_time', time);
+                                                    }}
+                                                    bookedSlots={rescheduleBookedSlots}
+                                                    slotCapacities={rescheduleSlotCapacities}
+                                                    visitType={selectedVisitForReschedule?.visit_type as 'physical' | 'virtual'}
+                                                />
+                                            )}
                                         </>
                                     )}
                                     <InputError message={rescheduleForm.errors.scheduled_time} />

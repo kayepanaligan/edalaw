@@ -130,6 +130,19 @@ type Props = {
     enforcement_actions: { forced_mutes: number; terminations: number; chat_locks: number };
     physical_visit_key_usage: { generated: number; used: number; expired: number };
     complaints_reviews_trend: Array<{ date: string; submitted: number; resolved: number }>;
+    filters?: {
+        date_preset?: string;
+        date_from?: string;
+        date_to?: string;
+        time_grouping?: string;
+        visit_type?: string;
+        status?: string;
+        recording_compliance?: string;
+        violation?: string;
+        monitoring_officer_id?: string;
+        inmate?: string;
+    };
+    monitoring_officers?: Array<{ id: number; name: string }>;
 }
 
 function getFullName(user: User): string {
@@ -216,6 +229,8 @@ export default function SuperAdminDashboard({
     enforcement_actions = { forced_mutes: 0, terminations: 0, chat_locks: 0 },
     physical_visit_key_usage = { generated: 0, used: 0, expired: 0 },
     complaints_reviews_trend = [],
+    filters: initialFilters = {},
+    monitoring_officers: monitoringOfficersList = [],
 }: Props) {
     const [selectedProvince, setSelectedProvince] = useState<string>('all');
     const [selectedMunicipality, setSelectedMunicipality] = useState<string>('all');
@@ -223,6 +238,34 @@ export default function SuperAdminDashboard({
     const [locationDistribution, setLocationDistribution] = useState(initialLocationDistribution);
     const [municipalities, setMunicipalities] = useState(initialMunicipalities);
     const [barangays, setBarangays] = useState(initialBarangays);
+
+    const [globalFilters, setGlobalFilters] = useState({
+        date_preset: initialFilters?.date_preset ?? 'last_30_days',
+        date_from: initialFilters?.date_from ?? '',
+        date_to: initialFilters?.date_to ?? '',
+        time_grouping: initialFilters?.time_grouping ?? 'daily',
+        visit_type: initialFilters?.visit_type ?? 'all',
+        status: initialFilters?.status ?? 'all',
+        recording_compliance: initialFilters?.recording_compliance ?? 'all',
+        violation: initialFilters?.violation ?? 'all',
+        monitoring_officer_id: initialFilters?.monitoring_officer_id || 'all',
+        inmate: initialFilters?.inmate ?? '',
+    });
+
+    const applyGlobalFilters = () => {
+        const params: Record<string, string> = {};
+        if (globalFilters.date_preset) params.date_preset = globalFilters.date_preset;
+        if (globalFilters.date_from) params.date_from = globalFilters.date_from;
+        if (globalFilters.date_to) params.date_to = globalFilters.date_to;
+        if (globalFilters.time_grouping && globalFilters.time_grouping !== 'daily') params.time_grouping = globalFilters.time_grouping;
+        if (globalFilters.visit_type && globalFilters.visit_type !== 'all') params.visit_type = globalFilters.visit_type;
+        if (globalFilters.status && globalFilters.status !== 'all') params.status = globalFilters.status;
+        if (globalFilters.recording_compliance && globalFilters.recording_compliance !== 'all') params.recording_compliance = globalFilters.recording_compliance;
+        if (globalFilters.violation && globalFilters.violation !== 'all') params.violation = globalFilters.violation;
+        if (globalFilters.monitoring_officer_id && globalFilters.monitoring_officer_id !== 'all') params.monitoring_officer_id = globalFilters.monitoring_officer_id;
+        if (globalFilters.inmate) params.inmate = globalFilters.inmate;
+        router.get('/dashboard/super-admin', params, { preserveState: false });
+    };
 
     useToast();
     useNotifications();
@@ -336,13 +379,124 @@ export default function SuperAdminDashboard({
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Super Admin Dashboard" />
-            <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-6">
-                <div className="flex items-center justify-between">
+            <div className="scrollbar-hide flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-6">
+                <div className="flex flex-wrap items-center justify-between gap-4">
                     <div>
                         <h1 className="text-2xl font-semibold">Super Admin Dashboard</h1>
                         <p className="text-muted-foreground">Manage all aspects of the system</p>
                     </div>
                 </div>
+
+                {/* Global filters — control all charts and KPIs via URL params */}
+                <Card>
+                    <CardHeader className="pb-2">
+                        <CardTitle className="text-sm">Overview filters</CardTitle>
+                        <CardDescription>Apply to all charts and reports. Changes update the dashboard via server.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex flex-wrap items-end gap-3">
+                        <div className="flex flex-col gap-1">
+                            <label className="text-xs text-muted-foreground">Date range</label>
+                            <Select value={globalFilters.date_preset} onValueChange={(v) => setGlobalFilters((f) => ({ ...f, date_preset: v }))}>
+                                <SelectTrigger className="w-[160px]">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="today">Today</SelectItem>
+                                    <SelectItem value="yesterday">Yesterday</SelectItem>
+                                    <SelectItem value="last_7_days">Last 7 Days</SelectItem>
+                                    <SelectItem value="last_30_days">Last 30 Days</SelectItem>
+                                    <SelectItem value="this_month">This Month</SelectItem>
+                                    <SelectItem value="last_month">Last Month</SelectItem>
+                                    <SelectItem value="this_year">This Year</SelectItem>
+                                    <SelectItem value="custom">Custom range</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        {globalFilters.date_preset === 'custom' && (
+                            <>
+                                <div className="flex flex-col gap-1">
+                                    <label className="text-xs text-muted-foreground">From</label>
+                                    <input
+                                        type="date"
+                                        className="rounded-md border border-input bg-background px-2 py-1.5 text-sm h-9"
+                                        value={globalFilters.date_from}
+                                        onChange={(e) => setGlobalFilters((f) => ({ ...f, date_from: e.target.value }))}
+                                    />
+                                </div>
+                                <div className="flex flex-col gap-1">
+                                    <label className="text-xs text-muted-foreground">To</label>
+                                    <input
+                                        type="date"
+                                        className="rounded-md border border-input bg-background px-2 py-1.5 text-sm h-9"
+                                        value={globalFilters.date_to}
+                                        onChange={(e) => setGlobalFilters((f) => ({ ...f, date_to: e.target.value }))}
+                                    />
+                                </div>
+                            </>
+                        )}
+                        <div className="flex flex-col gap-1">
+                            <label className="text-xs text-muted-foreground">Time grouping</label>
+                            <Select value={globalFilters.time_grouping} onValueChange={(v) => setGlobalFilters((f) => ({ ...f, time_grouping: v }))}>
+                                <SelectTrigger className="w-[120px]">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="daily">Daily</SelectItem>
+                                    <SelectItem value="weekly">Weekly</SelectItem>
+                                    <SelectItem value="monthly">Monthly</SelectItem>
+                                    <SelectItem value="quarterly">Quarterly</SelectItem>
+                                    <SelectItem value="yearly">Yearly</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="flex flex-col gap-1">
+                            <label className="text-xs text-muted-foreground">Visit type</label>
+                            <Select value={globalFilters.visit_type} onValueChange={(v) => setGlobalFilters((f) => ({ ...f, visit_type: v }))}>
+                                <SelectTrigger className="w-[110px]">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All</SelectItem>
+                                    <SelectItem value="virtual">Virtual</SelectItem>
+                                    <SelectItem value="physical">Physical</SelectItem>
+                                    <SelectItem value="eburol">Eburol</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="flex flex-col gap-1">
+                            <label className="text-xs text-muted-foreground">Status</label>
+                            <Select value={globalFilters.status} onValueChange={(v) => setGlobalFilters((f) => ({ ...f, status: v }))}>
+                                <SelectTrigger className="w-[120px]">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All</SelectItem>
+                                    <SelectItem value="pending">Pending</SelectItem>
+                                    <SelectItem value="approved">Approved</SelectItem>
+                                    <SelectItem value="rejected">Rejected</SelectItem>
+                                    <SelectItem value="completed">Completed</SelectItem>
+                                    <SelectItem value="missed">Missed</SelectItem>
+                                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="flex flex-col gap-1">
+                            <label className="text-xs text-muted-foreground">Monitoring officer</label>
+                            <Select value={globalFilters.monitoring_officer_id} onValueChange={(v) => setGlobalFilters((f) => ({ ...f, monitoring_officer_id: v }))}>
+                                <SelectTrigger className="w-[160px]">
+                                    <SelectValue placeholder="All" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All</SelectItem>
+                                    {monitoringOfficersList.map((o) => (
+                                        <SelectItem key={o.id} value={String(o.id)}>{o.name}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <Button onClick={applyGlobalFilters}>Apply filters</Button>
+                    </CardContent>
+                </Card>
 
                 {/* KPI Cards */}
                 <div className="grid auto-rows-min gap-4 md:grid-cols-4">

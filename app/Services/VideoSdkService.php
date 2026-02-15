@@ -25,7 +25,7 @@ class VideoSdkService
     }
 
     /**
-     * Create a new video room.
+     * Create a new video room. Retries once after 2 seconds on failure (transient errors).
      *
      * @param  string  $name  Room name
      * @param  array  $options  Additional room options
@@ -33,48 +33,108 @@ class VideoSdkService
      */
     public function createRoom(string $name, array $options = []): array
     {
-        if (! $this->apiKey || ! $this->apiEndpoint || ! $this->token) {
-            Log::error('VideoSDK API key, endpoint, or token not configured', [
-                'has_api_key' => ! empty($this->apiKey),
-                'has_endpoint' => ! empty($this->apiEndpoint),
-                'has_token' => ! empty($this->token),
-            ]);
+        $result = $this->createRoomOnce($name, $options);
+        if ($result['success']) {
+            return $result;
+        }
+        sleep(2);
 
-            return ['success' => false, 'error' => 'VideoSDK service not configured. Please check your environment variables: VIDEOSDK_API_KEY, VIDEOSDK_API_ENDPOINT, and VIDEOSDK_TOKEN.'];
+        return $this->createRoomOnce($name, $options);
+    }
+
+    /**
+     * Generate a JWT for VideoSDK server-side (v2) API. Required for create room.
+     * Uses roles: ["crawler"] and version: 2 as per VideoSDK docs.
+     */
+    public function generateServerApiToken(int $expiryMinutes = 60): ?string
+    {
+        if (! $this->apiKey || ! $this->secretKey) {
+            return null;
         }
 
         try {
-            // VideoSDK v2 API format - use customRoomId for room name
-            $requestBody = [
-                'customRoomId' => $name,
+            $payload = [
+                'apikey' => $this->apiKey,
+                'permissions' => ['allow_join', 'allow_mod'],
+                'version' => 2,
+                'roles' => ['crawler'],
+                'iat' => now()->timestamp,
+                'exp' => now()->addMinutes($expiryMinutes)->timestamp,
             ];
 
-            // Merge any additional options
-            if (! empty($options)) {
-                $requestBody = array_merge($requestBody, $options);
+            return JWT::encode($payload, $this->secretKey, 'HS256');
+        } catch (\Exception $e) {
+            Log::error('VideoSDK server token generation failed', ['error' => $e->getMessage()]);
+
+            return null;
+        }
+    }
+
+    /**
+     * Single attempt to create a video room.
+     * Supports v1 (meetings) and v2 (rooms) API. For v2, uses server-generated token when secret is set.
+     *
+     * @param  string  $name  Room name
+     * @param  array  $options  Additional room options
+     * @return array{success: bool, room_id?: string, room_name?: string, room_url?: string, error?: string}
+     */
+    public function createRoomOnce(string $name, array $options = []): array
+    {
+        $isV1 = str_contains($this->apiEndpoint, '/v1/meetings');
+
+        if ($isV1) {
+            if (! $this->apiEndpoint || ! $this->token) {
+                Log::error('VideoSDK v1: endpoint or token not configured');
+
+                return ['success' => false, 'error' => 'VideoSDK v1 requires VIDEOSDK_API_ENDPOINT and VIDEOSDK_TOKEN.'];
+            }
+        } else {
+            if (! $this->apiKey || ! $this->apiEndpoint) {
+                Log::error('VideoSDK API key or endpoint not configured');
+
+                return ['success' => false, 'error' => 'VideoSDK service not configured. Set VIDEOSDK_API_KEY, VIDEOSDK_API_ENDPOINT, and VIDEOSDK_SECRET_KEY for room creation.'];
+            }
+        }
+
+        try {
+            if ($isV1) {
+                $requestBody = ['userMeetingId' => $name];
+                $authHeader = $this->token;
+                if (! str_starts_with(trim($authHeader), 'Bearer ')) {
+                    $authHeader = 'Bearer '.trim($authHeader);
+                }
+            } else {
+                $requestBody = array_merge(['customRoomId' => $name], $options);
+                $serverToken = $this->generateServerApiToken();
+                $authHeader = $serverToken ?? $this->token;
+                if (! $authHeader) {
+                    return ['success' => false, 'error' => 'VideoSDK: Could not generate server token. Ensure VIDEOSDK_SECRET_KEY is set for v2 API.'];
+                }
+                // v2 API: official examples use raw token in Authorization (no "Bearer " prefix)
+                $authHeader = trim($authHeader);
             }
 
             Log::info('Creating VideoSDK room', [
                 'room_name' => $name,
                 'endpoint' => $this->apiEndpoint,
+                'api_version' => $isV1 ? 'v1' : 'v2',
             ]);
 
             $response = Http::timeout(30)->withHeaders([
-                'Authorization' => "Bearer {$this->token}",
+                'Authorization' => $authHeader,
                 'Content-Type' => 'application/json',
             ])->post($this->apiEndpoint, $requestBody);
 
             if ($response->successful()) {
                 $data = $response->json();
 
-                // VideoSDK v2 API response format
-                // Response may contain: roomId, links.room, or different structure
-                $roomId = $data['roomId'] ?? $data['id'] ?? $data['customRoomId'] ?? $name;
+                if ($isV1) {
+                    $roomId = $data['meetingId'] ?? $data['roomId'] ?? $data['id'] ?? $name;
+                } else {
+                    $roomId = $data['roomId'] ?? $data['id'] ?? $data['customRoomId'] ?? $name;
+                }
 
-                // Try different possible response formats for room URL
                 $roomUrl = $data['links']['room'] ?? $data['roomUrl'] ?? $data['url'] ?? null;
-
-                // If roomUrl is not in the response, construct it using roomId
                 if (! $roomUrl && $roomId) {
                     $roomUrl = "https://app.videosdk.live/meetings/{$roomId}";
                 }
@@ -83,13 +143,12 @@ class VideoSdkService
                     'room_id' => $roomId,
                     'room_name' => $name,
                     'room_url' => $roomUrl,
-                    'response_data' => $data,
                 ]);
 
                 return [
                     'success' => true,
                     'room_id' => $roomId,
-                    'room_name' => $data['name'] ?? $data['customRoomId'] ?? $name,
+                    'room_name' => $data['name'] ?? $data['customRoomId'] ?? $data['userMeetingId'] ?? $name,
                     'room_url' => $roomUrl,
                 ];
             }

@@ -41,6 +41,16 @@ class AssignedSessionsController extends Controller
                     ? trim("{$session->visit->inmate_first_name} {$session->visit->inmate_middle_name} {$session->visit->inmate_last_name}")
                     : trim("{$session->eburol->inmate_first_name} {$session->eburol->inmate_middle_name} {$session->eburol->inmate_last_name}");
 
+                $scheduledDate = null;
+                $scheduledTime = null;
+                $visitType = null;
+                if ($session->visit_id && $session->visit) {
+                    $scheduledDate = $session->visit->scheduled_date->format('Y-m-d');
+                    $scheduledTime = $session->visit->scheduled_time;
+                    $visitType = $session->visit->visit_type->value;
+                }
+                $scheduleEnded = now()->isAfter($session->scheduled_end);
+
                 return [
                     'id' => $session->id,
                     'visit_id' => $session->visit_id,
@@ -51,6 +61,10 @@ class AssignedSessionsController extends Controller
                     'type' => $session->session_type,
                     'scheduled_start' => $session->scheduled_start->toIso8601String(),
                     'scheduled_end' => $session->scheduled_end->toIso8601String(),
+                    'scheduled_date' => $scheduledDate,
+                    'scheduled_time' => $scheduledTime,
+                    'visit_type' => $visitType,
+                    'schedule_ended' => $scheduleEnded,
                     'status' => $session->status,
                     'recording_status' => $session->recording_status,
                     'started_at' => $session->started_at?->toIso8601String(),
@@ -76,8 +90,8 @@ class AssignedSessionsController extends Controller
         if ($session->monitor_id !== $request->user()->id) {
             abort(403);
         }
-        if (! $session->isWithinSchedule()) {
-            return response()->json(['error' => 'Session is not within the scheduled window.'], 422);
+        if (! $session->isWithinScheduleForTunnel()) {
+            return response()->json(['error' => 'Session is not within the scheduled window. You can generate the inmate link from 15 minutes before the session start until the session end.'], 422);
         }
         if ($session->isCompleted()) {
             return response()->json(['error' => 'Session has ended.'], 422);

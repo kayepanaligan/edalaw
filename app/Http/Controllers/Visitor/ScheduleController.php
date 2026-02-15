@@ -124,6 +124,7 @@ class ScheduleController extends Controller
         return Inertia::render('Visitor/ScheduleManagement', [
             'visits' => $visits,
             'bookedTimeSlots' => $bookedTimeSlots,
+            'today_unavailable' => now()->format('H:i') >= '21:50',
         ]);
     }
 
@@ -139,31 +140,55 @@ class ScheduleController extends Controller
 
         $visitType = $request->visit_type ?? 'physical';
         $date = $request->date;
+        $isPhysical = $visitType === 'physical';
 
-        // Generate all time slots
+        $dateCarbon = \Carbon\Carbon::parse($date)->startOfDay();
+        $nowTime = now()->format('H:i');
+        $dayCutoff = '21:50'; // After 9:50 PM, entire day is unavailable
+        $latestSlotEnd = $isPhysical ? '17:00' : '17:50';
+        $isDayUnavailable = $dateCarbon->isToday() && (
+            $nowTime >= $dayCutoff || $nowTime > $latestSlotEnd
+        );
+
+        // Physical: hourly slots 07:00–17:00 (7am–6pm). Virtual: 10-minute slots 7:00–17:50
         $allTimeSlots = [];
-        for ($hour = 7; $hour < 18; $hour++) {
-            for ($minute = 0; $minute < 60; $minute += 10) {
-                $allTimeSlots[] = sprintf('%02d:%02d', $hour, $minute);
+        if ($isPhysical) {
+            for ($hour = 7; $hour < 18; $hour++) {
+                $allTimeSlots[] = sprintf('%02d:00', $hour);
+            }
+        } else {
+            for ($hour = 7; $hour < 18; $hour++) {
+                for ($minute = 0; $minute < 60; $minute += 10) {
+                    $allTimeSlots[] = sprintf('%02d:%02d', $hour, $minute);
+                }
             }
         }
 
-        // Get capacity information for each slot
+        // Get capacity information for each slot (when day is unavailable, treat all as full)
         $slotCapacities = [];
         foreach ($allTimeSlots as $timeSlot) {
-            $capacity = \App\Models\TimeSlotCapacity::getCapacity($timeSlot, $visitType);
-            $currentBookings = \App\Models\TimeSlotCapacity::getCurrentBookings($date, $timeSlot, $visitType);
-            $isFull = $currentBookings >= $capacity;
+            if ($isDayUnavailable) {
+                $slotCapacities[$timeSlot] = [
+                    'current' => 999,
+                    'max' => 1,
+                    'isFull' => true,
+                ];
+            } else {
+                $capacity = \App\Models\TimeSlotCapacity::getCapacity($timeSlot, $visitType);
+                $currentBookings = \App\Models\TimeSlotCapacity::getCurrentBookings($date, $timeSlot, $visitType);
+                $isFull = $currentBookings >= $capacity;
 
-            $slotCapacities[$timeSlot] = [
-                'current' => $currentBookings,
-                'max' => $capacity,
-                'isFull' => $isFull,
-            ];
+                $slotCapacities[$timeSlot] = [
+                    'current' => $currentBookings,
+                    'max' => $capacity,
+                    'isFull' => $isFull,
+                ];
+            }
         }
 
         return response()->json([
             'slotCapacities' => $slotCapacities,
+            'isDayUnavailable' => $isDayUnavailable,
         ]);
     }
 
@@ -190,15 +215,38 @@ class ScheduleController extends Controller
                 ->withInput();
         }
 
-        // Check if the time slot has capacity
+        $scheduledDate = \Carbon\Carbon::parse($request->scheduled_date)->startOfDay();
+        if ($scheduledDate->isToday() && now()->format('H:i') >= '21:50') {
+            return redirect()->back()
+                ->withErrors(['scheduled_date' => 'This day is no longer available for scheduling (cutoff 9:50 PM). Please select another date.'])
+                ->withInput();
+        }
+        $isPhysical = $request->visit_type === 'physical';
+        $cutoff = $isPhysical ? '17:00' : '17:50';
+        if ($scheduledDate->isToday() && $request->scheduled_time > $cutoff) {
+            $message = $isPhysical
+                ? 'Schedule times for today end at 5:00 PM. Please select another date or time.'
+                : 'Schedule times for today end at 5:50 PM. Please select another date or time.';
+
+            return redirect()->back()
+                ->withErrors(['scheduled_time' => $message])
+                ->withInput();
+        }
+
+        // Physical visits use hourly slots: normalize to HH:00 for capacity and storage
+        $scheduledTime = $request->scheduled_time;
+        if ($isPhysical && preg_match('/^(\d{2}):\d{2}$/', $scheduledTime, $m)) {
+            $scheduledTime = $m[1].':00';
+        }
+
         $isAvailable = \App\Models\TimeSlotCapacity::isAvailable(
             $request->scheduled_date,
-            $request->scheduled_time,
+            $scheduledTime,
             $request->visit_type
         );
 
         if (! $isAvailable) {
-            $capacity = \App\Models\TimeSlotCapacity::getCapacity($request->scheduled_time, $request->visit_type);
+            $capacity = \App\Models\TimeSlotCapacity::getCapacity($scheduledTime, $request->visit_type);
 
             return redirect()->back()
                 ->withErrors(['scheduled_time' => "This time slot is full (maximum capacity: {$capacity} visitors). Please select another time."])
@@ -220,7 +268,7 @@ class ScheduleController extends Controller
         $visit = Visit::create([
             'user_id' => auth()->id(),
             'scheduled_date' => $request->scheduled_date,
-            'scheduled_time' => $request->scheduled_time,
+            'scheduled_time' => $scheduledTime,
             'visit_type' => VisitType::from($request->visit_type),
             'inmate_first_name' => $request->inmate_first_name,
             'inmate_middle_name' => $request->inmate_middle_name,
@@ -319,6 +367,12 @@ class ScheduleController extends Controller
         if ($validator->fails()) {
             return redirect()->back()
                 ->withErrors($validator)
+                ->withInput();
+        }
+
+        if (\Carbon\Carbon::parse($request->scheduled_date)->isToday() && now()->format('H:i') >= '21:50') {
+            return redirect()->back()
+                ->withErrors(['scheduled_date' => 'This day is no longer available for scheduling (cutoff 9:50 PM). Please select another date.'])
                 ->withInput();
         }
 

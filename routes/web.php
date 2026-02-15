@@ -118,8 +118,12 @@ Route::middleware(['auth', 'verified', 'approved'])->group(function () {
     Route::middleware(['role:super_admin'])->get('dashboard/super-admin', \App\Http\Controllers\Dashboard\SuperAdminDashboardController::class)
         ->name('dashboard.super-admin');
 
-    Route::middleware(['role:bjmp_officer'])->get('dashboard/bjmp-officer', \App\Http\Controllers\Dashboard\BjmpOfficerDashboardController::class)
+    Route::middleware(['role:bjmp_officer'])->get('dashboard/bjmp-officer', [\App\Http\Controllers\Dashboard\BjmpOfficerDashboardController::class, '__invoke'])
         ->name('dashboard.bjmp-officer');
+    Route::middleware(['role:bjmp_officer'])->get('dashboard/bjmp-officer/overview-data', [\App\Http\Controllers\Dashboard\BjmpOfficerDashboardController::class, 'overviewData'])
+        ->name('dashboard.bjmp-officer.overview-data');
+    Route::middleware(['role:bjmp_officer'])->get('dashboard/bjmp-officer/export-overview', [\App\Http\Controllers\Dashboard\BjmpOfficerDashboardController::class, 'exportCsv'])
+        ->name('dashboard.bjmp-officer.export-overview');
 
     Route::middleware(['role:monitoring_officer'])->get('dashboard/monitoring-officer', [\App\Http\Controllers\MonitoringOfficer\AnalyticsController::class, 'index'])
         ->name('dashboard.monitoring-officer');
@@ -205,6 +209,8 @@ Route::middleware(['auth', 'verified', 'approved'])->group(function () {
             ->name('schedules.update-status');
         Route::post('schedules/{visit}/generate-access-key', [\App\Http\Controllers\Admin\ScheduleManagementController::class, 'generateAccessKey'])
             ->name('schedules.generate-access-key');
+        Route::get('visit-session/{session}/join', [\App\Http\Controllers\StaffVisitSessionJoinController::class, 'join'])
+            ->name('visit-session.join');
 
         Route::get('eburols', [\App\Http\Controllers\Admin\EburolManagementController::class, 'index'])
             ->name('eburols.index');
@@ -313,6 +319,8 @@ Route::middleware(['auth', 'verified', 'approved'])->group(function () {
             ->name('schedules.generate-access-key');
         Route::post('schedules/{visit}/reschedule', [\App\Http\Controllers\BjmpOfficer\ScheduleManagementController::class, 'reschedule'])
             ->name('schedules.reschedule');
+        Route::get('visit-session/{session}/join', [\App\Http\Controllers\StaffVisitSessionJoinController::class, 'join'])
+            ->name('visit-session.join');
 
         // Appeal Processing
         Route::get('appeals', [\App\Http\Controllers\BjmpOfficer\AppealReviewController::class, 'index'])
