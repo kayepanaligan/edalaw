@@ -26,6 +26,36 @@ class SemaphoreSmsService
      */
     public function send(string $number, string $message): array
     {
+        return $this->sendToEndpoint('https://api.semaphore.co/api/v4/messages', $number, [
+            'message' => $message,
+        ]);
+    }
+
+    /**
+     * Send OTP via Semaphore's dedicated OTP endpoint (improved delivery for OTP traffic).
+     *
+     * @param  string  $number  Phone number (e.g., 09123456789)
+     * @param  string  $otp  The OTP code to send
+     * @return array{success: bool, message?: string, error?: string}
+     */
+    public function sendOtp(string $number, string $otp): array
+    {
+        $message = 'Your eDalawPlus OTP code is: {otp}. Valid for 10 minutes. Do not share this code with anyone.';
+
+        return $this->sendToEndpoint('https://api.semaphore.co/api/v4/otp', $number, [
+            'message' => $message,
+            'code' => $otp,
+        ]);
+    }
+
+    /**
+     * Send to a Semaphore API endpoint.
+     *
+     * @param  array<string, string>  $extraParams
+     * @return array{success: bool, message?: string, error?: string}
+     */
+    private function sendToEndpoint(string $url, string $number, array $extraParams): array
+    {
         if (! $this->apiKey) {
             Log::error('Semaphore API key not configured');
 
@@ -33,19 +63,20 @@ class SemaphoreSmsService
         }
 
         try {
-            // Format phone number (remove + if present, ensure it starts with 0 or country code)
             $formattedNumber = $this->formatPhoneNumber($number);
 
-            $response = Http::asForm()->post('https://api.semaphore.co/api/v4/messages', [
+            $payload = array_merge([
                 'apikey' => $this->apiKey,
                 'number' => $formattedNumber,
-                'message' => $message,
                 'sendername' => $this->senderName,
-            ]);
+            ], $extraParams);
+
+            $response = Http::asForm()->post($url, $payload);
 
             if ($response->successful()) {
                 $data = $response->json();
-                if (isset($data[0]['message_id'])) {
+
+                if (is_array($data) && isset($data[0]['message_id'])) {
                     Log::info('SMS sent successfully', [
                         'number' => $formattedNumber,
                         'message_id' => $data[0]['message_id'],
@@ -53,14 +84,29 @@ class SemaphoreSmsService
 
                     return ['success' => true, 'message' => 'SMS sent successfully'];
                 }
+
+                $errorMessage = is_array($data) && isset($data[0]['message'])
+                    ? $data[0]['message']
+                    : $response->body();
+                Log::error('Semaphore API returned unexpected response', [
+                    'number' => $formattedNumber,
+                    'response' => $response->body(),
+                ]);
+
+                return ['success' => false, 'error' => $errorMessage ?: 'Failed to send SMS'];
             }
+
+            $body = $response->body();
+            $decoded = json_decode($body, true);
+            $errorMessage = $decoded['message'] ?? $decoded['error'] ?? $body ?: 'Failed to send SMS';
 
             Log::error('Failed to send SMS', [
                 'number' => $formattedNumber,
-                'response' => $response->body(),
+                'status' => $response->status(),
+                'response' => $body,
             ]);
 
-            return ['success' => false, 'error' => 'Failed to send SMS'];
+            return ['success' => false, 'error' => $errorMessage];
         } catch (\Exception $e) {
             Log::error('SMS sending exception', [
                 'number' => $number,

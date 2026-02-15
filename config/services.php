@@ -41,15 +41,9 @@ return [
         'webhook_secret' => env('DAILY_CO_WEBHOOK_SECRET'),
     ],
 
-    'recaptcha' => [
-        'site_key' => env('RECAPTCHA_SITE_KEY'),
-        'secret_key' => env('RECAPTCHA_SECRET_KEY'),
-        'verify_url' => 'https://www.google.com/recaptcha/api/siteverify',
-    ],
-
     'semaphore' => [
         'api_key' => env('SEMAPHORE_API_KEY'),
-        'sender_name' => env('SEMAPHORE_SENDER_NAME', 'eDalawPlus'),
+        'sender_name' => env('SEMAPHORE_SENDER_NAME'),
     ],
 
     'videosdk' => [

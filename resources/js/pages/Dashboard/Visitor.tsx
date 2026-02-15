@@ -399,10 +399,20 @@ export default function VisitorDashboard({
 
                     <Card>
                         <CardHeader>
-                            <CardTitle>Recent Schedules</CardTitle>
-                            <CardDescription>
-                                Your latest visit schedule requests
-                            </CardDescription>
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <CardTitle>Recent Schedules</CardTitle>
+                                    <CardDescription>
+                                        Your latest visit schedule requests
+                                    </CardDescription>
+                                </div>
+                                <Link
+                                    href="/visitor/schedule"
+                                    className="text-sm font-medium text-primary hover:underline"
+                                >
+                                    Visit Management →
+                                </Link>
+                            </div>
                         </CardHeader>
                         <CardContent>
                             {recent_schedules.length === 0 ? (

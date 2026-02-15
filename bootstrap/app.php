@@ -6,6 +6,8 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets;
+use Illuminate\Validation\ValidationException;
+use Inertia\Inertia;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -29,5 +31,20 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        $exceptions->render(function (ValidationException $e, $request) {
+            if (! $request->isMethod('POST') || $request->path() !== 'login') {
+                return null;
+            }
+            $messages = $e->validator->errors()->getMessages();
+            $otpRequired = isset($messages['otp']) && in_array('OTP required', $messages['otp'], true);
+            if ($otpRequired || $request->session()->get('login.requires_otp')) {
+                $url = route('otp-verification.show');
+
+                return $request->header('X-Inertia')
+                    ? Inertia::location($url)
+                    : redirect()->to($url, 303);
+            }
+
+            return null;
+        });
     })->create();

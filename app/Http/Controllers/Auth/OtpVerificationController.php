@@ -28,7 +28,7 @@ class OtpVerificationController extends Controller
         $user = User::find($userId);
 
         if (! $user) {
-            Session::forget(['login.user_id', 'login.requires_otp']);
+            Session::forget(['login.user_id', 'login.requires_otp', 'login.remember']);
 
             return redirect()->route('login');
         }
@@ -58,7 +58,7 @@ class OtpVerificationController extends Controller
         $user = User::find($userId);
 
         if (! $user) {
-            Session::forget(['login.user_id', 'login.requires_otp']);
+            Session::forget(['login.user_id', 'login.requires_otp', 'login.remember']);
 
             return redirect()->route('login')
                 ->withErrors(['otp' => 'User not found. Please login again.']);
@@ -70,11 +70,17 @@ class OtpVerificationController extends Controller
             return back()->withErrors(['otp' => 'Invalid or expired OTP. Please try again.']);
         }
 
-        // Clear OTP session
-        Session::forget(['login.user_id', 'login.requires_otp']);
+        // Clear OTP session and capture remember before forget
+        $remember = Session::get('login.remember', $request->boolean('remember'));
+        Session::forget(['login.user_id', 'login.requires_otp', 'login.remember']);
 
-        // Login the user
-        Auth::login($user, $request->boolean('remember'));
+        // Login the user (honor remember from initial login)
+        Auth::login($user, $remember);
+
+        $user->load('role');
+        if (strtolower((string) $user->role?->slug) === 'visitor') {
+            return redirect()->intended(route('dashboard.visitor'));
+        }
 
         return redirect()->intended(route('dashboard'));
     }
@@ -94,7 +100,7 @@ class OtpVerificationController extends Controller
         $user = User::find($userId);
 
         if (! $user) {
-            Session::forget(['login.user_id', 'login.requires_otp']);
+            Session::forget(['login.user_id', 'login.requires_otp', 'login.remember']);
 
             return redirect()->route('login')
                 ->withErrors(['otp' => 'User not found. Please login again.']);

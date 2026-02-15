@@ -65,12 +65,9 @@ class UserFactory extends Factory
      */
     public function superAdmin(): static
     {
-        return $this->afterCreating(function ($user) {
-            $role = Role::where('slug', 'super_admin')->first();
-            if ($role) {
-                $user->update(['role_id' => $role->id]);
-            }
-        });
+        return $this->state(fn (array $attributes) => [
+            'role_id' => Role::where('slug', 'super_admin')->first()?->id,
+        ]);
     }
 
     /**
@@ -78,12 +75,9 @@ class UserFactory extends Factory
      */
     public function bjmpOfficer(): static
     {
-        return $this->afterCreating(function ($user) {
-            $role = Role::where('slug', 'bjmp_officer')->first();
-            if ($role) {
-                $user->update(['role_id' => $role->id]);
-            }
-        });
+        return $this->state(fn (array $attributes) => [
+            'role_id' => Role::where('slug', 'bjmp_officer')->first()?->id,
+        ]);
     }
 
     /**
@@ -91,12 +85,9 @@ class UserFactory extends Factory
      */
     public function visitor(): static
     {
-        return $this->afterCreating(function ($user) {
-            $role = Role::where('slug', 'visitor')->first();
-            if ($role) {
-                $user->update(['role_id' => $role->id]);
-            }
-        });
+        return $this->state(fn (array $attributes) => [
+            'role_id' => Role::where('slug', 'visitor')->first()?->id,
+        ]);
     }
 
     /**
@@ -104,11 +95,8 @@ class UserFactory extends Factory
      */
     public function monitoringOfficer(): static
     {
-        return $this->afterCreating(function ($user) {
-            $role = Role::where('slug', 'monitoring_officer')->first();
-            if ($role) {
-                $user->update(['role_id' => $role->id]);
-            }
-        });
+        return $this->state(fn (array $attributes) => [
+            'role_id' => Role::where('slug', 'monitoring_officer')->first()?->id,
+        ]);
     }
 }

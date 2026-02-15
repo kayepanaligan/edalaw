@@ -18,7 +18,6 @@
                 }
             })();
         </script>
-
         {{-- Inline style to set the HTML background color based on our theme in app.css --}}
         <style>
             html {
@@ -38,11 +37,6 @@
 
         <link rel="preconnect" href="https://fonts.bunny.net">
         <link href="https://fonts.bunny.net/css?family=poppins:400,500,600,700" rel="stylesheet" />
-
-        {{-- Load reCAPTCHA v2 script if site key is configured --}}
-        @if(config('services.recaptcha.site_key'))
-            <script src="https://www.google.com/recaptcha/api.js?render=explicit" async defer></script>
-        @endif
 
         @viteReactRefresh
         @vite(['resources/js/app.tsx', "resources/js/pages/{$page['component']}.tsx"])

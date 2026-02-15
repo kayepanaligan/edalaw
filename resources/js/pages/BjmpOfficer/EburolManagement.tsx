@@ -66,9 +66,16 @@ type Eburol = {
     status: 'pending' | 'approved' | 'rejected' | 'completed';
     admin_notes: string | null;
     rejection_reason: string | null;
+    monitoring_officer_id: number | null;
     death_certificate_path: string | null;
     relationship_proof_path: string | null;
     created_at: string;
+};
+
+type MonitoringOfficer = {
+    id: number;
+    name: string;
+    email: string;
 };
 
 type Props = {
@@ -80,6 +87,7 @@ type Props = {
         rejected: number;
         completed: number;
     };
+    monitoringOfficers: MonitoringOfficer[];
 };
 
 function getStatusBadge(status: string) {
@@ -114,10 +122,11 @@ function getStatusBadge(status: string) {
     );
 }
 
-export default function EburolManagement({ eburols, stats }: Props) {
+export default function EburolManagement({ eburols, stats, monitoringOfficers }: Props) {
     const [isViewModalOpen, setIsViewModalOpen] = useState(false);
     const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
     const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
+    const [isApproveModalOpen, setIsApproveModalOpen] = useState(false);
     const [selectedEburol, setSelectedEburol] = useState<Eburol | null>(null);
     const [statusFilter, setStatusFilter] = useState<string>('all');
     useToast();
@@ -126,16 +135,36 @@ export default function EburolManagement({ eburols, stats }: Props) {
         rejection_reason: '',
     });
 
+    const approveForm = useForm({
+        monitoring_officer_id: '',
+    });
+
     const statusForm = useForm({
         status: 'pending' as 'pending' | 'approved' | 'rejected' | 'completed',
         rejection_reason: '',
+        monitoring_officer_id: '',
     });
 
-    const handleApprove = (eburol: Eburol) => {
-        router.post(`/bjmp-officer/eburols/${eburol.id}/approve`, {}, {
+    const openApproveModal = (eburol: Eburol) => {
+        setSelectedEburol(eburol);
+        approveForm.setData('monitoring_officer_id', '');
+        setIsApproveModalOpen(true);
+    };
+
+    const handleApproveSubmit = () => {
+        if (!selectedEburol || !approveForm.data.monitoring_officer_id) {
+            toast.error('Please select a monitoring officer.');
+            return;
+        }
+        router.post(`/bjmp-officer/eburols/${selectedEburol.id}/approve`, {
+            monitoring_officer_id: approveForm.data.monitoring_officer_id,
+        }, {
             preserveScroll: true,
             onSuccess: () => {
                 toast.success('E-Burol application approved successfully.');
+                setIsApproveModalOpen(false);
+                setSelectedEburol(null);
+                approveForm.reset();
             },
             onError: () => {
                 toast.error('Failed to approve e-burol application.');
@@ -310,6 +339,7 @@ export default function EburolManagement({ eburols, stats }: Props) {
                                     statusForm.setData({
                                         status: eburol.status,
                                         rejection_reason: eburol.rejection_reason || '',
+                                        monitoring_officer_id: eburol.monitoring_officer_id?.toString() ?? '',
                                     });
                                     setIsStatusModalOpen(true);
                                 }}
@@ -320,7 +350,7 @@ export default function EburolManagement({ eburols, stats }: Props) {
                             {eburol.status === 'pending' && (
                                 <>
                                     <DropdownMenuSeparator />
-                                    <DropdownMenuItem onClick={() => handleApprove(eburol)}>
+                                    <DropdownMenuItem onClick={() => openApproveModal(eburol)}>
                                         <Check className="mr-2 h-4 w-4" />
                                         Approve
                                     </DropdownMenuItem>
@@ -549,6 +579,64 @@ export default function EburolManagement({ eburols, stats }: Props) {
                     </DialogContent>
                 </Dialog>
 
+                {/* Approve Modal */}
+                <Dialog open={isApproveModalOpen} onOpenChange={setIsApproveModalOpen}>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Approve E-Burol Application</DialogTitle>
+                            <DialogDescription>
+                                Assign a monitoring officer who will be responsible for overseeing this e-burol. They will be notified and can manage it from their Visit Monitoring dashboard.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                            {selectedEburol && (
+                                <div className="rounded-lg bg-muted p-4">
+                                    <p className="text-sm font-medium">Approving application for:</p>
+                                    <p className="text-sm text-muted-foreground mt-1">
+                                        {selectedEburol.deceased_name} - Inmate: {selectedEburol.inmate_name}
+                                    </p>
+                                </div>
+                            )}
+                            <div className="space-y-2">
+                                <Label htmlFor="approve_monitoring_officer_id">
+                                    Monitoring Officer <span className="text-destructive">*</span>
+                                </Label>
+                                <Select
+                                    value={approveForm.data.monitoring_officer_id}
+                                    onValueChange={(value) => approveForm.setData('monitoring_officer_id', value)}
+                                >
+                                    <SelectTrigger id="approve_monitoring_officer_id">
+                                        <SelectValue placeholder="Select monitoring officer" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {monitoringOfficers.map((officer) => (
+                                            <SelectItem key={officer.id} value={officer.id.toString()}>
+                                                {officer.name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <InputError message={approveForm.errors.monitoring_officer_id} />
+                            </div>
+                        </div>
+                        <DialogFooter>
+                            <Button
+                                variant="outline"
+                                onClick={() => {
+                                    setIsApproveModalOpen(false);
+                                    setSelectedEburol(null);
+                                    approveForm.reset();
+                                }}
+                            >
+                                Cancel
+                            </Button>
+                            <Button onClick={handleApproveSubmit} disabled={approveForm.processing}>
+                                {approveForm.processing ? 'Approving...' : 'Approve'}
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+
                 {/* Reject Modal */}
                 <Dialog open={isRejectModalOpen} onOpenChange={setIsRejectModalOpen}>
                     <DialogContent>
@@ -651,6 +739,32 @@ export default function EburolManagement({ eburols, stats }: Props) {
                                     <InputError message={statusForm.errors.rejection_reason} />
                                     <p className="text-xs text-muted-foreground">
                                         Minimum 10 characters, maximum 1000 characters
+                                    </p>
+                                </div>
+                            )}
+                            {monitoringOfficers && monitoringOfficers.length > 0 && (
+                                <div className="space-y-2">
+                                    <Label htmlFor="status_monitoring_officer_id">
+                                        Monitoring Officer
+                                    </Label>
+                                    <Select
+                                        value={statusForm.data.monitoring_officer_id}
+                                        onValueChange={(value) => statusForm.setData('monitoring_officer_id', value)}
+                                    >
+                                        <SelectTrigger id="status_monitoring_officer_id">
+                                            <SelectValue placeholder="Select monitoring officer" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {monitoringOfficers.map((officer) => (
+                                                <SelectItem key={officer.id} value={officer.id.toString()}>
+                                                    {officer.name}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    <InputError message={statusForm.errors.monitoring_officer_id} />
+                                    <p className="text-xs text-muted-foreground">
+                                        Officer responsible for overseeing this e-burol
                                     </p>
                                 </div>
                             )}

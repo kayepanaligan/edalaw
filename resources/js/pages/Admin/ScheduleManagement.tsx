@@ -1,5 +1,5 @@
 import { Head, router, useForm } from '@inertiajs/react';
-import { Calendar, Clock, Plus, User, Video, Check, X, MoreVertical, Eye, Edit, Trash2, Key, RefreshCw } from 'lucide-react';
+import { Calendar, Clock, Plus, User, Video, Check, X, MoreVertical, Eye, Edit, Trash2, Key, RefreshCw, FileOutput, VideoIcon } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { ColumnDef } from '@tanstack/react-table';
@@ -68,6 +68,8 @@ type Visit = {
     rejection_reason: string | null;
     access_key: string | null;
     access_key_expires_at: string | null;
+    monitoring_officer_id: number | null;
+    monitoring_officer_name: string | null;
     created_at: string;
 };
 
@@ -166,6 +168,7 @@ export default function ScheduleManagement({ visits, visitors, monitoringOfficer
     const statusForm = useForm({
         status: 'pending' as 'pending' | 'approved' | 'rejected' | 'missed' | 'completed' | 'cancelled',
         rejection_reason: '',
+        monitoring_officer_id: '',
     });
 
     const approveForm = useForm({
@@ -219,8 +222,12 @@ export default function ScheduleManagement({ visits, visitors, monitoringOfficer
         }
 
         const data: { monitoring_officer_id?: string; access_key?: string } = {};
-        
-        if (selectedVisit.visit_type === 'virtual' && approveForm.data.monitoring_officer_id) {
+
+        if (selectedVisit.visit_type === 'virtual') {
+            if (!approveForm.data.monitoring_officer_id) {
+                toast.error('Please select a monitoring officer for this virtual visit.');
+                return;
+            }
             data.monitoring_officer_id = approveForm.data.monitoring_officer_id;
         }
 
@@ -299,16 +306,18 @@ export default function ScheduleManagement({ visits, visitors, monitoringOfficer
             return;
         }
 
-        const data: { status: string; rejection_reason?: string } = {
-            status: statusForm.data.status,
-        };
-
         if (statusForm.data.status === 'rejected') {
             if (!statusForm.data.rejection_reason || statusForm.data.rejection_reason.trim().length < 10) {
                 toast.error('Rejection reason is required (minimum 10 characters)');
                 return;
             }
-            data.rejection_reason = statusForm.data.rejection_reason;
+        }
+
+        if (selectedVisit.visit_type === 'virtual' && (statusForm.data.status === 'approved' || statusForm.data.status === 'pending')) {
+            if (!statusForm.data.monitoring_officer_id) {
+                toast.error('Please select the monitoring officer responsible for this virtual visit.');
+                return;
+            }
         }
 
         statusForm.post(
@@ -365,8 +374,15 @@ export default function ScheduleManagement({ visits, visitors, monitoringOfficer
 
     const columns: ColumnDef<Visit>[] = useMemo(() => [
             {
+                accessorKey: 'id',
+                header: 'ID',
+                cell: ({ row }) => (
+                    <span className="font-mono text-sm text-muted-foreground">#{row.original.id}</span>
+                ),
+            },
+            {
                 accessorKey: 'scheduled_date',
-                header: 'Date & Time',
+                header: 'Date / Time',
                 cell: ({ row }) => {
                     const visit = row.original;
                     const scheduledDate = new Date(visit.scheduled_date);
@@ -426,35 +442,99 @@ export default function ScheduleManagement({ visits, visitors, monitoringOfficer
                 cell: ({ row }) => getVisitTypeBadge(row.original.visit_type),
             },
             {
+                id: 'access_key',
+                header: 'Access Key',
+                cell: ({ row }) => {
+                    const visit = row.original;
+                    if (visit.visit_type === 'virtual') {
+                        return <span className="text-sm text-muted-foreground">Not applicable</span>;
+                    }
+                    if (visit.access_key) {
+                        return (
+                            <code className="rounded bg-muted px-2 py-1 font-mono text-sm font-bold">
+                                {visit.access_key}
+                            </code>
+                        );
+                    }
+                    return <span className="text-sm text-muted-foreground">—</span>;
+                },
+            },
+            {
+                id: 'monitoring_officer',
+                header: 'Monitoring Officer',
+                cell: ({ row }) => {
+                    const visit = row.original;
+                    if (visit.visit_type === 'physical') {
+                        return <span className="text-sm text-muted-foreground">Not applicable</span>;
+                    }
+                    if (visit.monitoring_officer_name) {
+                        return <span className="text-sm">{visit.monitoring_officer_name}</span>;
+                    }
+                    return <span className="text-sm text-muted-foreground">Not assigned</span>;
+                },
+            },
+            {
                 accessorKey: 'status',
                 header: 'Status',
                 cell: ({ row }) => getStatusBadge(row.original.status),
             },
             {
-                accessorKey: 'meeting_link',
-                header: 'Meeting Link',
+                id: 'rejection_reason',
+                header: 'Rejection Reasons',
                 cell: ({ row }) => {
                     const visit = row.original;
-                    if (visit.visit_type === 'virtual' && visit.status === 'approved' && visit.meeting_link) {
+                    if (visit.status === 'approved') {
+                        return <span className="text-sm text-muted-foreground">Application was approved</span>;
+                    }
+                    if (visit.status === 'pending') {
+                        return <span className="text-sm text-muted-foreground">Application was pending</span>;
+                    }
+                    if (visit.status === 'rejected' && visit.rejection_reason) {
                         return (
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                asChild
-                            >
+                            <p className="max-w-xs text-sm text-destructive">{visit.rejection_reason}</p>
+                        );
+                    }
+                    return <span className="text-sm text-muted-foreground">—</span>;
+                },
+            },
+            {
+                id: 'icon',
+                header: '',
+                cell: ({ row }) => {
+                    const visit = row.original;
+                    if (visit.visit_type === 'physical' && visit.status === 'approved') {
+                        return (
+                            <Button size="sm" variant="outline" asChild>
                                 <a
-                                    href={visit.meeting_link}
+                                    href={`/visits/${visit.id}/proof`}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="inline-flex items-center gap-2"
+                                    className="inline-flex gap-2"
+                                    title="Proof of appointment"
                                 >
-                                    <Video className="h-4 w-4" />
-                                    View Link
+                                    <FileOutput className="h-4 w-4" />
+                                    PDF
                                 </a>
                             </Button>
                         );
                     }
-                    return <span className="text-sm text-muted-foreground">-</span>;
+                    if (visit.visit_type === 'virtual' && visit.status === 'approved' && visit.meeting_link) {
+                        return (
+                            <Button size="sm" variant="default" asChild className="bg-green-600 hover:bg-green-700">
+                                <a
+                                    href={visit.meeting_link}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex gap-2"
+                                    title="Video conferencing"
+                                >
+                                    <VideoIcon className="h-4 w-4" />
+                                    Join
+                                </a>
+                            </Button>
+                        );
+                    }
+                    return <span className="text-sm text-muted-foreground">—</span>;
                 },
             },
             {
@@ -520,6 +600,7 @@ export default function ScheduleManagement({ visits, visitors, monitoringOfficer
                                         statusForm.setData({
                                             status: visit.status,
                                             rejection_reason: visit.rejection_reason || '',
+                                            monitoring_officer_id: visit.monitoring_officer_id?.toString() ?? '',
                                         });
                                         setIsStatusModalOpen(true);
                                     }}
@@ -896,9 +977,9 @@ export default function ScheduleManagement({ visits, visitors, monitoringOfficer
                         <DialogHeader>
                             <DialogTitle>Approve Schedule</DialogTitle>
                             <DialogDescription>
-                                {selectedVisit?.visit_type === 'physical' 
+                                {selectedVisit?.visit_type === 'physical'
                                     ? 'Generate or enter an access key for this physical visit. The key will expire after the scheduled visit time.'
-                                    : 'Assign a monitoring officer for this virtual visit (optional).'}
+                                    : 'Assign a monitoring officer who will oversee this virtual visit. They will be notified and can manage it from Visit Monitoring.'}
                             </DialogDescription>
                         </DialogHeader>
                         <div className="space-y-4">
@@ -916,7 +997,9 @@ export default function ScheduleManagement({ visits, visitors, monitoringOfficer
 
                             {selectedVisit?.visit_type === 'virtual' && (
                                 <div className="space-y-2">
-                                    <Label htmlFor="monitoring_officer_id">Monitoring Officer (Optional)</Label>
+                                    <Label htmlFor="monitoring_officer_id">
+                                        Monitoring Officer <span className="text-destructive">*</span>
+                                    </Label>
                                     <Select
                                         value={approveForm.data.monitoring_officer_id}
                                         onValueChange={(value) => approveForm.setData('monitoring_officer_id', value)}
@@ -925,7 +1008,6 @@ export default function ScheduleManagement({ visits, visitors, monitoringOfficer
                                             <SelectValue placeholder="Select monitoring officer" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="">None</SelectItem>
                                             {monitoringOfficers.map((officer) => (
                                                 <SelectItem key={officer.id} value={officer.id.toString()}>
                                                     {officer.name}
@@ -934,6 +1016,9 @@ export default function ScheduleManagement({ visits, visitors, monitoringOfficer
                                         </SelectContent>
                                     </Select>
                                     <InputError message={approveForm.errors.monitoring_officer_id} />
+                                    <p className="text-xs text-muted-foreground">
+                                        The selected officer will be notified and can oversee this virtual visit from their dashboard.
+                                    </p>
                                 </div>
                             )}
 
@@ -1038,6 +1123,32 @@ export default function ScheduleManagement({ visits, visitors, monitoringOfficer
                                         )}
                                         <p className="text-xs text-muted-foreground">
                                             Minimum 10 characters required. This reason will be visible to the visitor.
+                                        </p>
+                                    </div>
+                                )}
+                                {selectedVisit.visit_type === 'virtual' && monitoringOfficers && monitoringOfficers.length > 0 && (
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="status_monitoring_officer_id">
+                                            Monitoring Officer <span className="text-destructive">*</span>
+                                        </Label>
+                                        <Select
+                                            value={statusForm.data.monitoring_officer_id}
+                                            onValueChange={(value) => statusForm.setData('monitoring_officer_id', value)}
+                                        >
+                                            <SelectTrigger id="status_monitoring_officer_id">
+                                                <SelectValue placeholder="Select monitoring officer" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {monitoringOfficers.map((officer) => (
+                                                    <SelectItem key={officer.id} value={officer.id.toString()}>
+                                                        {officer.name}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                        <InputError message={statusForm.errors.monitoring_officer_id} />
+                                        <p className="text-xs text-muted-foreground">
+                                            Officer responsible for overseeing this virtual visit
                                         </p>
                                     </div>
                                 )}

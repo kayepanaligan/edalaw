@@ -1,5 +1,5 @@
 import { Head, router, useForm, usePage } from '@inertiajs/react';
-import { Calendar, Clock, Plus, Scale, User, Video, X, CalendarClock, FileText } from 'lucide-react';
+import { Calendar, Clock, Plus, Scale, User, Video, X, CalendarClock, FileText, MoreVertical, FileOutput, VideoIcon } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { ColumnDef } from '@tanstack/react-table';
@@ -21,6 +21,14 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
     Select,
     SelectContent,
@@ -66,7 +74,7 @@ const breadcrumbs: BreadcrumbItem[] = [
         href: '/dashboard',
     },
     {
-        title: 'Schedule Management',
+        title: 'Visit Management',
         href: '/visitor/schedule',
     },
 ];
@@ -421,11 +429,18 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
         fetchRescheduleSlotCapacities();
     }, [rescheduleDate, selectedVisitForReschedule]);
 
-    // Define columns for the data table
+    // Define columns for the data table: ID, Date/Time, Visit Type, Access Key, Monitoring Officer, Status, Rejection Reasons, Icon, Actions
     const columns: ColumnDef<Visit>[] = useMemo(() => [
         {
+            accessorKey: 'id',
+            header: 'ID',
+            cell: ({ row }) => (
+                <span className="font-mono text-sm text-muted-foreground">#{row.original.id}</span>
+            ),
+        },
+        {
             accessorKey: 'scheduled_date',
-            header: 'Date & Time',
+            header: 'Date / Time',
             cell: ({ row }) => {
                 const visit = row.original;
                 return (
@@ -458,70 +473,43 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
             },
         },
         {
-            accessorKey: 'inmate_first_name',
-            header: 'Inmate Name',
-            cell: ({ row }) => {
-                const visit = row.original;
-                const inmateName = `${visit.inmate_first_name} ${visit.inmate_middle_name || ''} ${visit.inmate_last_name}`.trim();
-                return <div className="font-medium">{inmateName}</div>;
-            },
-        },
-        {
             accessorKey: 'visit_type',
             header: 'Visit Type',
             cell: ({ row }) => getVisitTypeBadge(row.original.visit_type),
-        },
-        {
-            id: 'monitoring_officer',
-            header: 'Monitoring Officer',
-            cell: ({ row }) => {
-                const visit = row.original;
-                if (visit.visit_type === 'virtual' && visit.monitoring_officer_name) {
-                    return (
-                        <div className="flex items-center gap-2">
-                            <User className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-sm">{visit.monitoring_officer_name}</span>
-                        </div>
-                    );
-                }
-                if (visit.visit_type === 'virtual') {
-                    return <span className="text-sm text-muted-foreground">Not assigned</span>;
-                }
-                return <span className="text-sm text-muted-foreground">-</span>;
-            },
         },
         {
             id: 'access_key',
             header: 'Access Key',
             cell: ({ row }) => {
                 const visit = row.original;
-                if (visit.visit_type === 'physical' && visit.access_key) {
-                    const isExpired = visit.access_key_expires_at 
-                        ? new Date(visit.access_key_expires_at) < new Date()
-                        : false;
+                if (visit.visit_type === 'virtual') {
+                    return <span className="text-sm text-muted-foreground">Not applicable</span>;
+                }
+                if (visit.access_key) {
                     return (
-                        <div className="space-y-1">
-                            <div className="flex items-center gap-2">
-                                <code className="px-2 py-1 bg-muted rounded text-sm font-mono font-bold">
-                                    {visit.access_key}
-                                </code>
-                            </div>
-                            {visit.access_key_expires_at && (
-                                <div className="text-xs text-muted-foreground">
-                                    {isExpired ? (
-                                        <span className="text-destructive">Expired</span>
-                                    ) : (
-                                        <span>Expires: {new Date(visit.access_key_expires_at).toLocaleString()}</span>
-                                    )}
-                                </div>
-                            )}
-                        </div>
+                        <code className="rounded bg-muted px-2 py-1 font-mono text-sm font-bold">
+                            {visit.access_key}
+                        </code>
                     );
                 }
-                if (visit.visit_type === 'physical' && visit.status === 'approved') {
+                if (visit.status === 'approved') {
                     return <span className="text-sm text-muted-foreground">Not generated</span>;
                 }
-                return <span className="text-sm text-muted-foreground">-</span>;
+                return <span className="text-sm text-muted-foreground">—</span>;
+            },
+        },
+        {
+            id: 'monitoring_officer',
+            header: 'Monitoring Officer',
+            cell: ({ row }) => {
+                const visit = row.original;
+                if (visit.visit_type === 'physical') {
+                    return <span className="text-sm text-muted-foreground">Not applicable</span>;
+                }
+                if (visit.monitoring_officer_name) {
+                    return <span className="text-sm">{visit.monitoring_officer_name}</span>;
+                }
+                return <span className="text-sm text-muted-foreground">Not assigned</span>;
             },
         },
         {
@@ -530,133 +518,114 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
             cell: ({ row }) => getStatusBadge(row.original.status),
         },
         {
-            accessorKey: 'rejection_reason',
-            header: 'Rejection Reason',
+            id: 'rejection_reason',
+            header: 'Rejection Reasons',
             cell: ({ row }) => {
                 const visit = row.original;
+                if (visit.status === 'approved') {
+                    return <span className="text-sm text-muted-foreground">Application was approved</span>;
+                }
+                if (visit.status === 'pending') {
+                    return <span className="text-sm text-muted-foreground">Application was pending</span>;
+                }
                 if (visit.status === 'rejected' && visit.rejection_reason) {
                     return (
-                        <div className="max-w-md">
-                            <p className="text-sm text-destructive">{visit.rejection_reason}</p>
-                        </div>
+                        <p className="max-w-xs text-sm text-destructive">{visit.rejection_reason}</p>
                     );
                 }
-                return <span className="text-sm text-muted-foreground">-</span>;
+                return <span className="text-sm text-muted-foreground">—</span>;
             },
         },
         {
-            accessorKey: 'meeting_link',
-            header: 'Meeting Link',
+            id: 'icon',
+            header: '',
             cell: ({ row }) => {
                 const visit = row.original;
-                const isTimeForVisit = (() => {
-                    if (!visit.scheduled_date || visit.status !== 'approved') {
-                        return false;
-                    }
-                    const scheduledDate = new Date(visit.scheduled_date);
-                    const now = new Date();
-
-                    if (scheduledDate.toDateString() === now.toDateString() || scheduledDate < now) {
-                        if (visit.scheduled_time) {
-                            const [hours, minutes] = visit.scheduled_time.split(':').map(Number);
-                            const scheduledDateTime = new Date(scheduledDate);
-                            scheduledDateTime.setHours(hours, minutes, 0, 0);
-                            return now >= scheduledDateTime;
-                        }
-                        return scheduledDate.toDateString() === now.toDateString();
-                    }
-                    return false;
-                })();
-
-                const canJoinVideoCall = visit.visit_type === 'virtual'
-                    && visit.status === 'approved'
-                    && visit.meeting_link
-                    && isTimeForVisit;
-
-                if (canJoinVideoCall) {
+                if (visit.visit_type === 'physical' && visit.status === 'approved') {
                     return (
-                        <Button
-                            size="sm"
-                            variant="default"
-                            asChild
-                            className="bg-green-500 hover:bg-green-600"
-                        >
+                        <Button size="sm" variant="outline" asChild>
                             <a
-                                href={visit.meeting_link!}
+                                href={`/visits/${visit.id}/proof`}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="inline-flex items-center gap-2"
+                                className="inline-flex gap-2"
+                                title="Proof of appointment (print to show officer)"
                             >
-                                <Video className="h-4 w-4" />
-                                Join Call
+                                <FileOutput className="h-4 w-4" />
+                                PDF
                             </a>
                         </Button>
                     );
                 }
                 if (visit.visit_type === 'virtual' && visit.status === 'approved' && visit.meeting_link) {
                     return (
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <Video className="h-4 w-4" />
-                            <span>Available at scheduled time</span>
-                        </div>
+                        <Button size="sm" variant="default" asChild className="bg-green-600 hover:bg-green-700">
+                            <a
+                                href={visit.meeting_link}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex gap-2"
+                                title="Join video conferencing"
+                            >
+                                <VideoIcon className="h-4 w-4" />
+                                Join
+                            </a>
+                        </Button>
                     );
                 }
-                return <span className="text-sm text-muted-foreground">-</span>;
+                return <span className="text-sm text-muted-foreground">—</span>;
             },
-        },
-        {
-            accessorKey: 'created_at',
-            header: 'Created',
-            cell: ({ row }) => (
-                <div className="text-sm text-muted-foreground">
-                    {new Date(row.original.created_at).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        year: 'numeric',
-                    })}
-                </div>
-            ),
         },
         {
             id: 'actions',
             header: 'Actions',
             cell: ({ row }) => {
                 const visit = row.original;
-                if (visit.status === 'pending' || visit.status === 'approved') {
-                    return (
-                        <div className="flex items-center gap-2">
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleOpenRescheduleModal(visit)}
-                            >
-                                <CalendarClock className="mr-2 h-4 w-4" />
-                                Reschedule
+                return (
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" className="h-8 w-8 p-0">
+                                <span className="sr-only">Open menu</span>
+                                <MoreVertical className="h-4 w-4" />
                             </Button>
-                            <Button
-                                size="sm"
-                                variant="destructive"
-                                onClick={() => handleCancelVisit(visit.id)}
-                            >
-                                <X className="mr-2 h-4 w-4" />
-                                Cancel
-                            </Button>
-                        </div>
-                    );
-                }
-                if (visit.status === 'rejected' && visit.can_appeal) {
-                    return (
-                        <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleOpenAppealModal(visit)}
-                        >
-                            <Scale className="mr-2 h-4 w-4" />
-                            Appeal
-                        </Button>
-                    );
-                }
-                return <span className="text-sm text-muted-foreground">-</span>;
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            {(visit.status === 'pending' || visit.status === 'approved') && (
+                                <>
+                                    <DropdownMenuItem onClick={() => handleOpenRescheduleModal(visit)}>
+                                        <CalendarClock className="mr-2 h-4 w-4" />
+                                        Reschedule
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                        onClick={() => handleCancelVisit(visit.id)}
+                                        className="text-destructive focus:text-destructive"
+                                    >
+                                        <X className="mr-2 h-4 w-4" />
+                                        Cancel
+                                    </DropdownMenuItem>
+                                </>
+                            )}
+                            {visit.status === 'rejected' && visit.can_appeal && (
+                                <DropdownMenuItem onClick={() => handleOpenAppealModal(visit)}>
+                                    <Scale className="mr-2 h-4 w-4" />
+                                    Appeal
+                                </DropdownMenuItem>
+                            )}
+                            {visit.status === 'rejected' && !visit.can_appeal && (
+                                <DropdownMenuItem disabled className="text-muted-foreground">
+                                    Appeal deadline passed
+                                </DropdownMenuItem>
+                            )}
+                            {!['pending', 'approved', 'rejected'].includes(visit.status) && (
+                                <DropdownMenuItem disabled className="text-muted-foreground">
+                                    No actions available
+                                </DropdownMenuItem>
+                            )}
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                );
             },
         },
     ], [handleCancelVisit, handleOpenRescheduleModal, handleOpenAppealModal]);
@@ -665,11 +634,11 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Schedule Management" />
+            <Head title="Visit Management" />
             <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-4">
                 <div className="flex items-center justify-between">
                     <div>
-                        <h1 className="text-2xl font-semibold">Schedule Management</h1>
+                        <h1 className="text-2xl font-semibold">Visit Management</h1>
                         <p className="text-muted-foreground">
                             View and manage your visit schedule requests
                         </p>
@@ -683,9 +652,9 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
                 {/* Table */}
                 <Card>
                     <CardHeader>
-                        <CardTitle>My Visit Schedules</CardTitle>
+                        <CardTitle>My Visits</CardTitle>
                         <CardDescription>
-                            {filteredVisits.length} of {visits.length} schedule{visits.length !== 1 ? 's' : ''}
+                            {filteredVisits.length} of {visits.length} visit{visits.length !== 1 ? 's' : ''}
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -699,8 +668,8 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
                             <DataTable
                                 columns={columns}
                                 data={filteredVisits}
-                                searchKey="visitor_name"
-                                searchPlaceholder="Search by visitor name, inmate name, date..."
+                                searchKey="inmate_first_name"
+                                searchPlaceholder="Search by inmate name, date..."
                                 headerActions={
                                     <div className="flex flex-wrap items-center gap-2">
                                         <Select value={statusFilter} onValueChange={setStatusFilter}>

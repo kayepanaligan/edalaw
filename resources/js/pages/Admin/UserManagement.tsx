@@ -383,6 +383,33 @@ export default function UserManagement({ users: initialUsers = [], roles: initia
                 ),
             },
             {
+                accessorKey: 'role',
+                header: 'Role',
+                cell: ({ row }) => getRoleBadge(row.original.role),
+            },
+            {
+                accessorKey: 'approval_status',
+                header: 'Approval Status',
+                cell: ({ row }) => getStatusBadge(row.original.approval_status),
+            },
+            {
+                accessorKey: 'is_active',
+                header: 'Active',
+                cell: ({ row }) => {
+                    const isActive = row.original.is_active;
+                    return (
+                        <div className="flex items-center gap-2">
+                            <Circle
+                                className={`h-3 w-3 ${isActive ? 'text-green-600 dark:text-green-400 fill-current' : 'text-gray-400'}`}
+                            />
+                            <span className={isActive ? 'text-green-600 dark:text-green-400' : 'text-gray-500'}>
+                                {isActive ? 'Active' : 'Inactive'}
+                            </span>
+                        </div>
+                    );
+                },
+            },
+            {
                 accessorKey: 'gender',
                 header: 'Gender',
                 cell: ({ row }) => <div>{row.original.gender || 'N/A'}</div>,
@@ -422,33 +449,7 @@ export default function UserManagement({ users: initialUsers = [], roles: initia
                 header: 'Contact Number',
                 cell: ({ row }) => <div>{row.original.contact_number || 'N/A'}</div>,
             },
-            {
-                accessorKey: 'role',
-                header: 'Role',
-                cell: ({ row }) => getRoleBadge(row.original.role),
-            },
-            {
-                accessorKey: 'approval_status',
-                header: 'Approval Status',
-                cell: ({ row }) => getStatusBadge(row.original.approval_status),
-            },
-            {
-                accessorKey: 'is_active',
-                header: 'Active',
-                cell: ({ row }) => {
-                    const isActive = row.original.is_active;
-                    return (
-                        <div className="flex items-center gap-2">
-                            <Circle
-                                className={`h-3 w-3 ${isActive ? 'text-green-600 dark:text-green-400 fill-current' : 'text-gray-400'}`}
-                            />
-                            <span className={isActive ? 'text-green-600 dark:text-green-400' : 'text-gray-500'}>
-                                {isActive ? 'Active' : 'Inactive'}
-                            </span>
-                        </div>
-                    );
-                },
-            },
+           
             {
                 id: 'actions',
                 header: 'Actions',
@@ -565,8 +566,27 @@ export default function UserManagement({ users: initialUsers = [], roles: initia
                             columns={columns}
                             data={filteredUsers}
                             enableGlobalFilter={true}
+                            searchKey="search"
                             searchPlaceholder="Search by name, email, contact number..."
                             headerActions={headerActions}
+                            globalFilterFn={(row, _columnId, filterValue) => {
+                                if (!filterValue || !filterValue.trim()) return true;
+                                const term = String(filterValue).toLowerCase().trim();
+                                const u = row.original as User;
+                                const fullName = [u.first_name, u.middle_name, u.last_name]
+                                    .filter(Boolean)
+                                    .join(' ')
+                                    .toLowerCase();
+                                const email = (u.email ?? '').toLowerCase();
+                                const contact = (u.contact_number ?? '').toLowerCase();
+                                const roleName = (u.role_name ?? '').toLowerCase();
+                                return (
+                                    fullName.includes(term) ||
+                                    email.includes(term) ||
+                                    contact.includes(term) ||
+                                    roleName.includes(term)
+                                );
+                            }}
                         />
                     </CardContent>
                 </Card>

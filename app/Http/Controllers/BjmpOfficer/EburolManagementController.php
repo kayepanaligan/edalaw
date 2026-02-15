@@ -49,6 +49,7 @@ class EburolManagementController extends Controller
                     'status' => $eburol->status->value,
                     'admin_notes' => $eburol->admin_notes,
                     'rejection_reason' => $eburol->rejection_reason,
+                    'monitoring_officer_id' => $eburol->monitoring_officer_id,
                     'death_certificate_path' => $eburol->death_certificate_path ? Storage::disk('public')->url($eburol->death_certificate_path) : null,
                     'relationship_proof_path' => $eburol->relationship_proof_path ? Storage::disk('public')->url($eburol->relationship_proof_path) : null,
                     'created_at' => $eburol->created_at->format('Y-m-d H:i:s'),
@@ -63,9 +64,24 @@ class EburolManagementController extends Controller
             'completed' => $eburols->where('status', 'completed')->count(),
         ];
 
+        $monitoringOfficers = \App\Models\User::whereHas('role', function ($query) {
+            $query->where('slug', 'monitoring_officer');
+        })
+            ->where('approval_status', 'approved')
+            ->orderBy('first_name')
+            ->get()
+            ->map(function ($user) {
+                return [
+                    'id' => $user->id,
+                    'name' => trim("{$user->first_name} {$user->middle_name} {$user->last_name}"),
+                    'email' => $user->email,
+                ];
+            });
+
         return Inertia::render('BjmpOfficer/EburolManagement', [
             'eburols' => $eburols,
             'stats' => $stats,
+            'monitoringOfficers' => $monitoringOfficers,
         ]);
     }
 
@@ -74,6 +90,10 @@ class EburolManagementController extends Controller
      */
     public function approve(Request $request, Eburol $eburol): RedirectResponse
     {
+        $request->validate([
+            'monitoring_officer_id' => ['required', 'exists:users,id'],
+        ]);
+
         // Create VideoSDK room for e-burol session
         $videoSdkService = new VideoSdkService;
         $roomName = "eburol-{$eburol->id}-".uniqid();
@@ -81,6 +101,7 @@ class EburolManagementController extends Controller
 
         $updateData = [
             'status' => EburolStatus::Approved,
+            'monitoring_officer_id' => $request->monitoring_officer_id,
         ];
 
         if ($roomResult['success']) {
@@ -108,6 +129,8 @@ class EburolManagementController extends Controller
 
         $eburol->update($updateData);
 
+        $eburol->refresh();
+        \App\Services\NotificationService::notifyMonitoringOfficerAboutEburol($eburol);
         \App\Services\NotificationService::createEburolNotification($eburol, 'approved');
 
         AuditLogService::logAction(
@@ -159,9 +182,11 @@ class EburolManagementController extends Controller
         $request->validate([
             'status' => 'required|in:pending,approved,rejected,completed',
             'rejection_reason' => ['required_if:status,rejected', 'string', 'min:10', 'max:1000'],
+            'monitoring_officer_id' => ['nullable', 'exists:users,id'],
         ]);
 
         $oldStatus = $eburol->status->value;
+        $oldMonitoringOfficerId = $eburol->monitoring_officer_id;
         $updateData = ['status' => EburolStatus::from($request->status)];
 
         // If rejecting, require and store rejection reason
@@ -172,7 +197,16 @@ class EburolManagementController extends Controller
             $updateData['rejection_reason'] = null;
         }
 
+        if ($request->has('monitoring_officer_id')) {
+            $updateData['monitoring_officer_id'] = $request->monitoring_officer_id;
+        }
+
         $eburol->update($updateData);
+
+        $eburol->refresh();
+        if ($request->monitoring_officer_id && $oldMonitoringOfficerId != $request->monitoring_officer_id && in_array($request->status, ['approved', 'pending'])) {
+            \App\Services\NotificationService::notifyMonitoringOfficerAboutEburol($eburol);
+        }
 
         if ($request->status !== 'pending') {
             \App\Services\NotificationService::createEburolNotification($eburol, $request->status);

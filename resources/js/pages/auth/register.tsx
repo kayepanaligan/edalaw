@@ -1,6 +1,5 @@
 import { Head, useForm } from '@inertiajs/react';
 import { useRef, useState } from 'react';
-import ReCAPTCHA from 'react-google-recaptcha';
 
 import InputError from '@/components/input-error';
 import TextLink from '@/components/text-link';
@@ -15,18 +14,15 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
-import { useAppearance } from '@/hooks/use-appearance';
 import AuthLayout from '@/layouts/auth-layout';
 import { login } from '@/routes';
 import { store } from '@/routes/register';
 
 type Props = {
-    recaptchaSiteKey?: string;
     roles?: Array<{ id: number; name: string; slug: string }>;
 };
 
-export default function Register({ recaptchaSiteKey, roles = [] }: Props) {
-    const { resolvedAppearance } = useAppearance();
+export default function Register({ roles = [] }: Props) {
     const [selectedRole, setSelectedRole] = useState<string>('');
     const form = useForm({
         role_id: '',
@@ -46,50 +42,15 @@ export default function Register({ recaptchaSiteKey, roles = [] }: Props) {
         password_confirmation: '',
         id_document_1: null as File | null,
         id_document_2: null as File | null,
-        recaptcha_token: '',
     });
     const formRef = useRef<HTMLFormElement>(null);
-    const recaptchaRef = useRef<ReCAPTCHA>(null);
-    const [recaptchaError, setRecaptchaError] = useState<string>('');
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        setRecaptchaError('');
-
-        // Only require reCAPTCHA if it's configured
-        if (recaptchaSiteKey) {
-            // Wait a bit for reCAPTCHA to be ready if it's still loading
-            if (!recaptchaRef.current) {
-                setRecaptchaError('reCAPTCHA is still loading. Please wait a moment and try again.');
-                return;
-            }
-
-            const token = recaptchaRef.current?.getValue();
-            if (!token) {
-                setRecaptchaError('Please complete the reCAPTCHA verification.');
-                return;
-            }
-            // Set the token before submitting
-            form.setData('recaptcha_token', token);
-        } else {
-            // Clear any existing token if reCAPTCHA is not configured
-            form.setData('recaptcha_token', '');
-        }
 
         form.post(store().url, {
             preserveScroll: true,
             forceFormData: true,
-            onFinish: () => {
-                form.setData('recaptcha_token', '');
-                recaptchaRef.current?.reset();
-            },
-            onError: () => {
-                // Reset reCAPTCHA on error
-                if (recaptchaRef.current) {
-                    recaptchaRef.current.reset();
-                }
-                form.setData('recaptcha_token', '');
-            },
         });
     };
 
@@ -386,41 +347,6 @@ export default function Register({ recaptchaSiteKey, roles = [] }: Props) {
                             </div>
                         </div>
                     </div>
-
-                    <div className="flex justify-center">
-                        {recaptchaSiteKey ? (
-                            <ReCAPTCHA
-                                ref={recaptchaRef}
-                                sitekey={recaptchaSiteKey}
-                                theme={resolvedAppearance}
-                                onChange={(token) => {
-                                    if (token) {
-                                        setRecaptchaError('');
-                                        form.setData('recaptcha_token', token);
-                                    }
-                                }}
-                                onExpired={() => {
-                                    setRecaptchaError('reCAPTCHA expired. Please verify again.');
-                                    form.setData('recaptcha_token', '');
-                                }}
-                                onError={() => {
-                                    setRecaptchaError('reCAPTCHA error. Please try again.');
-                                    form.setData('recaptcha_token', '');
-                                }}
-                            />
-                        ) : (
-                            <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-3 dark:border-yellow-900/50 dark:bg-yellow-900/10">
-                                <p className="text-sm text-yellow-800 dark:text-yellow-400">
-                                    <strong>Note:</strong> reCAPTCHA is not configured. Please contact the administrator if you encounter registration issues.
-                                </p>
-                            </div>
-                        )}
-                    </div>
-
-                    {recaptchaError && (
-                        <div className="text-sm text-red-600">{recaptchaError}</div>
-                    )}
-                    <InputError message={form.errors.recaptcha} />
 
                     <Button
                         type="submit"

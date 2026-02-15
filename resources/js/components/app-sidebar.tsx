@@ -1,5 +1,5 @@
 import { Link, usePage } from '@inertiajs/react';
-import { AlertTriangle, Bell, Calendar, FileText, LayoutGrid, MessageSquare, Phone, Scale, Shield, Users, Heart, Monitor, Video, Camera, Flag, Settings, Sliders } from 'lucide-react';
+import { AlertTriangle, Bell, Calendar, CalendarCheck, FileText, LayoutGrid, MessageSquare, Phone, Scale, Shield, Users, Heart, Monitor, Video, Camera, Flag, Settings, Sliders } from 'lucide-react';
 
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
@@ -149,7 +149,7 @@ export function AppSidebar() {
                 label: 'Applications',
                 items: [
                     {
-                        title: 'Apply for Visit',
+                        title: 'Visit Management',
                         href: '/visitor/schedule',
                         icon: Calendar,
                     },
@@ -234,6 +234,16 @@ export function AppSidebar() {
 
     // Monitoring Officer navigation
     if (userRole === 'monitoring_officer') {
+        mainNavItems.push({
+            title: 'Visit Monitoring',
+            href: '/monitoring-officer/visit-monitoring',
+            icon: CalendarCheck,
+        });
+        mainNavItems.push({
+            title: 'E-Burol Monitoring',
+            href: '/monitoring-officer/eburol-monitoring',
+            icon: Heart,
+        });
         mainNavItems.push({
             title: 'Session Monitoring',
             href: '/monitoring-officer/sessions',

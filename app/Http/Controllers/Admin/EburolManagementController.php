@@ -309,7 +309,7 @@ class EburolManagementController extends Controller
     public function approve(Request $request, Eburol $eburol): RedirectResponse
     {
         $request->validate([
-            'monitoring_officer_id' => ['nullable', 'exists:users,id'],
+            'monitoring_officer_id' => ['required', 'exists:users,id'],
         ]);
 
         $oldMonitoringOfficerId = $eburol->monitoring_officer_id;

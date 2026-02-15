@@ -1,16 +1,32 @@
 <?php
 
+use App\ApprovalStatus;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Laravel\Fortify\Features;
 
 Route::get('/', function () {
-    // If user is already authenticated, redirect to their dashboard
-    if (auth()->check()) {
-        $user = auth()->user();
-        $role = $user->role?->slug;
+    if (Auth::check()) {
+        $user = Auth::user();
+        $user->load('role');
 
-        // Redirect based on role
+        if ($user->role?->slug !== 'super_admin') {
+            if ($user->approval_status === ApprovalStatus::Pending) {
+                return redirect()->route('account-pending');
+            }
+            if ($user->approval_status === ApprovalStatus::Rejected) {
+                return redirect()->route('account-rejected');
+            }
+            if ($user->approval_status !== ApprovalStatus::Approved) {
+                Auth::logout();
+
+                return redirect()->route('login')
+                    ->withErrors(['email' => 'Your account is not approved. Please contact support.']);
+            }
+        }
+
+        $role = $user->role?->slug;
         if ($role === 'super_admin') {
             return redirect()->route('dashboard.super-admin');
         }
@@ -21,17 +37,19 @@ Route::get('/', function () {
             return redirect()->route('dashboard.visitor');
         }
 
-        // Fallback to general dashboard
         return redirect()->route('dashboard');
     }
 
-    // If not authenticated, show login page
     return Inertia::render('auth/login', [
+        'canResetPassword' => Features::enabled(Features::resetPasswords()),
         'canRegister' => Features::enabled(Features::registration()),
+        'status' => session('status'),
+        'loginUrl' => route('login.store'),
+        'csrfToken' => csrf_token(),
+        'oldEmail' => request()->old('email'),
     ]);
 })->name('home');
 
-// Webhook routes (no auth required, uses signature verification)
 Route::post('webhooks/daily-co', [\App\Http\Controllers\Webhook\DailyCoWebhookController::class, 'handle'])
     ->name('webhooks.daily-co');
 
@@ -45,7 +63,6 @@ Route::middleware('guest')->group(function () {
         ->name('otp-verification.resend');
 });
 
-// Account status routes (auth required but may be pending/rejected)
 Route::middleware('auth')->group(function () {
     Route::get('account-pending', [\App\Http\Controllers\Auth\AccountStatusController::class, 'showPending'])
         ->name('account-pending');
@@ -60,7 +77,6 @@ Route::middleware(['auth', 'verified', 'approved'])->group(function () {
         $user = auth()->user();
         $role = $user->role?->slug;
 
-        // Redirect based on role
         if ($role === 'super_admin') {
             return redirect()->route('dashboard.super-admin');
         }
@@ -89,6 +105,14 @@ Route::middleware(['auth', 'verified', 'approved'])->group(function () {
 
     Route::middleware(['role:monitoring_officer'])->get('dashboard/monitoring-officer', \App\Http\Controllers\Dashboard\MonitoringOfficerDashboardController::class)
         ->name('dashboard.monitoring-officer');
+
+    Route::middleware(['role:monitoring_officer'])->get('monitoring-officer/visit-monitoring', \App\Http\Controllers\MonitoringOfficer\VisitMonitoringController::class)
+        ->name('monitoring-officer.visit-monitoring');
+    Route::middleware(['role:monitoring_officer'])->get('monitoring-officer/eburol-monitoring', \App\Http\Controllers\MonitoringOfficer\EburolMonitoringController::class)
+        ->name('monitoring-officer.eburol-monitoring');
+
+    Route::get('visits/{visit}/proof', [\App\Http\Controllers\VisitProofController::class, 'show'])
+        ->name('visits.proof');
 
     Route::middleware(['role:super_admin'])->prefix('admin')->name('admin.')->group(function () {
         Route::resource('users', \App\Http\Controllers\Admin\UserManagementController::class)
@@ -192,7 +216,7 @@ Route::middleware(['auth', 'verified', 'approved'])->group(function () {
     });
 
     Route::middleware(['role:bjmp_officer'])->prefix('bjmp-officer')->name('bjmp-officer.')->group(function () {
-        // E-Burol Management
+
         Route::get('eburols', [\App\Http\Controllers\BjmpOfficer\EburolManagementController::class, 'index'])
             ->name('eburols.index');
         Route::post('eburols/{eburol}/approve', [\App\Http\Controllers\BjmpOfficer\EburolManagementController::class, 'approve'])

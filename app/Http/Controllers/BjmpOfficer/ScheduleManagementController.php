@@ -88,10 +88,14 @@ class ScheduleManagementController extends Controller
      */
     public function approve(Request $request, Visit $visit): RedirectResponse
     {
-        $validator = Validator::make($request->all(), [
+        $rules = [
             'meeting_link' => ['nullable', 'url', 'required_if:visit_type,virtual'],
             'monitoring_officer_id' => ['nullable', 'exists:users,id'],
-        ]);
+        ];
+        if ($visit->visit_type === VisitType::Virtual) {
+            $rules['monitoring_officer_id'] = ['required', 'exists:users,id'];
+        }
+        $validator = Validator::make($request->all(), $rules);
 
         if ($validator->fails()) {
             return redirect()->back()

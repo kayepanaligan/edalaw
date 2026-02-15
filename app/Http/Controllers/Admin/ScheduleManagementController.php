@@ -91,10 +91,14 @@ class ScheduleManagementController extends Controller
      */
     public function approve(Request $request, Visit $visit): RedirectResponse
     {
-        $request->validate([
+        $rules = [
             'monitoring_officer_id' => ['nullable', 'exists:users,id'],
             'access_key' => ['nullable', 'string', 'regex:/^[A-Z0-9]{8,12}$/'],
-        ]);
+        ];
+        if ($visit->visit_type === \App\VisitType::Virtual) {
+            $rules['monitoring_officer_id'] = ['required', 'exists:users,id'];
+        }
+        $request->validate($rules);
 
         $oldMonitoringOfficerId = $visit->monitoring_officer_id;
 

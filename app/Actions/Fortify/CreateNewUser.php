@@ -8,7 +8,6 @@ use App\Concerns\ProfileValidationRules;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\OtpService;
-use App\Services\RecaptchaService;
 use Illuminate\Support\Facades\Validator;
 use Laravel\Fortify\Contracts\CreatesNewUsers;
 
@@ -23,35 +22,6 @@ class CreateNewUser implements CreatesNewUsers
      */
     public function create(array $input): User
     {
-        // Verify reCAPTCHA token (only if configured)
-        $recaptchaSiteKey = config('services.recaptcha.site_key');
-        $recaptchaSecretKey = config('services.recaptcha.secret_key');
-        $isRecaptchaConfigured = ! empty(trim((string) $recaptchaSiteKey)) && ! empty(trim((string) $recaptchaSecretKey));
-
-        if ($isRecaptchaConfigured) {
-            // Get recaptcha_token from request (it might be in $input or request())
-            $request = request();
-            $recaptchaToken = $input['recaptcha_token'] ?? $request->input('recaptcha_token');
-
-            // Require reCAPTCHA token if configured
-            if (empty($recaptchaToken)) {
-                Validator::make([], [
-                    'recaptcha' => 'required',
-                ])->after(function ($validator) {
-                    $validator->errors()->add('recaptcha', 'Please complete the reCAPTCHA verification.');
-                })->validate();
-            }
-
-            $recaptchaResult = RecaptchaService::verify($recaptchaToken, 'register', 0.5);
-            if (! $recaptchaResult || ! $recaptchaResult['success']) {
-                Validator::make([], [
-                    'recaptcha' => 'required',
-                ])->after(function ($validator) {
-                    $validator->errors()->add('recaptcha', 'reCAPTCHA verification failed. Please try again.');
-                })->validate();
-            }
-        }
-
         $request = request();
 
         // Validate role_id
