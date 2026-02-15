@@ -12,7 +12,6 @@ class EnsureRole
      * Handle an incoming request.
      *
      * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
-     * @param  string  ...$roleSlugs
      */
     public function handle(Request $request, Closure $next, string ...$roleSlugs): Response
     {
@@ -22,7 +21,16 @@ class EnsureRole
 
         $userRole = $request->user()->role;
 
-        if (! $userRole || ! in_array($userRole->slug, $roleSlugs, true)) {
+        $allowedSlugs = [];
+        foreach ($roleSlugs as $slug) {
+            if (str_contains($slug, ',')) {
+                $allowedSlugs = array_merge($allowedSlugs, array_map('trim', explode(',', $slug)));
+            } else {
+                $allowedSlugs[] = $slug;
+            }
+        }
+
+        if (! $userRole || ! in_array($userRole->slug, $allowedSlugs, true)) {
             abort(403);
         }
 

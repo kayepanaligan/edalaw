@@ -3,9 +3,13 @@
 namespace App\Actions\Fortify;
 
 use App\ApprovalStatus;
+use App\Exceptions\ConcurrentLoginAttemptException;
+use App\Models\ConcurrentLoginAttempt;
 use App\Models\User;
+use App\Services\NotificationService;
 use App\Services\OtpService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\ValidationException;
@@ -29,6 +33,8 @@ class AuthenticateUser
         }
 
         if (strtolower((string) $user->role?->slug) !== 'visitor') {
+            $this->guardAgainstConcurrentLogin($request, $user);
+
             return $user;
         }
 
@@ -45,6 +51,8 @@ class AuthenticateUser
                 'email' => 'Your account is not approved. Please contact support.',
             ]);
         }
+
+        $this->guardAgainstConcurrentLogin($request, $user);
 
         if (empty(trim((string) ($user->contact_number ?? '')))) {
             throw ValidationException::withMessages([
@@ -68,5 +76,36 @@ class AuthenticateUser
         throw ValidationException::withMessages([
             'otp' => 'OTP required',
         ]);
+    }
+
+    /**
+     * Block login if user already has an active session (another device).
+     * Record the attempt, notify super admin and user, then throw.
+     */
+    private function guardAgainstConcurrentLogin(Request $request, User $user): void
+    {
+        $hasOtherSession = DB::table(config('session.table', 'sessions'))
+            ->where('user_id', $user->id)
+            ->exists();
+
+        if (! $hasOtherSession) {
+            return;
+        }
+
+        ConcurrentLoginAttempt::create([
+            'user_id' => $user->id,
+            'email' => $user->email,
+            'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+            'attempted_at' => now(),
+        ]);
+
+        NotificationService::notifyConcurrentLoginAttempt(
+            $user,
+            $request->ip() ?? 'unknown',
+            $request->userAgent() ?? ''
+        );
+
+        throw new ConcurrentLoginAttemptException($user, $request);
     }
 }

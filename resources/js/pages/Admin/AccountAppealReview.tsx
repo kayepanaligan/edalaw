@@ -97,8 +97,7 @@ function getStatusBadge(status: string) {
     );
 }
 
-export default function AccountAppealReview({ appeals: initialAppeals = [] }: Props) {
-    const [appeals] = useState<Appeal[]>(initialAppeals);
+export default function AccountAppealReview({ appeals = [] }: Props) {
     const [statusFilter, setStatusFilter] = useState<string>('all');
     const [selectedAppeal, setSelectedAppeal] = useState<Appeal | null>(null);
     const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);

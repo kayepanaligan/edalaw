@@ -89,19 +89,12 @@ class ScheduleManagementController extends Controller
     public function approve(Request $request, Visit $visit): RedirectResponse
     {
         $rules = [
-            'meeting_link' => ['nullable', 'url', 'required_if:visit_type,virtual'],
             'monitoring_officer_id' => ['nullable', 'exists:users,id'],
         ];
         if ($visit->visit_type === VisitType::Virtual) {
             $rules['monitoring_officer_id'] = ['required', 'exists:users,id'];
         }
-        $validator = Validator::make($request->all(), $rules);
-
-        if ($validator->fails()) {
-            return redirect()->back()
-                ->withErrors($validator)
-                ->withInput();
-        }
+        $request->validate($rules);
 
         $oldMonitoringOfficerId = $visit->monitoring_officer_id;
         $updateData = [
@@ -109,44 +102,36 @@ class ScheduleManagementController extends Controller
             'monitoring_officer_id' => $request->monitoring_officer_id,
         ];
 
-        // If virtual visit, create VideoSDK room
+        $roomId = null;
+        $approvalWarning = null;
+        // If virtual visit, create VideoSDK room (system-generated; no manual link required)
         if ($visit->visit_type === VisitType::Virtual) {
             $videoSdkService = new VideoSdkService;
             $roomName = "visit-{$visit->id}-".uniqid();
             $roomResult = $videoSdkService->createRoom($roomName);
 
             if ($roomResult['success']) {
+                $roomId = $roomResult['room_id'] ?? null;
                 $updateData['meeting_link'] = $roomResult['room_url'] ?? null;
-                $updateData['daily_co_room_id'] = $roomResult['room_id'] ?? null;
+                $updateData['daily_co_room_id'] = $roomId;
                 $updateData['daily_co_room_name'] = $roomResult['room_name'] ?? $roomName;
                 $updateData['daily_co_room_url'] = $roomResult['room_url'] ?? null;
                 $updateData['room_created_at'] = now();
 
-                // Create monitoring session
                 MonitoringSession::create([
                     'visit_id' => $visit->id,
                     'visitor_id' => $visit->user_id,
                     'session_type' => 'visit',
-                    'session_token' => $roomResult['room_id'] ?? $roomName,
+                    'session_token' => $roomId ?? $roomName,
                     'status' => 'pending',
                     'started_at' => now(),
                 ]);
             } else {
-                // Log error but don't block approval - officer can manually add meeting link
                 \Illuminate\Support\Facades\Log::error('VideoSDK room creation failed during approval', [
                     'visit_id' => $visit->id,
                     'error' => $roomResult['error'] ?? 'Unknown error',
                 ]);
-
-                // If VideoSDK fails, check if manual meeting link was provided
-                if ($request->filled('meeting_link')) {
-                    $updateData['meeting_link'] = $request->meeting_link;
-                } else {
-                    // Still allow approval to proceed, but show warning
-                    return redirect()->back()
-                        ->with('warning', 'Schedule approved, but video room creation failed: '.($roomResult['error'] ?? 'Unknown error').'. Please add meeting link manually or try again.')
-                        ->withInput();
-                }
+                $approvalWarning = 'Video room creation failed: '.($roomResult['error'] ?? 'Unknown error').'. Please try again later or contact support.';
             }
         }
 
@@ -167,6 +152,10 @@ class ScheduleManagementController extends Controller
         // Refresh visit to get updated meeting_link
         $visit->refresh();
 
+        if ($roomId && $visit->visit_type === VisitType::Virtual) {
+            app(\App\Services\VisitSessionService::class)->createForVisit($visit, $roomId);
+        }
+
         // Notify monitoring officer if assigned and it's a new assignment
         if ($request->monitoring_officer_id && $oldMonitoringOfficerId !== $request->monitoring_officer_id) {
             NotificationService::notifyMonitoringOfficerAboutVisit($visit);
@@ -174,22 +163,21 @@ class ScheduleManagementController extends Controller
 
         NotificationService::createVisitNotification($visit, 'approved');
 
-        $metadata = [];
-        if ($visit->visit_type === VisitType::Virtual && $request->meeting_link) {
-            $metadata['meeting_link'] = $request->meeting_link;
-        }
-
         AuditLogService::logAction(
             'visit_approved',
             $visit,
             'Visit Schedule Management',
             "Visit schedule #{$visit->id} approved for visitor {$visit->user->first_name} {$visit->user->last_name}",
-            $request,
-            $metadata
+            $request
         );
 
-        return redirect()->route('bjmp-officer.schedules.index')
+        $redirect = redirect()->route('bjmp-officer.schedules.index')
             ->with('success', 'Schedule approved successfully.');
+        if ($approvalWarning) {
+            $redirect->with('warning', $approvalWarning);
+        }
+
+        return $redirect;
     }
 
     /**
@@ -226,37 +214,48 @@ class ScheduleManagementController extends Controller
      */
     public function updateStatus(Request $request, Visit $visit): RedirectResponse
     {
-        $request->validate([
-            'status' => 'required|in:pending,approved,rejected,completed,missed',
+        if ($request->has('monitoring_officer_id') && $request->monitoring_officer_id === '') {
+            $request->merge(['monitoring_officer_id' => null]);
+        }
+
+        $rules = [
+            'status' => 'required|in:pending,approved,rejected,completed,missed,cancelled',
             'rejection_reason' => ['required_if:status,rejected', 'string', 'min:10', 'max:1000'],
-            'meeting_link' => ['nullable', 'url'],
             'monitoring_officer_id' => ['nullable', 'exists:users,id'],
-        ]);
+        ];
+        if ($request->status === 'approved' && $visit->visit_type === VisitType::Virtual) {
+            $rules['monitoring_officer_id'] = ['required', 'exists:users,id'];
+        }
+        $request->validate($rules);
 
         $oldMonitoringOfficerId = $visit->monitoring_officer_id;
         $updateData = ['status' => VisitStatus::from($request->status)];
 
-        // If rejecting, require and store rejection reason
         if ($request->status === 'rejected') {
             $updateData['rejection_reason'] = $request->rejection_reason;
         } else {
-            // Clear rejection reason if status changes from rejected
             $updateData['rejection_reason'] = null;
         }
 
-        // Update monitoring officer if provided
-        if ($request->has('monitoring_officer_id')) {
+        if ($request->status === 'approved' && $request->filled('monitoring_officer_id')) {
             $updateData['monitoring_officer_id'] = $request->monitoring_officer_id;
+        } elseif (in_array($request->status, ['rejected', 'pending'], true)) {
+            $updateData['monitoring_officer_id'] = null;
         }
 
-        // If approving virtual visit, require meeting link
-        if ($request->status === 'approved' && $visit->visit_type === VisitType::Virtual) {
-            if (! $request->meeting_link) {
-                return redirect()->back()
-                    ->withErrors(['meeting_link' => 'Meeting link is required for virtual visits.'])
-                    ->withInput();
+        // When approving virtual visit, auto-generate meeting link if not already set
+        if ($request->status === 'approved' && $visit->visit_type === VisitType::Virtual && ! $visit->meeting_link) {
+            $videoSdkService = new VideoSdkService;
+            $roomName = "visit-{$visit->id}-".uniqid();
+            $roomResult = $videoSdkService->createRoom($roomName);
+            if ($roomResult['success']) {
+                $roomId = $roomResult['room_id'] ?? null;
+                $updateData['meeting_link'] = $roomResult['room_url'] ?? null;
+                $updateData['daily_co_room_id'] = $roomId;
+                $updateData['daily_co_room_name'] = $roomResult['room_name'] ?? $roomName;
+                $updateData['daily_co_room_url'] = $roomResult['room_url'] ?? null;
+                $updateData['room_created_at'] = now();
             }
-            $updateData['meeting_link'] = $request->meeting_link;
         }
 
         // Generate access key for physical visits when approved
@@ -274,7 +273,11 @@ class ScheduleManagementController extends Controller
         $oldStatus = $visit->status->value;
         $visit->update($updateData);
 
-        // Notify monitoring officer if assigned and it's a new assignment
+        $visit->refresh();
+        if ($request->status === 'approved' && $visit->visit_type === VisitType::Virtual && $visit->daily_co_room_id) {
+            app(\App\Services\VisitSessionService::class)->createForVisit($visit, $visit->daily_co_room_id);
+        }
+
         if ($request->monitoring_officer_id && $oldMonitoringOfficerId !== $request->monitoring_officer_id && in_array($request->status, ['approved', 'pending'])) {
             NotificationService::notifyMonitoringOfficerAboutVisit($visit);
         }
@@ -289,9 +292,6 @@ class ScheduleManagementController extends Controller
         ];
         if ($request->status === 'rejected' && $request->rejection_reason) {
             $metadata['rejection_reason'] = $request->rejection_reason;
-        }
-        if ($request->status === 'approved' && $visit->visit_type === VisitType::Virtual && $request->meeting_link) {
-            $metadata['meeting_link'] = $request->meeting_link;
         }
 
         AuditLogService::logAction(

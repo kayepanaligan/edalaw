@@ -53,6 +53,24 @@ Route::get('/', function () {
 Route::post('webhooks/daily-co', [\App\Http\Controllers\Webhook\DailyCoWebhookController::class, 'handle'])
     ->name('webhooks.daily-co');
 
+// Inmate join (no auth - tunnel token validates access)
+Route::get('inmate/join/{token}', [\App\Http\Controllers\InmateTunnelController::class, 'join'])
+    ->name('inmate.join');
+Route::get('inmate/join/{token}/token', [\App\Http\Controllers\InmateTunnelController::class, 'getInmateToken'])
+    ->name('inmate.token');
+Route::get('inmate/chat', [\App\Http\Controllers\InmateTunnelController::class, 'listChat'])
+    ->name('inmate.chat.list');
+Route::post('inmate/chat', [\App\Http\Controllers\InmateTunnelController::class, 'sendChat'])
+    ->name('inmate.chat.send');
+
+// Concurrent login warning (no auth - shown when login blocked due to existing session)
+Route::get('concurrent-login-warning', function () {
+    return Inertia::render('auth/concurrent-login-warning', [
+        'email' => session('concurrent_login_email'),
+        'loginUrl' => route('login'),
+    ]);
+})->name('concurrent-login-warning')->middleware('guest');
+
 // OTP Verification routes (no auth required)
 Route::middleware('guest')->group(function () {
     Route::get('otp-verification', [\App\Http\Controllers\Auth\OtpVerificationController::class, 'show'])
@@ -103,13 +121,60 @@ Route::middleware(['auth', 'verified', 'approved'])->group(function () {
     Route::middleware(['role:bjmp_officer'])->get('dashboard/bjmp-officer', \App\Http\Controllers\Dashboard\BjmpOfficerDashboardController::class)
         ->name('dashboard.bjmp-officer');
 
-    Route::middleware(['role:monitoring_officer'])->get('dashboard/monitoring-officer', \App\Http\Controllers\Dashboard\MonitoringOfficerDashboardController::class)
+    Route::middleware(['role:monitoring_officer'])->get('dashboard/monitoring-officer', [\App\Http\Controllers\MonitoringOfficer\AnalyticsController::class, 'index'])
         ->name('dashboard.monitoring-officer');
+
+    Route::middleware(['role:super_admin,monitoring_officer'])->prefix('monitoring')->name('monitoring.')->group(function () {
+        Route::get('video-recordings', [\App\Http\Controllers\MonitoringOfficer\VideoRecordingsController::class, 'index'])
+            ->name('video-recordings.index');
+        Route::get('chat-recordings', [\App\Http\Controllers\MonitoringOfficer\ChatRecordingsController::class, 'index'])
+            ->name('chat-recordings.index');
+    });
 
     Route::middleware(['role:monitoring_officer'])->get('monitoring-officer/visit-monitoring', \App\Http\Controllers\MonitoringOfficer\VisitMonitoringController::class)
         ->name('monitoring-officer.visit-monitoring');
     Route::middleware(['role:monitoring_officer'])->get('monitoring-officer/eburol-monitoring', \App\Http\Controllers\MonitoringOfficer\EburolMonitoringController::class)
         ->name('monitoring-officer.eburol-monitoring');
+
+    Route::middleware(['role:monitoring_officer'])->prefix('monitoring-officer')->name('monitoring-officer.')->group(function () {
+        Route::get('assigned-sessions', [\App\Http\Controllers\MonitoringOfficer\AssignedSessionsController::class, 'index'])
+            ->name('assigned-sessions.index');
+        Route::post('assigned-sessions/{session}/generate-tunnel', [\App\Http\Controllers\MonitoringOfficer\AssignedSessionsController::class, 'generateTunnel'])
+            ->name('assigned-sessions.generate-tunnel');
+        Route::post('assigned-sessions/{session}/start', [\App\Http\Controllers\MonitoringOfficer\AssignedSessionsController::class, 'startSession'])
+            ->name('assigned-sessions.start');
+        Route::post('assigned-sessions/{session}/end', [\App\Http\Controllers\MonitoringOfficer\AssignedSessionsController::class, 'endSession'])
+            ->name('assigned-sessions.end');
+        Route::post('assigned-sessions/{session}/lock-chat', [\App\Http\Controllers\MonitoringOfficer\AssignedSessionsController::class, 'lockChat'])
+            ->name('assigned-sessions.lock-chat');
+        Route::post('assigned-sessions/{session}/unlock-chat', [\App\Http\Controllers\MonitoringOfficer\AssignedSessionsController::class, 'unlockChat'])
+            ->name('assigned-sessions.unlock-chat');
+        Route::get('video-recordings', [\App\Http\Controllers\MonitoringOfficer\VideoRecordingsController::class, 'index'])
+            ->name('video-recordings.index');
+        Route::get('chat-recordings', [\App\Http\Controllers\MonitoringOfficer\ChatRecordingsController::class, 'index'])
+            ->name('chat-recordings.index');
+        Route::get('analytics', [\App\Http\Controllers\MonitoringOfficer\AnalyticsController::class, 'index'])
+            ->name('analytics.index');
+        Route::get('analytics/export/csv', [\App\Http\Controllers\MonitoringOfficer\AnalyticsController::class, 'exportCsv'])
+            ->name('analytics.export.csv');
+        Route::get('incidents', [\App\Http\Controllers\MonitoringOfficer\IncidentReportingController::class, 'index'])
+            ->name('incidents.index');
+        Route::get('history', [\App\Http\Controllers\MonitoringOfficer\HistoryController::class, 'index'])
+            ->name('history.index');
+        Route::get('inmate-tunnels', [\App\Http\Controllers\MonitoringOfficer\InmateTunnelController::class, 'index'])
+            ->name('inmate-tunnels.index');
+    });
+
+    Route::get('visit/session/{session}/chat', [\App\Http\Controllers\VisitSessionChatController::class, 'index'])
+        ->name('visit-session.chat.index');
+    Route::post('visit/session/{session}/chat', [\App\Http\Controllers\VisitSessionChatController::class, 'store'])
+        ->name('visit-session.chat.store');
+    Route::post('visit/session/{session}/chat/{chatLog}/flag', [\App\Http\Controllers\VisitSessionChatController::class, 'flag'])
+        ->name('visit-session.chat.flag');
+    Route::post('visit/session/{session}/chat/export', [\App\Http\Controllers\VisitSessionChatExportController::class, 'store'])
+        ->name('visit-session.chat.export');
+    Route::get('chat-exports/{chatExport}/download', [\App\Http\Controllers\VisitSessionChatExportController::class, 'download'])
+        ->name('chat-exports.download');
 
     Route::get('visits/{visit}/proof', [\App\Http\Controllers\VisitProofController::class, 'show'])
         ->name('visits.proof');
@@ -215,6 +280,15 @@ Route::middleware(['auth', 'verified', 'approved'])->group(function () {
             ->name('history.index');
     });
 
+    Route::middleware(['role:visitor'])->group(function () {
+        Route::get('visit/session/{session}', [\App\Http\Controllers\Visitor\VisitSessionController::class, 'show'])
+            ->name('visit-session.show');
+        Route::post('visit/session/{session}/accept-terms', [\App\Http\Controllers\Visitor\VisitSessionController::class, 'acceptTerms'])
+            ->name('visit-session.accept-terms');
+        Route::post('visit/session/{session}/participant-joined', [\App\Http\Controllers\Visitor\VisitSessionController::class, 'participantJoined'])
+            ->name('visit-session.participant-joined');
+    });
+
     Route::middleware(['role:bjmp_officer'])->prefix('bjmp-officer')->name('bjmp-officer.')->group(function () {
 
         Route::get('eburols', [\App\Http\Controllers\BjmpOfficer\EburolManagementController::class, 'index'])
@@ -282,6 +356,10 @@ Route::middleware(['auth', 'verified', 'approved'])->group(function () {
             ->name('audit-logs.index');
         Route::get('audit-logs/export', [\App\Http\Controllers\Admin\AuditLogController::class, 'export'])
             ->name('audit-logs.export');
+        Route::get('incident-reporting', [\App\Http\Controllers\Admin\IncidentReportingController::class, 'index'])
+            ->name('incident-reporting.index');
+        Route::get('inmate-tunnels', [\App\Http\Controllers\Admin\InmateTunnelController::class, 'index'])
+            ->name('inmate-tunnels.index');
     });
 });
 

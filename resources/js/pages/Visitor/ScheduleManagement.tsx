@@ -10,6 +10,7 @@ import { TimeSlotPicker } from '@/components/TimeSlotPicker';
 import { DataTable } from '@/components/data-table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
     Dialog,
@@ -42,6 +43,15 @@ import AppLayout from '@/layouts/app-layout';
 import visitor from '@/routes/visitor/index';
 import type { BreadcrumbItem } from '@/types';
 
+type VisitSessionInfo = {
+    id: number;
+    scheduled_start: string;
+    scheduled_end: string;
+    status: string;
+    terms_accepted_at: string | null;
+    can_join_video: boolean;
+} | null;
+
 type Visit = {
     id: number;
     scheduled_date: string;
@@ -61,6 +71,7 @@ type Visit = {
     created_at: string;
     can_appeal?: boolean;
     appeal_deadline?: string | null;
+    visit_session?: VisitSessionInfo;
 };
 
 type Props = {
@@ -151,6 +162,10 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
     const [loadingSlots, setLoadingSlots] = useState(false);
     const [statusFilter, setStatusFilter] = useState<string>('all');
     const [visitTypeFilter, setVisitTypeFilter] = useState<string>('all');
+    const [videoTermsModalOpen, setVideoTermsModalOpen] = useState(false);
+    const [selectedSessionForVideo, setSelectedSessionForVideo] = useState<{ sessionId: number; visit: Visit } | null>(null);
+    const [videoTermsAccepted, setVideoTermsAccepted] = useState(false);
+    const [acceptingTerms, setAcceptingTerms] = useState(false);
     const today = new Date().toISOString().split('T')[0];
 
     const form = useForm({
@@ -557,21 +572,47 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
                         </Button>
                     );
                 }
-                if (visit.visit_type === 'virtual' && visit.status === 'approved' && visit.meeting_link) {
-                    return (
-                        <Button size="sm" variant="default" asChild className="bg-green-600 hover:bg-green-700">
-                            <a
-                                href={visit.meeting_link}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex gap-2"
-                                title="Join video conferencing"
+                if (visit.visit_type === 'virtual' && visit.status === 'approved') {
+                    const session = visit.visit_session;
+                    if (session?.can_join_video) {
+                        return (
+                            <Button
+                                size="sm"
+                                variant="default"
+                                className="bg-green-600 hover:bg-green-700 inline-flex gap-2"
+                                title="Join video call"
+                                onClick={() => {
+                                    setSelectedSessionForVideo({ sessionId: session.id, visit });
+                                    setVideoTermsAccepted(false);
+                                    setVideoTermsModalOpen(true);
+                                }}
                             >
                                 <VideoIcon className="h-4 w-4" />
-                                Join
-                            </a>
-                        </Button>
-                    );
+                                Video Call
+                            </Button>
+                        );
+                    }
+                    if (session && ['completed', 'terminated'].includes(session.status)) {
+                        return <span className="text-sm text-muted-foreground">Completed</span>;
+                    }
+                    if (session && !session.can_join_video) {
+                        return (
+                            <Button size="sm" variant="outline" disabled className="inline-flex gap-2" title="Available during scheduled time only">
+                                <VideoIcon className="h-4 w-4" />
+                                Video Call
+                            </Button>
+                        );
+                    }
+                    if (visit.meeting_link) {
+                        return (
+                            <Button size="sm" variant="outline" asChild className="inline-flex gap-2">
+                                <a href={visit.meeting_link} target="_blank" rel="noopener noreferrer" title="Join video (legacy link)">
+                                    <VideoIcon className="h-4 w-4" />
+                                    Join
+                                </a>
+                            </Button>
+                        );
+                    }
                 }
                 return <span className="text-sm text-muted-foreground">—</span>;
             },
@@ -702,6 +743,59 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
                         )}
                     </CardContent>
                 </Card>
+
+                {/* Video Call Terms & Conditions Modal */}
+                <Dialog open={videoTermsModalOpen} onOpenChange={setVideoTermsModalOpen}>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Terms & Conditions</DialogTitle>
+                            <DialogDescription>
+                                Please read and accept before joining the video call.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4 py-4">
+                            <ul className="list-disc list-inside space-y-2 text-sm text-muted-foreground">
+                                <li>The call is monitored by an officer.</li>
+                                <li>The call is recorded.</li>
+                                <li>Violations may result in termination of the call and/or future visit privileges.</li>
+                            </ul>
+                            <div className="flex items-center gap-2">
+                                <Checkbox
+                                    id="video-terms"
+                                    checked={videoTermsAccepted}
+                                    onCheckedChange={(c) => setVideoTermsAccepted(c === true)}
+                                />
+                                <Label htmlFor="video-terms" className="text-sm font-normal cursor-pointer">
+                                    I understand and accept these terms.
+                                </Label>
+                            </div>
+                        </div>
+                        <DialogFooter>
+                            <Button variant="outline" onClick={() => setVideoTermsModalOpen(false)}>
+                                Cancel
+                            </Button>
+                            <Button
+                                disabled={!videoTermsAccepted || acceptingTerms}
+                                onClick={() => {
+                                    if (!selectedSessionForVideo) return;
+                                    const sessionId = selectedSessionForVideo.sessionId;
+                                    setAcceptingTerms(true);
+                                    router.post(`/visit/session/${sessionId}/accept-terms`, {}, {
+                                        onSuccess: () => {
+                                            setVideoTermsModalOpen(false);
+                                            setSelectedSessionForVideo(null);
+                                            setAcceptingTerms(false);
+                                            router.visit(`/visit/session/${sessionId}`);
+                                        },
+                                        onError: () => setAcceptingTerms(false),
+                                    });
+                                }}
+                            >
+                                {acceptingTerms ? 'Accepting...' : 'Accept and Join'}
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
 
                 {/* Apply Schedule Modal */}
                 <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>

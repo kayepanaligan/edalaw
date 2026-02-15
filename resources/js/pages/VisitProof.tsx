@@ -36,6 +36,13 @@ export default function VisitProof({ visit }: Props) {
                 </div>
 
                 <div className="mx-auto max-w-2xl border border-gray-300 p-8 print:border-gray-800">
+                    <div className="mb-8 flex justify-center print:mb-6">
+                        <img
+                            src="/edalaw_logo.png"
+                            alt="EDALaw Logo"
+                            className="h-16 w-auto object-contain print:h-14"
+                        />
+                    </div>
                     <h1 className="mb-2 text-center text-2xl font-bold uppercase tracking-wide text-gray-900">
                         Proof of Appointment
                     </h1>
@@ -91,6 +98,25 @@ export default function VisitProof({ visit }: Props) {
                         This is an official proof of your approved physical visit. Please print and bring this document
                         with you.
                     </p>
+
+                    <div className="mt-12 grid grid-cols-2 gap-8 border-t border-gray-200 pt-8 print:mt-16">
+                        <div className="flex flex-col">
+                            <p className="mb-2 h-6 border-b border-gray-400" aria-hidden="true" />
+                            <p className="mb-1 text-xs font-medium uppercase tracking-wide text-gray-500">
+                                Name of Visitor
+                            </p>
+                            <p className="border-b border-gray-400 pb-1 text-base font-medium text-gray-900">
+                                {visit.visitor_name}
+                            </p>
+                        </div>
+                        <div className="flex flex-col">
+                            <p className="mb-2 h-6 border-b border-gray-400" aria-hidden="true" />
+                            <p className="mb-1 text-xs font-medium uppercase tracking-wide text-gray-500">
+                                Warden
+                            </p>
+                            <p className="h-6 border-b border-gray-300" aria-hidden="true" />
+                        </div>
+                    </div>
                 </div>
             </div>
         </>

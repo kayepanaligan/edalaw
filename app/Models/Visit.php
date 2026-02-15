@@ -112,6 +112,16 @@ class Visit extends Model
     }
 
     /**
+     * Get the visit sessions for this visit.
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany<VisitSession>
+     */
+    public function visitSessions(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(VisitSession::class);
+    }
+
+    /**
      * Get the appeals for the visit.
      *
      * @return \Illuminate\Database\Eloquent\Relations\MorphMany<Appeal>

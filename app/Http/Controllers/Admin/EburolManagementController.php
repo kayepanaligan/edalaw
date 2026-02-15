@@ -278,8 +278,16 @@ class EburolManagementController extends Controller
     /**
      * Delete an e-burol application.
      */
-    public function destroy(Eburol $eburol): RedirectResponse
+    public function destroy(Request $request, Eburol $eburol): RedirectResponse
     {
+        AuditLogService::logAction(
+            'eburol_deleted',
+            $eburol,
+            'E-Burol Management',
+            "E-Burol application #{$eburol->id} deleted by admin",
+            $request
+        );
+
         // Delete associated files
         if ($eburol->death_certificate_path) {
             Storage::disk('public')->delete($eburol->death_certificate_path);
@@ -288,16 +296,7 @@ class EburolManagementController extends Controller
             Storage::disk('public')->delete($eburol->relationship_proof_path);
         }
 
-        $eburolId = $eburol->id;
         $eburol->delete();
-
-        AuditLogService::logAction(
-            'eburol_deleted',
-            null,
-            'E-Burol Management',
-            "E-Burol application #{$eburolId} deleted by admin",
-            request()
-        );
 
         return redirect()->route('admin.eburols.index')
             ->with('success', 'E-Burol application deleted successfully.');
@@ -319,13 +318,15 @@ class EburolManagementController extends Controller
             'monitoring_officer_id' => $request->monitoring_officer_id,
         ];
 
+        $roomId = null;
         // Create VideoSDK room for e-burol
         $videoSdkService = new \App\Services\VideoSdkService;
         $roomName = "eburol-{$eburol->id}-".uniqid();
         $roomResult = $videoSdkService->createRoom($roomName);
 
         if ($roomResult['success']) {
-            $updateData['daily_co_room_id'] = $roomResult['room_id'] ?? null;
+            $roomId = $roomResult['room_id'] ?? null;
+            $updateData['daily_co_room_id'] = $roomId;
             $updateData['daily_co_room_name'] = $roomResult['room_name'] ?? $roomName;
             $updateData['daily_co_room_url'] = $roomResult['room_url'] ?? null;
             $updateData['room_created_at'] = now();
@@ -335,7 +336,7 @@ class EburolManagementController extends Controller
                 'eburol_id' => $eburol->id,
                 'visitor_id' => $eburol->user_id,
                 'session_type' => 'eburol',
-                'session_token' => $roomResult['room_id'] ?? $roomName,
+                'session_token' => $roomId ?? $roomName,
                 'status' => 'pending',
                 'started_at' => now(),
             ]);
@@ -348,6 +349,11 @@ class EburolManagementController extends Controller
         }
 
         $eburol->update($updateData);
+
+        // Create visit_sessions record for new flow
+        if ($roomId) {
+            app(\App\Services\VisitSessionService::class)->createForEburol($eburol, $roomId);
+        }
 
         // Notify monitoring officer if assigned and it's a new assignment
         if ($request->monitoring_officer_id && $oldMonitoringOfficerId !== $request->monitoring_officer_id) {

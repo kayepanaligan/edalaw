@@ -1,5 +1,5 @@
 import { Link, usePage } from '@inertiajs/react';
-import { AlertTriangle, Bell, Calendar, CalendarCheck, FileText, LayoutGrid, MessageSquare, Phone, Scale, Shield, Users, Heart, Monitor, Video, Camera, Flag, Settings, Sliders } from 'lucide-react';
+import { AlertTriangle, BarChart3, Bell, Calendar, CalendarCheck, FileText, LayoutGrid, Link2, MessageSquare, Phone, Scale, Shield, Users, Heart, Monitor, Video, Camera, Flag, Settings, Sliders, Film, MessageCircle } from 'lucide-react';
 
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
@@ -92,6 +92,26 @@ export function AppSidebar() {
                         title: 'Sessions',
                         href: '/admin/sessions',
                         icon: Monitor,
+                    },
+                    {
+                        title: 'Video Recordings',
+                        href: '/monitoring/video-recordings',
+                        icon: Film,
+                    },
+                    {
+                        title: 'Chat Recordings',
+                        href: '/monitoring/chat-recordings',
+                        icon: MessageCircle,
+                    },
+                    {
+                        title: 'Incident Reporting',
+                        href: '/admin/incident-reporting',
+                        icon: Flag,
+                    },
+                    {
+                        title: 'Inmate Tunnels',
+                        href: '/admin/inmate-tunnels',
+                        icon: Link2,
                     },
                 ],
             },
@@ -232,37 +252,27 @@ export function AppSidebar() {
         });
     }
 
-    // Monitoring Officer navigation
+    // Monitoring Officer navigation (Dashboard = analytics; only these 6 modules)
     if (userRole === 'monitoring_officer') {
         mainNavItems.push({
-            title: 'Visit Monitoring',
-            href: '/monitoring-officer/visit-monitoring',
-            icon: CalendarCheck,
-        });
-        mainNavItems.push({
-            title: 'E-Burol Monitoring',
-            href: '/monitoring-officer/eburol-monitoring',
-            icon: Heart,
-        });
-        mainNavItems.push({
-            title: 'Session Monitoring',
-            href: '/monitoring-officer/sessions',
-            icon: Monitor,
-        });
-        mainNavItems.push({
-            title: 'Live Video Supervision',
-            href: '/monitoring-officer/video-supervision',
+            title: 'Assigned Sessions',
+            href: '/monitoring-officer/assigned-sessions',
             icon: Video,
         });
         mainNavItems.push({
-            title: 'Recordings',
-            href: '/monitoring-officer/recordings',
-            icon: Camera,
+            title: 'Video Recordings',
+            href: '/monitoring-officer/video-recordings',
+            icon: Film,
         });
         mainNavItems.push({
-            title: 'Chat Oversight',
-            href: '/monitoring-officer/chat',
-            icon: MessageSquare,
+            title: 'Chat Recordings',
+            href: '/monitoring-officer/chat-recordings',
+            icon: MessageCircle,
+        });
+        mainNavItems.push({
+            title: 'History',
+            href: '/monitoring-officer/history',
+            icon: FileText,
         });
         mainNavItems.push({
             title: 'Incident Reporting',
@@ -270,24 +280,9 @@ export function AppSidebar() {
             icon: Flag,
         });
         mainNavItems.push({
-            title: 'Session Control',
-            href: '/monitoring-officer/sessions',
-            icon: Shield,
-        });
-        mainNavItems.push({
-            title: 'Monitoring Logs',
-            href: '/monitoring-officer/logs',
-            icon: FileText,
-        });
-        mainNavItems.push({
-            title: 'Alerts',
-            href: '/monitoring-officer/alerts',
-            icon: AlertTriangle,
-        });
-        mainNavItems.push({
-            title: 'Settings',
-            href: '/settings',
-            icon: Settings,
+            title: 'Inmate Tunnels',
+            href: '/monitoring-officer/inmate-tunnels',
+            icon: Link2,
         });
     }
 

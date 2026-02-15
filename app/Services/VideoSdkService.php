@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use Firebase\JWT\JWT;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -191,12 +192,122 @@ class VideoSdkService
     }
 
     /**
-     * Generate a token for joining a room.
+     * Generate a token for joining a room (legacy - returns static token).
      */
     public function generateToken(string $roomId, array $permissions = ['allow_join']): string
     {
-        // For now, return the configured token
-        // In production, you might want to generate room-specific tokens
         return $this->token;
+    }
+
+    /**
+     * Generate a participant JWT for VideoSDK room join.
+     * Permissions: allow_join (publish), allow_mod (admin - mute/remove others).
+     *
+     * @param  array{allow_join?: bool, ask_join?: bool, allow_mod?: bool}  $permissions
+     */
+    public function generateParticipantToken(
+        string $roomId,
+        string $participantId,
+        array $permissions = ['allow_join'],
+        int $expiryMinutes = 120
+    ): array {
+        if (! $this->apiKey || ! $this->secretKey) {
+            Log::error('VideoSDK API key or secret not configured');
+
+            return ['success' => false, 'error' => 'VideoSDK not configured', 'token' => null];
+        }
+
+        try {
+            $payload = [
+                'apikey' => $this->apiKey,
+                'permissions' => $permissions,
+                'version' => 2,
+                'roomId' => $roomId,
+                'participantId' => $participantId,
+                'roles' => 'rtc',
+                'exp' => now()->addMinutes($expiryMinutes)->timestamp,
+                'iat' => now()->timestamp,
+            ];
+
+            $token = JWT::encode($payload, $this->secretKey, 'HS256');
+
+            return ['success' => true, 'token' => $token];
+        } catch (\Exception $e) {
+            Log::error('VideoSDK participant token generation failed', ['error' => $e->getMessage()]);
+
+            return ['success' => false, 'error' => $e->getMessage(), 'token' => null];
+        }
+    }
+
+    /**
+     * Start participant recording for a room.
+     *
+     * @return array{success: bool, error?: string}
+     */
+    public function startRecording(string $roomId, string $participantId): array
+    {
+        if (! $this->token) {
+            return ['success' => false, 'error' => 'VideoSDK not configured'];
+        }
+
+        $endpoint = 'https://api.videosdk.live/v2/recordings/participant/start';
+        try {
+            $response = Http::timeout(30)->withHeaders([
+                'Authorization' => $this->token,
+                'Content-Type' => 'application/json',
+            ])->post($endpoint, [
+                'roomId' => $roomId,
+                'participantId' => $participantId,
+            ]);
+
+            if ($response->successful()) {
+                return ['success' => true];
+            }
+
+            $body = $response->json();
+            $error = is_array($body) ? ($body['message'] ?? $body['error'] ?? $response->body()) : $response->body();
+
+            return ['success' => false, 'error' => $error];
+        } catch (\Exception $e) {
+            Log::error('VideoSDK start recording exception', ['error' => $e->getMessage()]);
+
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * Stop participant recording for a room.
+     *
+     * @return array{success: bool, error?: string}
+     */
+    public function stopRecording(string $roomId, string $participantId): array
+    {
+        if (! $this->token) {
+            return ['success' => false, 'error' => 'VideoSDK not configured'];
+        }
+
+        $endpoint = 'https://api.videosdk.live/v2/recordings/participant/stop';
+        try {
+            $response = Http::timeout(30)->withHeaders([
+                'Authorization' => $this->token,
+                'Content-Type' => 'application/json',
+            ])->post($endpoint, [
+                'roomId' => $roomId,
+                'participantId' => $participantId,
+            ]);
+
+            if ($response->successful()) {
+                return ['success' => true];
+            }
+
+            $body = $response->json();
+            $error = is_array($body) ? ($body['message'] ?? $body['error'] ?? $response->body()) : $response->body();
+
+            return ['success' => false, 'error' => $error];
+        } catch (\Exception $e) {
+            Log::error('VideoSDK stop recording exception', ['error' => $e->getMessage()]);
+
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
     }
 }

@@ -1,7 +1,7 @@
-import { Head, router, useForm } from '@inertiajs/react';
+import { Head, router, useForm, usePage } from '@inertiajs/react';
 import type { ColumnDef } from '@tanstack/react-table';
 import { Calendar, Video, MoreVertical, Eye, Check, X, RefreshCw, CalendarClock, FileOutput, VideoIcon } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { DataTable } from '@/components/data-table';
@@ -147,20 +147,25 @@ export default function ScheduleManagement({ visits, stats, monitoringOfficers }
     const [statusFilter, setStatusFilter] = useState<string>('all');
     const [visitTypeFilter, setVisitTypeFilter] = useState<string>('all');
     useToast();
+    const page = usePage();
+    const flash = (page.props as { flash?: { warning?: string } }).flash;
+    useEffect(() => {
+        if (flash?.warning) {
+            toast.warning(flash.warning);
+        }
+    }, [flash?.warning]);
 
     const rejectForm = useForm({
         rejection_reason: '',
     });
 
     const approveForm = useForm({
-        meeting_link: '',
         monitoring_officer_id: '',
     });
 
     const statusForm = useForm({
         status: 'pending' as 'pending' | 'approved' | 'rejected' | 'missed' | 'completed',
         rejection_reason: '',
-        meeting_link: '',
         monitoring_officer_id: '',
     });
 
@@ -174,20 +179,13 @@ export default function ScheduleManagement({ visits, stats, monitoringOfficers }
             return;
         }
 
-        if (selectedVisit.visit_type === 'virtual') {
-            if (!approveForm.data.meeting_link || !approveForm.data.meeting_link.trim()) {
-                toast.error('Meeting link is required for virtual visits');
-                return;
-            }
-            if (!approveForm.data.monitoring_officer_id) {
-                toast.error('Please select a monitoring officer for this virtual visit.');
-                return;
-            }
+        if (selectedVisit.visit_type === 'virtual' && !approveForm.data.monitoring_officer_id) {
+            toast.error('Please select a monitoring officer for this virtual visit.');
+            return;
         }
 
-        const payload: { meeting_link?: string; monitoring_officer_id?: string } = {};
+        const payload: { monitoring_officer_id?: string } = {};
         if (selectedVisit.visit_type === 'virtual') {
-            payload.meeting_link = approveForm.data.meeting_link;
             payload.monitoring_officer_id = approveForm.data.monitoring_officer_id;
         }
         router.post(`/bjmp-officer/schedules/${selectedVisit.id}/approve`, payload, {
@@ -241,13 +239,6 @@ export default function ScheduleManagement({ visits, stats, monitoringOfficers }
         }
 
         if (statusForm.data.status === 'approved' && selectedVisit.visit_type === 'virtual') {
-            if (!statusForm.data.meeting_link || !statusForm.data.meeting_link.trim()) {
-                toast.error('Meeting link is required for virtual visits');
-                return;
-            }
-        }
-
-        if ((statusForm.data.status === 'approved' || statusForm.data.status === 'pending') && selectedVisit.visit_type === 'virtual') {
             if (!statusForm.data.monitoring_officer_id) {
                 toast.error('Please select the monitoring officer responsible for this virtual visit.');
                 return;
@@ -437,18 +428,15 @@ export default function ScheduleManagement({ visits, stats, monitoringOfficers }
                 }
                 if (visit.visit_type === 'virtual' && visit.status === 'approved' && visit.meeting_link) {
                     return (
-                        <Button size="sm" variant="default" asChild className="bg-green-600 hover:bg-green-700">
-                            <a
-                                href={visit.meeting_link}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex gap-2"
-                                title="Video conferencing"
-                            >
-                                <VideoIcon className="h-4 w-4" />
-                                Join
-                            </a>
-                        </Button>
+                        <a
+                            href={visit.meeting_link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-green-600 text-white hover:bg-green-700"
+                            title="Join video call"
+                        >
+                            <VideoIcon className="h-4 w-4" />
+                        </a>
                     );
                 }
                 return <span className="text-sm text-muted-foreground">—</span>;
@@ -494,7 +482,6 @@ export default function ScheduleManagement({ visits, stats, monitoringOfficers }
                                     statusForm.setData({
                                         status: visit.status,
                                         rejection_reason: visit.rejection_reason || '',
-                                        meeting_link: visit.meeting_link || '',
                                         monitoring_officer_id: visit.monitoring_officer_id?.toString() ?? '',
                                     });
                                     setIsStatusModalOpen(true);
@@ -509,7 +496,10 @@ export default function ScheduleManagement({ visits, stats, monitoringOfficers }
                                     <DropdownMenuItem
                                         onClick={() => {
                                             setSelectedVisit(visit);
-                                            approveForm.setData('meeting_link', visit.meeting_link || '');
+                                            approveForm.reset();
+                                            if (visit.visit_type === 'virtual') {
+                                                approveForm.setData('monitoring_officer_id', visit.monitoring_officer_id?.toString() ?? '');
+                                            }
                                             setIsApproveModalOpen(true);
                                         }}
                                     >
@@ -696,15 +686,16 @@ export default function ScheduleManagement({ visits, stats, monitoringOfficers }
                                     </div>
                                     {selectedVisit.visit_type === 'virtual' && selectedVisit.meeting_link && (
                                         <div className="col-span-2">
-                                            <Label className="text-muted-foreground">Meeting Link</Label>
-                                            <p className="font-medium">
+                                            <Label className="text-muted-foreground">Join video call</Label>
+                                            <p className="mt-1">
                                                 <a
                                                     href={selectedVisit.meeting_link}
                                                     target="_blank"
                                                     rel="noopener noreferrer"
-                                                    className="text-blue-600 hover:underline"
+                                                    className="inline-flex h-10 w-10 items-center justify-center rounded-md bg-green-600 text-white hover:bg-green-700"
+                                                    title="Join video call"
                                                 >
-                                                    {selectedVisit.meeting_link}
+                                                    <VideoIcon className="h-5 w-5" />
                                                 </a>
                                             </p>
                                         </div>
@@ -744,54 +735,35 @@ export default function ScheduleManagement({ visits, stats, monitoringOfficers }
                         <DialogHeader>
                             <DialogTitle>Approve Visit Schedule</DialogTitle>
                             <DialogDescription>
-                                Approve this visit schedule. For virtual visits, a meeting link is required.
+                                Approve this visit schedule. For virtual visits, assign a monitoring officer. The meeting link will be generated automatically.
                             </DialogDescription>
                         </DialogHeader>
                         <div className="space-y-4">
                             {selectedVisit && selectedVisit.visit_type === 'virtual' && (
-                                <>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="monitoring_officer_id">
-                                            Monitoring Officer <span className="text-destructive">*</span>
-                                        </Label>
-                                        <Select
-                                            value={approveForm.data.monitoring_officer_id}
-                                            onValueChange={(value) => approveForm.setData('monitoring_officer_id', value)}
-                                        >
-                                            <SelectTrigger id="monitoring_officer_id">
-                                                <SelectValue placeholder="Select monitoring officer" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {monitoringOfficers.map((officer) => (
-                                                    <SelectItem key={officer.id} value={officer.id.toString()}>
-                                                        {officer.name}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                        <InputError message={approveForm.errors.monitoring_officer_id} />
-                                        <p className="text-xs text-muted-foreground">
-                                            The selected officer will oversee this virtual visit and will be notified.
-                                        </p>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="meeting_link">
-                                            Meeting Link <span className="text-destructive">*</span>
-                                        </Label>
-                                        <Input
-                                            id="meeting_link"
-                                            type="url"
-                                            required
-                                            value={approveForm.data.meeting_link}
-                                            onChange={(e) => approveForm.setData('meeting_link', e.target.value)}
-                                            placeholder="https://meet.example.com/room-id"
-                                        />
-                                        <InputError message={approveForm.errors.meeting_link} />
-                                        <p className="text-xs text-muted-foreground">
-                                            Provide the meeting link for the virtual visit
-                                        </p>
-                                    </div>
-                                </>
+                                <div className="space-y-2">
+                                    <Label htmlFor="monitoring_officer_id">
+                                        Monitoring Officer <span className="text-destructive">*</span>
+                                    </Label>
+                                    <Select
+                                        value={approveForm.data.monitoring_officer_id}
+                                        onValueChange={(value) => approveForm.setData('monitoring_officer_id', value)}
+                                    >
+                                        <SelectTrigger id="monitoring_officer_id">
+                                            <SelectValue placeholder="Select monitoring officer" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {monitoringOfficers.map((officer) => (
+                                                <SelectItem key={officer.id} value={officer.id.toString()}>
+                                                    {officer.name}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    <InputError message={approveForm.errors.monitoring_officer_id} />
+                                    <p className="text-xs text-muted-foreground">
+                                        The selected officer will oversee this virtual visit and will be notified. A video meeting link is created automatically.
+                                    </p>
+                                </div>
                             )}
                         </div>
                         <DialogFooter>
@@ -918,26 +890,7 @@ export default function ScheduleManagement({ visits, stats, monitoringOfficers }
                                     </p>
                                 </div>
                             )}
-                            {statusForm.data.status === 'approved' && selectedVisit?.visit_type === 'virtual' && (
-                                <div className="space-y-2">
-                                    <Label htmlFor="status_meeting_link">
-                                        Meeting Link <span className="text-destructive">*</span>
-                                    </Label>
-                                    <Input
-                                        id="status_meeting_link"
-                                        type="url"
-                                        required
-                                        value={statusForm.data.meeting_link}
-                                        onChange={(e) => statusForm.setData('meeting_link', e.target.value)}
-                                        placeholder="https://meet.example.com/room-id"
-                                    />
-                                    <InputError message={statusForm.errors.meeting_link} />
-                                    <p className="text-xs text-muted-foreground">
-                                        Provide the meeting link for the virtual visit
-                                    </p>
-                                </div>
-                            )}
-                            {selectedVisit?.visit_type === 'virtual' && monitoringOfficers && monitoringOfficers.length > 0 && (
+                            {statusForm.data.status === 'approved' && selectedVisit?.visit_type === 'virtual' && monitoringOfficers && monitoringOfficers.length > 0 && (
                                 <div className="space-y-2">
                                     <Label htmlFor="status_monitoring_officer_id">
                                         Monitoring Officer <span className="text-destructive">*</span>
@@ -959,7 +912,7 @@ export default function ScheduleManagement({ visits, stats, monitoringOfficers }
                                     </Select>
                                     <InputError message={statusForm.errors.monitoring_officer_id} />
                                     <p className="text-xs text-muted-foreground">
-                                        Officer responsible for overseeing this virtual visit
+                                        Required when approving. A meeting link is generated automatically if not already set.
                                     </p>
                                 </div>
                             )}

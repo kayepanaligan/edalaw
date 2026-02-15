@@ -84,6 +84,16 @@ class Eburol extends Model
     }
 
     /**
+     * Get the visit sessions for this e-burol.
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany<VisitSession>
+     */
+    public function visitSessions(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(VisitSession::class);
+    }
+
+    /**
      * Get the appeals for the e-burol.
      *
      * @return \Illuminate\Database\Eloquent\Relations\MorphMany<Appeal>

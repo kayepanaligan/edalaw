@@ -1,6 +1,6 @@
-import { Head, router, useForm } from '@inertiajs/react';
+import { Head, router, useForm, usePage } from '@inertiajs/react';
 import { Calendar, Clock, Plus, User, Video, Check, X, MoreVertical, Eye, Edit, Trash2, Key, RefreshCw, FileOutput, VideoIcon } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { ColumnDef } from '@tanstack/react-table';
 
@@ -160,6 +160,13 @@ export default function ScheduleManagement({ visits, visitors, monitoringOfficer
     const [bookedSlots, setBookedSlots] = useState<string[]>([]);
     const [loadingSlots, setLoadingSlots] = useState(false);
     useToast();
+    const page = usePage();
+    const flash = (page.props as { flash?: { success?: string; warning?: string; error?: string } }).flash;
+    useEffect(() => {
+        if (flash?.warning) {
+            toast.warning(flash.warning);
+        }
+    }, [flash?.warning]);
 
     const rejectForm = useForm({
         rejection_reason: '',
@@ -313,7 +320,7 @@ export default function ScheduleManagement({ visits, visitors, monitoringOfficer
             }
         }
 
-        if (selectedVisit.visit_type === 'virtual' && (statusForm.data.status === 'approved' || statusForm.data.status === 'pending')) {
+        if (statusForm.data.status === 'approved' && selectedVisit.visit_type === 'virtual') {
             if (!statusForm.data.monitoring_officer_id) {
                 toast.error('Please select the monitoring officer responsible for this virtual visit.');
                 return;
@@ -520,18 +527,15 @@ export default function ScheduleManagement({ visits, visitors, monitoringOfficer
                     }
                     if (visit.visit_type === 'virtual' && visit.status === 'approved' && visit.meeting_link) {
                         return (
-                            <Button size="sm" variant="default" asChild className="bg-green-600 hover:bg-green-700">
-                                <a
-                                    href={visit.meeting_link}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="inline-flex gap-2"
-                                    title="Video conferencing"
-                                >
-                                    <VideoIcon className="h-4 w-4" />
-                                    Join
-                                </a>
-                            </Button>
+                            <a
+                                href={visit.meeting_link}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-green-600 text-white hover:bg-green-700"
+                                title="Join video call"
+                            >
+                                <VideoIcon className="h-4 w-4" />
+                            </a>
                         );
                     }
                     return <span className="text-sm text-muted-foreground">—</span>;
@@ -1126,7 +1130,7 @@ export default function ScheduleManagement({ visits, visitors, monitoringOfficer
                                         </p>
                                     </div>
                                 )}
-                                {selectedVisit.visit_type === 'virtual' && monitoringOfficers && monitoringOfficers.length > 0 && (
+                                {statusForm.data.status === 'approved' && selectedVisit?.visit_type === 'virtual' && monitoringOfficers && monitoringOfficers.length > 0 && (
                                     <div className="grid gap-2">
                                         <Label htmlFor="status_monitoring_officer_id">
                                             Monitoring Officer <span className="text-destructive">*</span>
@@ -1148,7 +1152,7 @@ export default function ScheduleManagement({ visits, visitors, monitoringOfficer
                                         </Select>
                                         <InputError message={statusForm.errors.monitoring_officer_id} />
                                         <p className="text-xs text-muted-foreground">
-                                            Officer responsible for overseeing this virtual visit
+                                            Officer responsible for overseeing this virtual visit (required when approving).
                                         </p>
                                     </div>
                                 )}
@@ -1226,15 +1230,16 @@ export default function ScheduleManagement({ visits, visitors, monitoringOfficer
                                     </div>
                                     {selectedVisit.meeting_link && (
                                         <div className="col-span-2">
-                                            <Label className="text-muted-foreground">Meeting Link</Label>
-                                            <p className="font-medium break-all">
+                                            <Label className="text-muted-foreground">Join video call</Label>
+                                            <p className="mt-1">
                                                 <a
                                                     href={selectedVisit.meeting_link}
                                                     target="_blank"
                                                     rel="noopener noreferrer"
-                                                    className="text-blue-600 hover:underline"
+                                                    className="inline-flex h-10 w-10 items-center justify-center rounded-md bg-green-600 text-white hover:bg-green-700"
+                                                    title="Join video call"
                                                 >
-                                                    {selectedVisit.meeting_link}
+                                                    <VideoIcon className="h-5 w-5" />
                                                 </a>
                                             </p>
                                         </div>

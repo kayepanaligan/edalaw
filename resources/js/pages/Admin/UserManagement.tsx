@@ -131,9 +131,8 @@ function getRoleBadge(role: string | null) {
     );
 }
 
-export default function UserManagement({ users: initialUsers = [], roles: initialRoles = [] }: Props) {
-    const [users] = useState<User[]>(initialUsers);
-    const [roles] = useState<Role[]>(initialRoles);
+export default function UserManagement({ users = [], roles: rolesProp = [] }: Props) {
+    const roles = rolesProp;
     const [roleFilter, setRoleFilter] = useState<string>('all');
     const [statusFilter, setStatusFilter] = useState<string>('all');
     const [selectedUser, setSelectedUser] = useState<User | null>(null);
@@ -143,6 +142,10 @@ export default function UserManagement({ users: initialUsers = [], roles: initia
     const [isRejectDialogOpen, setIsRejectDialogOpen] = useState(false);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [isAddUserDialogOpen, setIsAddUserDialogOpen] = useState(false);
+    const [duplicateErrorModal, setDuplicateErrorModal] = useState<{ open: boolean; message: string }>({
+        open: false,
+        message: '',
+    });
 
     const updateStatusForm = useForm({
         approval_status: 'pending' as 'pending' | 'approved' | 'rejected',
@@ -315,8 +318,17 @@ export default function UserManagement({ users: initialUsers = [], roles: initia
                 setSelectedUser(null);
                 editForm.reset();
             },
-            onError: () => {
-                toast.error('Failed to update user');
+            onError: (errors) => {
+                const emailErr = errors?.email;
+                const contactErr = errors?.contact_number;
+                if (emailErr || contactErr) {
+                    setDuplicateErrorModal({
+                        open: true,
+                        message: [emailErr, contactErr].filter(Boolean).join(' '),
+                    });
+                } else {
+                    toast.error('Failed to update user');
+                }
             },
         });
     };
@@ -347,8 +359,17 @@ export default function UserManagement({ users: initialUsers = [], roles: initia
                 setIsAddUserDialogOpen(false);
                 createForm.reset();
             },
-            onError: () => {
-                toast.error('Failed to create user');
+            onError: (errors) => {
+                const emailErr = errors?.email;
+                const contactErr = errors?.contact_number;
+                if (emailErr || contactErr) {
+                    setDuplicateErrorModal({
+                        open: true,
+                        message: [emailErr, contactErr].filter(Boolean).join(' '),
+                    });
+                } else {
+                    toast.error('Failed to create user');
+                }
             },
         });
     };
@@ -853,6 +874,24 @@ export default function UserManagement({ users: initialUsers = [], roles: initia
                             </Button>
                             <Button onClick={submitEdit} disabled={editForm.processing}>
                                 {editForm.processing ? 'Updating...' : 'Update User'}
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+
+                {/* Duplicate email/contact number error modal */}
+                <Dialog
+                    open={duplicateErrorModal.open}
+                    onOpenChange={(open) => setDuplicateErrorModal((prev) => ({ ...prev, open }))}
+                >
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Cannot save user</DialogTitle>
+                            <DialogDescription>{duplicateErrorModal.message}</DialogDescription>
+                        </DialogHeader>
+                        <DialogFooter>
+                            <Button onClick={() => setDuplicateErrorModal({ open: false, message: '' })}>
+                                OK
                             </Button>
                         </DialogFooter>
                     </DialogContent>

@@ -45,6 +45,8 @@ class NotificationService
             'rejected' => 'Your visit schedule has been rejected.',
             'completed' => 'Your visit has been marked as completed.',
             'missed' => 'Your visit has been marked as missed.',
+            'pending' => 'Your visit schedule has been set back to pending.',
+            'cancelled' => 'Your visit schedule has been cancelled.',
         ];
 
         $titles = [
@@ -52,6 +54,8 @@ class NotificationService
             'rejected' => 'Visit Schedule Rejected',
             'completed' => 'Visit Completed',
             'missed' => 'Visit Missed',
+            'pending' => 'Visit Schedule Pending',
+            'cancelled' => 'Visit Schedule Cancelled',
         ];
 
         $inmateName = trim("{$visit->inmate_first_name} {$visit->inmate_middle_name} {$visit->inmate_last_name}");
@@ -408,6 +412,39 @@ class NotificationService
                 'notifiable_type' => User::class,
             ]);
         }
+    }
+
+    /**
+     * Notify super admins and the user about a concurrent login attempt (same account, different device).
+     */
+    public static function notifyConcurrentLoginAttempt(User $user, string $ipAddress, string $userAgent): void
+    {
+        $userName = trim("{$user->first_name} {$user->middle_name} {$user->last_name}");
+        $deviceInfo = strlen($userAgent) > 100 ? substr($userAgent, 0, 100).'...' : $userAgent;
+
+        $superAdminRole = Role::where('slug', 'super_admin')->first();
+        if ($superAdminRole) {
+            $superAdmins = User::where('role_id', $superAdminRole->id)->get();
+            foreach ($superAdmins as $admin) {
+                Notification::create([
+                    'user_id' => $admin->id,
+                    'type' => 'admin_notification',
+                    'title' => 'Concurrent Login Attempt',
+                    'message' => "{$userName} ({$user->email}) attempted to log in from another device while already logged in. IP: {$ipAddress}. This attempt has been blocked and tracked.",
+                    'notifiable_id' => $user->id,
+                    'notifiable_type' => User::class,
+                ]);
+            }
+        }
+
+        Notification::create([
+            'user_id' => $user->id,
+            'type' => 'device_warning',
+            'title' => 'Login Blocked: Already Logged In Elsewhere',
+            'message' => "A login was attempted from another device (IP: {$ipAddress}). You are already logged in elsewhere. If this was not you, contact support. This attempt has been monitored and reported.",
+            'notifiable_id' => $user->id,
+            'notifiable_type' => User::class,
+        ]);
     }
 
     /**

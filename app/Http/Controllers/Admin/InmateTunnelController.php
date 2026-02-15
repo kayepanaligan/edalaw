@@ -1,0 +1,87 @@
+<?php
+
+namespace App\Http\Controllers\Admin;
+
+use App\Http\Controllers\Controller;
+use App\Models\InmateTunnel;
+use Illuminate\Http\Request;
+use Inertia\Inertia;
+use Inertia\Response;
+
+class InmateTunnelController extends Controller
+{
+    /**
+     * Display all inmate tunnels (super admin sees all).
+     */
+    public function index(Request $request): Response
+    {
+        $query = InmateTunnel::with(['visitSession.visit.user', 'visitSession.eburol.user', 'visitSession.monitor']);
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('tunnel_token', 'like', "%{$search}%")
+                    ->orWhereHas('visitSession', function ($s) use ($search) {
+                        $s->where('id', 'like', "%{$search}%");
+                    });
+            });
+        }
+
+        if ($request->filled('date_from')) {
+            $query->whereDate('created_at', '>=', $request->date_from);
+        }
+        if ($request->filled('date_to')) {
+            $query->whereDate('created_at', '<=', $request->date_to);
+        }
+        if ($request->filled('status')) {
+            if ($request->status === 'used') {
+                $query->where('is_used', true);
+            } elseif ($request->status === 'expired') {
+                $query->where('expires_at', '<', now());
+            } elseif ($request->status === 'valid') {
+                $query->where('is_used', false)->where('expires_at', '>=', now());
+            }
+        }
+
+        $tunnels = $query->orderByDesc('created_at')
+            ->paginate(15)
+            ->withQueryString()
+            ->through(function (InmateTunnel $t) {
+                $session = $t->visitSession;
+                $visit = $session?->visit;
+                $eburol = $session?->eburol;
+                $visitor = $visit?->user ?? $eburol?->user;
+                $visitorName = $visitor ? trim("{$visitor->first_name} {$visitor->last_name}") : null;
+                $inmateName = $visit
+                    ? trim("{$visit->inmate_first_name} {$visit->inmate_middle_name} {$visit->inmate_last_name}")
+                    : ($eburol ? trim("{$eburol->inmate_first_name} {$eburol->inmate_middle_name} {$eburol->inmate_last_name}") : null);
+                $monitor = $session?->monitor;
+                $monitorName = $monitor ? trim("{$monitor->first_name} {$monitor->last_name}") : null;
+
+                return [
+                    'id' => $t->id,
+                    'visit_session_id' => $t->visit_session_id,
+                    'tunnel_token' => $t->tunnel_token,
+                    'expires_at' => $t->expires_at->toIso8601String(),
+                    'expires_at_human' => $t->expires_at->diffForHumans(),
+                    'is_used' => $t->is_used,
+                    'status' => $t->is_used ? 'used' : ($t->expires_at->isPast() ? 'expired' : 'valid'),
+                    'session_type' => $visit ? 'visit' : 'eburol',
+                    'visitor_name' => $visitorName,
+                    'inmate_name' => $inmateName,
+                    'monitor_name' => $monitorName,
+                    'created_at' => $t->created_at->toIso8601String(),
+                ];
+            });
+
+        return Inertia::render('Admin/InmateTunnels', [
+            'tunnels' => $tunnels,
+            'filters' => [
+                'search' => $request->search,
+                'date_from' => $request->date_from,
+                'date_to' => $request->date_to,
+                'status' => $request->status ?? 'all',
+            ],
+        ]);
+    }
+}

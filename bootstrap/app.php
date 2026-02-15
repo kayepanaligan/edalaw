@@ -1,5 +1,6 @@
 <?php
 
+use App\Exceptions\ConcurrentLoginAttemptException;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
 use Illuminate\Foundation\Application;
@@ -31,6 +32,12 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        $exceptions->render(function (ConcurrentLoginAttemptException $e, $request) {
+            return redirect()->route('concurrent-login-warning')
+                ->with('concurrent_login_email', $e->user->email)
+                ->with('warning', 'concurrent');
+        });
+
         $exceptions->render(function (ValidationException $e, $request) {
             if (! $request->isMethod('POST') || $request->path() !== 'login') {
                 return null;

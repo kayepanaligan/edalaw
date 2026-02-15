@@ -94,6 +94,7 @@ class EburolManagementController extends Controller
             'monitoring_officer_id' => ['required', 'exists:users,id'],
         ]);
 
+        $roomId = null;
         // Create VideoSDK room for e-burol session
         $videoSdkService = new VideoSdkService;
         $roomName = "eburol-{$eburol->id}-".uniqid();
@@ -105,7 +106,8 @@ class EburolManagementController extends Controller
         ];
 
         if ($roomResult['success']) {
-            $updateData['daily_co_room_id'] = $roomResult['room_id'] ?? null;
+            $roomId = $roomResult['room_id'] ?? null;
+            $updateData['daily_co_room_id'] = $roomId;
             $updateData['daily_co_room_name'] = $roomResult['room_name'] ?? $roomName;
             $updateData['daily_co_room_url'] = $roomResult['room_url'] ?? null;
             $updateData['room_created_at'] = now();
@@ -115,7 +117,7 @@ class EburolManagementController extends Controller
                 'eburol_id' => $eburol->id,
                 'visitor_id' => $eburol->user_id,
                 'session_type' => 'eburol',
-                'session_token' => $roomResult['room_id'] ?? $roomName,
+                'session_token' => $roomId ?? $roomName,
                 'status' => 'pending',
                 'started_at' => now(),
             ]);
@@ -128,6 +130,10 @@ class EburolManagementController extends Controller
         }
 
         $eburol->update($updateData);
+
+        if ($roomId) {
+            app(\App\Services\VisitSessionService::class)->createForEburol($eburol, $roomId);
+        }
 
         $eburol->refresh();
         \App\Services\NotificationService::notifyMonitoringOfficerAboutEburol($eburol);

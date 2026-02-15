@@ -9,6 +9,7 @@ use App\Models\UserSession;
 use App\Services\AuditLogService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -192,9 +193,12 @@ class UserManagementController extends Controller
             'province' => ['nullable', 'string', 'max:255'],
             'postal_code' => ['nullable', 'string', 'max:10'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
-            'contact_number' => ['nullable', 'string', 'max:20'],
+            'contact_number' => ['nullable', 'string', 'max:20', 'unique:users,contact_number'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
             'role_id' => ['required', 'exists:roles,id'],
+        ], [
+            'email.unique' => 'This email address is already registered to another account.',
+            'contact_number.unique' => 'This contact number is already in use by another account.',
         ]);
 
         $user = User::create([
@@ -252,9 +256,12 @@ class UserManagementController extends Controller
             'municipality' => ['nullable', 'string', 'max:255'],
             'province' => ['nullable', 'string', 'max:255'],
             'postal_code' => ['nullable', 'string', 'max:10'],
-            'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email,'.$user->id],
-            'contact_number' => ['nullable', 'string', 'max:20'],
+            'email' => ['required', 'string', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
+            'contact_number' => ['nullable', 'string', 'max:20', Rule::unique('users', 'contact_number')->ignore($user->id)],
             'role_id' => ['required', 'exists:roles,id'],
+        ], [
+            'email.unique' => 'This email address is already registered to another account.',
+            'contact_number.unique' => 'This contact number is already in use by another account.',
         ]);
 
         // Store old values for logging

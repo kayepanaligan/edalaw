@@ -23,7 +23,7 @@ class ScheduleController extends Controller
      */
     public function index(Request $request): Response
     {
-        $visits = Visit::with('monitoringOfficer')
+        $visits = Visit::with(['monitoringOfficer', 'visitSessions' => fn ($q) => $q->orderBy('scheduled_start', 'desc')->limit(1)])
             ->where('user_id', auth()->id())
             ->orderBy('scheduled_date', 'desc')
             ->orderBy('created_at', 'desc')
@@ -48,6 +48,22 @@ class ScheduleController extends Controller
                     }
                 }
 
+                $latestSession = $visit->visitSessions->first();
+                $sessionPayload = null;
+                if ($latestSession) {
+                    $now = now();
+                    $withinWindow = $now->between($latestSession->scheduled_start, $latestSession->scheduled_end);
+                    $notCompleted = ! in_array($latestSession->status, ['completed', 'terminated'], true);
+                    $sessionPayload = [
+                        'id' => $latestSession->id,
+                        'scheduled_start' => $latestSession->scheduled_start->toIso8601String(),
+                        'scheduled_end' => $latestSession->scheduled_end->toIso8601String(),
+                        'status' => $latestSession->status,
+                        'terms_accepted_at' => $latestSession->terms_accepted_at?->toIso8601String(),
+                        'can_join_video' => $visit->status === VisitStatus::Approved && $withinWindow && $notCompleted,
+                    ];
+                }
+
                 return [
                     'id' => $visit->id,
                     'scheduled_date' => $visit->scheduled_date->format('Y-m-d'),
@@ -67,6 +83,7 @@ class ScheduleController extends Controller
                     'created_at' => $visit->created_at->format('Y-m-d H:i:s'),
                     'can_appeal' => $canAppeal,
                     'appeal_deadline' => $appealDeadline,
+                    'visit_session' => $sessionPayload,
                 ];
             });
 

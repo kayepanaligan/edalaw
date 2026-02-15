@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\Visit;
+use App\Services\AuditLogService;
 use App\Services\NotificationService;
 use App\VisitStatus;
 use App\VisitType;
@@ -107,6 +108,8 @@ class ScheduleManagementController extends Controller
             'monitoring_officer_id' => $request->monitoring_officer_id,
         ];
 
+        $roomId = null;
+        $approvalWarning = null;
         // Create VideoSDK room for virtual visits
         if ($visit->visit_type === \App\VisitType::Virtual) {
             $videoSdkService = new \App\Services\VideoSdkService;
@@ -114,8 +117,9 @@ class ScheduleManagementController extends Controller
             $roomResult = $videoSdkService->createRoom($roomName);
 
             if ($roomResult['success']) {
+                $roomId = $roomResult['room_id'] ?? null;
                 $updateData['meeting_link'] = $roomResult['room_url'] ?? null;
-                $updateData['daily_co_room_id'] = $roomResult['room_id'] ?? null;
+                $updateData['daily_co_room_id'] = $roomId;
                 $updateData['daily_co_room_name'] = $roomResult['room_name'] ?? $roomName;
                 $updateData['daily_co_room_url'] = $roomResult['room_url'] ?? null;
                 $updateData['room_created_at'] = now();
@@ -125,25 +129,19 @@ class ScheduleManagementController extends Controller
                     'visit_id' => $visit->id,
                     'visitor_id' => $visit->user_id,
                     'session_type' => 'visit',
-                    'session_token' => $roomResult['room_id'] ?? $roomName,
+                    'session_token' => $roomId ?? $roomName,
                     'status' => 'pending',
                     'started_at' => now(),
                 ]);
             } else {
-                // Log error but don't block approval - admin can manually add meeting link
                 \Illuminate\Support\Facades\Log::error('VideoSDK room creation failed during approval', [
                     'visit_id' => $visit->id,
                     'error' => $roomResult['error'] ?? 'Unknown error',
                 ]);
-
-                // If VideoSDK fails, check if manual meeting link was provided
                 if ($request->filled('meeting_link')) {
                     $updateData['meeting_link'] = $request->meeting_link;
                 } else {
-                    // Show warning message
-                    return redirect()->back()
-                        ->with('warning', 'Schedule approved, but video room creation failed: '.($roomResult['error'] ?? 'Unknown error').'. Please add meeting link manually.')
-                        ->withInput();
+                    $approvalWarning = 'Video room creation failed: '.($roomResult['error'] ?? 'Unknown error').'. Please add meeting link manually.';
                 }
             }
         }
@@ -173,6 +171,11 @@ class ScheduleManagementController extends Controller
         // Refresh visit to get updated meeting_link
         $visit->refresh();
 
+        // Create visit_sessions record for new flow (visitor token, inmate tunnel, etc.)
+        if ($roomId && $visit->visit_type === \App\VisitType::Virtual) {
+            app(\App\Services\VisitSessionService::class)->createForVisit($visit, $roomId);
+        }
+
         // Notify monitoring officer if assigned and it's a new assignment
         if ($request->monitoring_officer_id && $oldMonitoringOfficerId !== $request->monitoring_officer_id) {
             \App\Services\NotificationService::notifyMonitoringOfficerAboutVisit($visit);
@@ -181,8 +184,21 @@ class ScheduleManagementController extends Controller
         // Send notification with meeting link
         NotificationService::createVisitNotification($visit, 'approved');
 
-        return redirect()->route('admin.schedules.index')
+        AuditLogService::logAction(
+            'visit_approved',
+            $visit,
+            'Visit Schedule',
+            "Visit schedule #{$visit->id} approved by admin",
+            $request
+        );
+
+        $redirect = redirect()->route('admin.schedules.index')
             ->with('success', 'Schedule approved successfully.');
+        if ($approvalWarning) {
+            $redirect->with('warning', $approvalWarning);
+        }
+
+        return $redirect;
     }
 
     /**
@@ -199,6 +215,15 @@ class ScheduleManagementController extends Controller
             'rejection_reason' => $request->rejection_reason,
         ]);
 
+        AuditLogService::logAction(
+            'visit_rejected',
+            $visit,
+            'Visit Schedule',
+            "Visit schedule #{$visit->id} rejected by admin. Reason: ".substr($request->rejection_reason, 0, 100),
+            $request,
+            ['rejection_reason' => $request->rejection_reason]
+        );
+
         return redirect()->route('admin.schedules.index')
             ->with('success', 'Schedule rejected successfully.');
     }
@@ -208,14 +233,22 @@ class ScheduleManagementController extends Controller
      */
     public function updateStatus(Request $request, Visit $visit): RedirectResponse
     {
-        $request->validate([
+        if ($request->has('monitoring_officer_id') && $request->monitoring_officer_id === '') {
+            $request->merge(['monitoring_officer_id' => null]);
+        }
+
+        $rules = [
             'status' => 'required|in:pending,approved,rejected,completed,missed,cancelled',
             'rejection_reason' => ['required_if:status,rejected', 'string', 'min:10', 'max:1000'],
             'monitoring_officer_id' => ['nullable', 'exists:users,id'],
-        ]);
+        ];
+        if ($request->status === 'approved' && $visit->visit_type === \App\VisitType::Virtual) {
+            $rules['monitoring_officer_id'] = ['required', 'exists:users,id'];
+        }
+        $request->validate($rules);
 
         $oldMonitoringOfficerId = $visit->monitoring_officer_id;
-        $updateData = ['status' => $request->status];
+        $updateData = ['status' => \App\VisitStatus::from($request->status)];
 
         // If rejecting, require and store rejection reason
         if ($request->status === 'rejected') {
@@ -225,9 +258,36 @@ class ScheduleManagementController extends Controller
             $updateData['rejection_reason'] = null;
         }
 
-        // Update monitoring officer if provided
-        if ($request->has('monitoring_officer_id')) {
+        // Set monitoring officer only when approving (required for virtual)
+        if ($request->status === 'approved' && $request->filled('monitoring_officer_id')) {
             $updateData['monitoring_officer_id'] = $request->monitoring_officer_id;
+        } elseif (in_array($request->status, ['rejected', 'pending'], true)) {
+            $updateData['monitoring_officer_id'] = null; // Clear when rejected or set back to pending
+        }
+
+        // When approving virtual visit, auto-generate meeting link and create session if not already set
+        if ($request->status === 'approved' && $visit->visit_type === \App\VisitType::Virtual) {
+            if (! $visit->meeting_link) {
+                $videoSdkService = new \App\Services\VideoSdkService;
+                $roomName = "visit-{$visit->id}-".uniqid();
+                $roomResult = $videoSdkService->createRoom($roomName);
+                if ($roomResult['success']) {
+                    $roomId = $roomResult['room_id'] ?? null;
+                    $updateData['meeting_link'] = $roomResult['room_url'] ?? null;
+                    $updateData['daily_co_room_id'] = $roomId;
+                    $updateData['daily_co_room_name'] = $roomResult['room_name'] ?? $roomName;
+                    $updateData['daily_co_room_url'] = $roomResult['room_url'] ?? null;
+                    $updateData['room_created_at'] = now();
+                    \App\Models\MonitoringSession::create([
+                        'visit_id' => $visit->id,
+                        'visitor_id' => $visit->user_id,
+                        'session_type' => 'visit',
+                        'session_token' => $roomId ?? $roomName,
+                        'status' => 'pending',
+                        'started_at' => now(),
+                    ]);
+                }
+            }
         }
 
         // Generate access key for physical visits when approved
@@ -243,11 +303,28 @@ class ScheduleManagementController extends Controller
         }
 
         $visit->update($updateData);
+        $visit->refresh();
+
+        // Create visit_session for new flow when virtual and we have a room
+        if ($request->status === 'approved' && $visit->visit_type === \App\VisitType::Virtual && $visit->daily_co_room_id) {
+            if (! $visit->visitSessions()->exists()) {
+                app(\App\Services\VisitSessionService::class)->createForVisit($visit, $visit->daily_co_room_id);
+            }
+        }
 
         // Notify monitoring officer if assigned and it's a new assignment
         if ($request->monitoring_officer_id && $oldMonitoringOfficerId !== $request->monitoring_officer_id && in_array($request->status, ['approved', 'pending'])) {
             \App\Services\NotificationService::notifyMonitoringOfficerAboutVisit($visit);
         }
+
+        AuditLogService::logAction(
+            'visit_status_updated',
+            $visit,
+            'Visit Schedule',
+            "Visit schedule #{$visit->id} status updated to {$request->status} by admin",
+            $request,
+            ['new_status' => $request->status]
+        );
 
         return redirect()->route('admin.schedules.index')
             ->with('success', 'Schedule status updated successfully.');
@@ -339,6 +416,14 @@ class ScheduleManagementController extends Controller
         // Send notification to the visitor
         NotificationService::createVisitNotification($visit, 'approved');
 
+        AuditLogService::logAction(
+            'visit_created',
+            $visit,
+            'Visit Schedule',
+            "Visit schedule #{$visit->id} created and approved by admin for visitor",
+            $request
+        );
+
         return redirect()->route('admin.schedules.index')
             ->with('success', 'Schedule created and approved successfully.');
     }
@@ -389,6 +474,14 @@ class ScheduleManagementController extends Controller
             'meeting_link' => $request->meeting_link,
         ]);
 
+        AuditLogService::logAction(
+            'visit_updated',
+            $visit,
+            'Visit Schedule',
+            "Visit schedule #{$visit->id} updated by admin",
+            $request
+        );
+
         return redirect()->route('admin.schedules.index')
             ->with('success', 'Schedule updated successfully.');
     }
@@ -396,8 +489,18 @@ class ScheduleManagementController extends Controller
     /**
      * Delete a visit schedule.
      */
-    public function destroy(Visit $visit): RedirectResponse
+    public function destroy(Request $request, Visit $visit): RedirectResponse
     {
+        $visitId = $visit->id;
+
+        AuditLogService::logAction(
+            'visit_deleted',
+            $visit,
+            'Visit Schedule',
+            "Visit schedule #{$visitId} deleted by admin",
+            $request
+        );
+
         $visit->delete();
 
         return redirect()->route('admin.schedules.index')
