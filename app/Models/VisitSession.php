@@ -93,19 +93,19 @@ class VisitSession extends Model
 
     /**
      * Whether we are within the window where generating an inmate tunnel is allowed.
-     * Allows from 15 minutes before scheduled_start until scheduled_end.
+     * Allows from the start of the scheduled date until scheduled_end so the officer can generate the link in advance.
      */
     public function isWithinScheduleForTunnel(): bool
     {
         $now = now();
-        $windowStart = $this->scheduled_start->copy()->subMinutes(15);
+        $windowStart = $this->scheduled_start->copy()->startOfDay();
 
         return $now->between($windowStart, $this->scheduled_end);
     }
 
     public function isCompleted(): bool
     {
-        return in_array($this->status, ['completed', 'terminated', 'locked'], true);
+        return in_array($this->status, ['completed', 'terminated', 'locked', 'no_show', 'unsuccessful'], true);
     }
 
     public function isLocked(): bool

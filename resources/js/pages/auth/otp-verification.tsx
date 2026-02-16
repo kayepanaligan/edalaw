@@ -28,8 +28,8 @@ export default function OtpVerification({ email, contact_number }: Props) {
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        form.setData('otp', otp);
-        form.post('/otp-verification/verify', {
+        // Include current OTP from state at submit time (setData is async, so form.data.otp may be stale on first click)
+        form.transform((data) => ({ ...data, otp })).post('/otp-verification/verify', {
             preserveScroll: true,
         });
     };

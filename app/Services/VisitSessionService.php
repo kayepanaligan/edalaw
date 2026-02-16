@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Eburol;
+use App\Models\InmateTunnel;
 use App\Models\Visit;
 use App\Models\VisitSession;
 use App\VisitType;
@@ -32,7 +33,7 @@ class VisitSessionService
         }
         $scheduledEnd = $scheduledStart->copy()->addHour();
 
-        return VisitSession::create([
+        $session = VisitSession::create([
             'visit_id' => $visit->id,
             'eburol_id' => null,
             'room_id' => $roomId,
@@ -42,6 +43,10 @@ class VisitSessionService
             'status' => 'scheduled',
             'recording_status' => 'pending',
         ]);
+
+        $this->createInmateTunnelForSession($session, $scheduledEnd);
+
+        return $session;
     }
 
     /**
@@ -62,7 +67,7 @@ class VisitSessionService
         }
         $scheduledEnd = $scheduledStart->copy()->addHour();
 
-        return VisitSession::create([
+        $session = VisitSession::create([
             'visit_id' => null,
             'eburol_id' => $eburol->id,
             'room_id' => $roomId,
@@ -71,6 +76,23 @@ class VisitSessionService
             'scheduled_end' => $scheduledEnd,
             'status' => 'scheduled',
             'recording_status' => 'pending',
+        ]);
+
+        $this->createInmateTunnelForSession($session, $scheduledEnd);
+
+        return $session;
+    }
+
+    /**
+     * Create a single inmate tunnel for the session (activated during visit, expires at scheduled end).
+     */
+    private function createInmateTunnelForSession(VisitSession $session, \Carbon\CarbonInterface $expiresAt): void
+    {
+        InmateTunnel::create([
+            'visit_session_id' => $session->id,
+            'tunnel_token' => InmateTunnel::generateToken(),
+            'expires_at' => $expiresAt,
+            'is_used' => false,
         ]);
     }
 }

@@ -17,6 +17,7 @@ class CallLog extends Model
      */
     protected $fillable = [
         'user_id',
+        'visit_session_id',
         'phone_number',
         'call_type',
         'call_date',
@@ -45,5 +46,15 @@ class CallLog extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * Get the visit session (for video call logs).
+     *
+     * @return BelongsTo<VisitSession, CallLog>
+     */
+    public function visitSession(): BelongsTo
+    {
+        return $this->belongsTo(VisitSession::class);
     }
 }

@@ -62,6 +62,7 @@ type Appeal = {
         id: number;
         file_name: string;
         file_path: string;
+        download_url?: string;
     }>;
     created_at: string;
 };
@@ -298,7 +299,7 @@ export default function AccountAppealReview({ appeals = [] }: Props) {
                                         {selectedAppeal.documents.map((doc) => (
                                             <a
                                                 key={doc.id}
-                                                href={`/storage/${doc.file_path}`}
+                                                href={doc.download_url ?? doc.file_path}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
                                                 className="block rounded-lg border p-2 text-sm hover:bg-muted"

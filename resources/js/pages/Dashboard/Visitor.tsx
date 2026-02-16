@@ -50,6 +50,8 @@ type RecentSchedule = {
     status: 'pending' | 'approved' | 'rejected' | 'missed' | 'completed';
     meeting_link: string | null;
     created_at: string;
+    can_join_video?: boolean;
+    session_ended?: boolean;
 };
 
 type RecentCallLog = {
@@ -428,33 +430,7 @@ export default function VisitorDashboard({
                             ) : (
                                 <div className="space-y-4">
                                     {recent_schedules.map((schedule) => {
-                                        // Check if scheduled time has arrived
-                                        const isTimeForVisit = (() => {
-                                            if (!schedule.scheduled_date || schedule.status !== 'approved') {
-                                                return false;
-                                            }
-                                            const scheduledDate = new Date(schedule.scheduled_date);
-                                            const now = new Date();
-                                            
-                                            // If scheduled date is today or in the past
-                                            if (scheduledDate.toDateString() === now.toDateString() || scheduledDate < now) {
-                                                // If there's a scheduled time, check if it has passed
-                                                if (schedule.scheduled_time) {
-                                                    const [hours, minutes] = schedule.scheduled_time.split(':').map(Number);
-                                                    const scheduledDateTime = new Date(scheduledDate);
-                                                    scheduledDateTime.setHours(hours, minutes, 0, 0);
-                                                    return now >= scheduledDateTime;
-                                                }
-                                                // If no time specified, allow access on the scheduled date
-                                                return scheduledDate.toDateString() === now.toDateString();
-                                            }
-                                            return false;
-                                        })();
-
-                                        const canJoinVideoCall = schedule.visit_type === 'virtual' 
-                                            && schedule.status === 'approved' 
-                                            && schedule.meeting_link 
-                                            && isTimeForVisit;
+                                        const canJoinVideoCall = schedule.can_join_video === true;
 
                                         return (
                                             <div
@@ -483,8 +459,8 @@ export default function VisitorDashboard({
                                                         <div className="text-sm text-muted-foreground">
                                                             Inmate: {schedule.inmate_name}
                                                         </div>
-                                                        {schedule.visit_type === 'virtual' 
-                                                            && schedule.status === 'approved' 
+                                                        {schedule.visit_type === 'virtual'
+                                                            && schedule.status === 'approved'
                                                             && schedule.meeting_link && (
                                                             <div className="text-sm">
                                                                 {canJoinVideoCall ? (
@@ -501,8 +477,8 @@ export default function VisitorDashboard({
                                                                     <div className="flex items-center gap-2 text-muted-foreground">
                                                                         <Video className="h-4 w-4" />
                                                                         <span>
-                                                                            {isTimeForVisit 
-                                                                                ? 'Meeting link available' 
+                                                                            {schedule.session_ended
+                                                                                ? 'Session ended'
                                                                                 : 'Meeting link will be available at scheduled time'}
                                                                         </span>
                                                                     </div>

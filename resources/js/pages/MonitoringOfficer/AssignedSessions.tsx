@@ -1,6 +1,6 @@
-import { Head, router } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import type { ColumnDef } from '@tanstack/react-table';
-import { Link2, Lock, Play, Square, Unlock } from 'lucide-react';
+import { Eye, Link2, Lock, Play, Square, Unlock } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -43,6 +43,7 @@ type Session = {
     started_at: string | null;
     ended_at: string | null;
     has_active_tunnel: boolean;
+    has_tunnel: boolean;
     chat_locked: boolean;
 };
 
@@ -57,6 +58,8 @@ function getStatusBadge(status: string) {
         active: { label: 'Active', className: 'bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20' },
         completed: { label: 'Completed', className: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20' },
         terminated: { label: 'Terminated', className: 'bg-gray-500/10 text-gray-600 dark:text-gray-400 border-gray-500/20' },
+        no_show: { label: 'No show', className: 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20' },
+        unsuccessful: { label: 'Unsuccessful', className: 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20' },
     };
     const config = map[status] ?? { label: status, className: '' };
     return <Badge variant="secondary" className={config.className}>{config.label}</Badge>;
@@ -209,12 +212,26 @@ export default function AssignedSessions({ sessions, filters: initialFilters }: 
                                     {generatingTunnelFor === s.id ? '...' : 'Inmate Link'}
                                 </Button>
                                 {isScheduled && (
-                                    <Button size="sm" variant="default" onClick={() => handleStartSession(s.id)}>
+                                    <Button
+                                        size="sm"
+                                        variant="default"
+                                        onClick={() => handleStartSession(s.id)}
+                                        disabled={!s.has_tunnel}
+                                        title={!s.has_tunnel ? 'Generate inmate link first' : undefined}
+                                    >
                                         <Play className="mr-1 h-4 w-4" />
                                         Start
                                     </Button>
                                 )}
 {isActive && (
+                                    <Button size="sm" variant="outline" asChild>
+                                        <Link href={`/monitoring-officer/assigned-sessions/${s.id}/join`}>
+                                            <Eye className="mr-1 h-4 w-4" />
+                                            Join as observer
+                                        </Link>
+                                    </Button>
+                                )}
+                                {isActive && (
                                     <Button size="sm" variant="destructive" onClick={() => handleEndSession(s.id)} disabled={endingFor === s.id}>
                                         <Square className="mr-1 h-4 w-4" />
                                         {endingFor === s.id ? '...' : 'End'}

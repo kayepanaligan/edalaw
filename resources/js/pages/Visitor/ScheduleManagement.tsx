@@ -52,6 +52,7 @@ type VisitSessionInfo = {
     status: string;
     terms_accepted_at: string | null;
     can_join_video: boolean;
+    join_disabled_reason?: 'not_started' | 'ended' | null;
 } | null;
 
 type Visit = {
@@ -597,8 +598,13 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
                         return <span className="text-sm text-muted-foreground">Completed</span>;
                     }
                     if (session && !session.can_join_video) {
+                        const tooltip = session.join_disabled_reason === 'not_started'
+                            ? 'Video call is available from the scheduled start time.'
+                            : session.join_disabled_reason === 'ended'
+                                ? 'Schedule has ended.'
+                                : 'Available during scheduled time only.';
                         return (
-                            <Button size="sm" variant="outline" disabled className="inline-flex gap-2" title="Available during scheduled time only">
+                            <Button size="sm" variant="outline" disabled className="inline-flex gap-2" title={tooltip}>
                                 <VideoIcon className="h-4 w-4" />
                                 Video Call
                             </Button>

@@ -1,7 +1,7 @@
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 import type { ColumnDef } from '@tanstack/react-table';
 import { Calendar, Video, MoreVertical, Eye, Check, X, RefreshCw, CalendarClock, FileOutput, VideoIcon } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import { formatVisitSchedule } from '@/lib/formatVisitSchedule';
@@ -68,6 +68,7 @@ type Visit = {
     monitoring_officer_name: string | null;
     access_key: string | null;
     created_at: string;
+    schedule_started?: boolean;
     schedule_ended?: boolean;
     visit_session_id?: number | null;
 };
@@ -152,10 +153,20 @@ export default function ScheduleManagement({ visits, stats, monitoringOfficers }
     useToast();
     const page = usePage();
     const flash = (page.props as { flash?: { success?: string; warning?: string; error?: string } }).flash;
+    const flashShownRef = useRef<{ w?: string; e?: string; s?: string }>({});
     useEffect(() => {
-        if (flash?.warning) toast.warning(flash.warning);
-        if (flash?.error) toast.error(flash.error);
-        if (flash?.success) toast.success(flash.success);
+        if (flash?.warning && flashShownRef.current.w !== flash.warning) {
+            flashShownRef.current.w = flash.warning;
+            toast.warning(flash.warning);
+        }
+        if (flash?.error && flashShownRef.current.e !== flash.error) {
+            flashShownRef.current.e = flash.error;
+            toast.error(flash.error);
+        }
+        if (flash?.success && flashShownRef.current.s !== flash.success) {
+            flashShownRef.current.s = flash.success;
+            toast.success(flash.success);
+        }
     }, [flash?.warning, flash?.error, flash?.success]);
 
     const rejectForm = useForm({
@@ -194,13 +205,13 @@ export default function ScheduleManagement({ visits, stats, monitoringOfficers }
         router.post(`/bjmp-officer/schedules/${selectedVisit.id}/approve`, payload, {
             preserveScroll: true,
             onSuccess: () => {
-                toast.success('Schedule approved successfully.');
                 setIsApproveModalOpen(false);
                 setSelectedVisit(null);
                 approveForm.reset();
             },
-            onError: () => {
-                toast.error('Failed to approve schedule.');
+            onError: (errors) => {
+                const msg = Array.isArray(errors?.approve) ? errors.approve[0] : (errors?.approve ?? 'Failed to approve schedule.');
+                toast.error(msg);
             },
         });
     };
@@ -423,7 +434,7 @@ export default function ScheduleManagement({ visits, stats, monitoringOfficers }
                     );
                 }
                 if (visit.visit_type === 'virtual' && visit.status === 'approved') {
-                    const canJoin = visit.visit_session_id && !visit.schedule_ended;
+                    const canJoin = visit.visit_session_id && visit.schedule_started && !visit.schedule_ended;
                     if (canJoin) {
                         return (
                             <a
@@ -437,16 +448,19 @@ export default function ScheduleManagement({ visits, stats, monitoringOfficers }
                             </a>
                         );
                     }
-                    if (visit.schedule_ended) {
-                        return (
-                            <span
-                                className="inline-flex h-9 w-9 cursor-not-allowed items-center justify-center rounded-md bg-muted text-muted-foreground"
-                                title="Schedule has ended"
-                            >
-                                <VideoIcon className="h-4 w-4" />
-                            </span>
-                        );
-                    }
+                    const tooltip = !visit.schedule_started
+                        ? 'Video call is available from the scheduled start time.'
+                        : visit.schedule_ended
+                            ? 'Schedule has ended.'
+                            : 'Not available';
+                    return (
+                        <span
+                            className="inline-flex h-9 w-9 cursor-not-allowed items-center justify-center rounded-md bg-muted text-muted-foreground"
+                            title={tooltip}
+                        >
+                            <VideoIcon className="h-4 w-4" />
+                        </span>
+                    );
                 }
                 return <span className="text-sm text-muted-foreground">—</span>;
             },
@@ -697,7 +711,7 @@ export default function ScheduleManagement({ visits, stats, monitoringOfficers }
                                         <div className="col-span-2">
                                             <Label className="text-muted-foreground">Join video call</Label>
                                             <p className="mt-1">
-                                                {selectedVisit.visit_session_id && !selectedVisit.schedule_ended
+                                                {selectedVisit.visit_session_id && selectedVisit.schedule_started && !selectedVisit.schedule_ended
                                                     ? (
                                                             <a
                                                                 href={`/bjmp-officer/visit-session/${selectedVisit.visit_session_id}/join`}
@@ -712,7 +726,13 @@ export default function ScheduleManagement({ visits, stats, monitoringOfficers }
                                                     : (
                                                             <span
                                                                 className="inline-flex h-10 w-10 cursor-not-allowed items-center justify-center rounded-md bg-muted text-muted-foreground"
-                                                                title={selectedVisit.schedule_ended ? 'Schedule has ended' : 'Not available'}
+                                                                title={
+                                                                    !selectedVisit.schedule_started
+                                                                        ? 'Video call is available from the scheduled start time.'
+                                                                        : selectedVisit.schedule_ended
+                                                                            ? 'Schedule has ended.'
+                                                                            : 'Not available'
+                                                                }
                                                             >
                                                                 <VideoIcon className="h-5 w-5" />
                                                             </span>

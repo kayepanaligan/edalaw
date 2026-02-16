@@ -9,6 +9,7 @@ use App\Models\Appeal;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -19,7 +20,7 @@ class AccountAppealReviewController extends Controller
      */
     public function index(): Response
     {
-        $appeals = Appeal::with(['user', 'reviewer'])
+        $appeals = Appeal::with(['user', 'reviewer', 'documents'])
             ->where('appealable_type', User::class)
             ->orderBy('created_at', 'desc')
             ->get()
@@ -47,7 +48,8 @@ class AccountAppealReviewController extends Controller
                         return [
                             'id' => $doc->id,
                             'file_name' => $doc->file_name,
-                            'file_path' => $doc->file_path,
+                            'file_path' => Storage::disk('public')->url($doc->file_path),
+                            'download_url' => route('admin.appeals.documents.download', $doc),
                         ];
                     }),
                     'created_at' => $appeal->created_at->format('Y-m-d H:i:s'),

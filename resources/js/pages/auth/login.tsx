@@ -1,7 +1,6 @@
 import { Head, usePage } from '@inertiajs/react';
 import { Eye, EyeOff } from 'lucide-react';
 import { useState } from 'react';
-
 import InputError from '@/components/input-error';
 import TextLink from '@/components/text-link';
 import { Button } from '@/components/ui/button';
@@ -165,14 +164,19 @@ export default function Login({
                             {isSubmitting && <Spinner />}
                             {isSubmitting ? 'Logging in...' : 'Log in'}
                         </Button>
-                    </div>
 
-                    {canRegister && (
+                        {canRegister && (
                         <div className="text-center text-sm text-muted-foreground">
                             Don&apos;t have an account?{' '}
                             <TextLink href={register()}>Sign up</TextLink>
                         </div>
                     )}
+                    </div>
+
+                
+                    <div className="text-center text-sm text-muted-foreground">
+                        <TextLink href="/inmate-tunnel">Join as inmate</TextLink>
+                    </div>
                 </form>
             </div>
 

@@ -54,13 +54,21 @@ class ScheduleController extends Controller
                     $now = now();
                     $withinWindow = $now->between($latestSession->scheduled_start, $latestSession->scheduled_end);
                     $notCompleted = ! in_array($latestSession->status, ['completed', 'terminated'], true);
+                    $canJoin = $visit->status === VisitStatus::Approved && $withinWindow && $notCompleted;
+                    $joinDisabledReason = null;
+                    if (! $canJoin && $visit->status === VisitStatus::Approved && $notCompleted) {
+                        $joinDisabledReason = $now->lt($latestSession->scheduled_start) ? 'not_started' : 'ended';
+                    } elseif (! $canJoin && $notCompleted === false) {
+                        $joinDisabledReason = 'ended';
+                    }
                     $sessionPayload = [
                         'id' => $latestSession->id,
                         'scheduled_start' => $latestSession->scheduled_start->toIso8601String(),
                         'scheduled_end' => $latestSession->scheduled_end->toIso8601String(),
                         'status' => $latestSession->status,
                         'terms_accepted_at' => $latestSession->terms_accepted_at?->toIso8601String(),
-                        'can_join_video' => $visit->status === VisitStatus::Approved && $withinWindow && $notCompleted,
+                        'can_join_video' => $canJoin,
+                        'join_disabled_reason' => $joinDisabledReason,
                     ];
                 }
 

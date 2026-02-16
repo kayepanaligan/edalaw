@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\AppealStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Appeal;
+use App\Models\AppealDocument;
 use App\Models\Eburol;
 use App\Models\Visit;
 use App\Services\AuditLogService;
@@ -15,6 +16,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class AppealsOversightController extends Controller
 {
@@ -34,28 +36,32 @@ class AppealsOversightController extends Controller
 
                 if ($appeal->appealable_type === Visit::class) {
                     $visit = $appeal->appealable;
-                    $appealableData = [
-                        'type' => 'visit',
-                        'id' => $visit->id,
-                        'scheduled_date' => $visit->scheduled_date->format('Y-m-d'),
-                        'scheduled_time' => $visit->scheduled_time,
-                        'visit_type' => $visit->visit_type->value,
-                        'inmate_name' => trim("{$visit->inmate_first_name} {$visit->inmate_middle_name} {$visit->inmate_last_name}"),
-                        'status' => $visit->status->value,
-                        'notes' => $visit->notes,
-                    ];
+                    $appealableData = $visit
+                        ? [
+                            'type' => 'visit',
+                            'id' => $visit->id,
+                            'scheduled_date' => $visit->scheduled_date->format('Y-m-d'),
+                            'scheduled_time' => $visit->scheduled_time,
+                            'visit_type' => $visit->visit_type->value,
+                            'inmate_name' => trim("{$visit->inmate_first_name} {$visit->inmate_middle_name} {$visit->inmate_last_name}"),
+                            'status' => $visit->status->value,
+                            'notes' => $visit->notes,
+                        ]
+                        : ['type' => 'visit', 'deleted' => true];
                 } else {
                     $eburol = $appeal->appealable;
-                    $appealableData = [
-                        'type' => 'eburol',
-                        'id' => $eburol->id,
-                        'deceased_name' => trim("{$eburol->deceased_first_name} {$eburol->deceased_middle_name} {$eburol->deceased_last_name}"),
-                        'inmate_name' => trim("{$eburol->inmate_first_name} {$eburol->inmate_middle_name} {$eburol->inmate_last_name}"),
-                        'wake_start_date' => $eburol->wake_start_date->format('Y-m-d'),
-                        'wake_end_date' => $eburol->wake_end_date->format('Y-m-d'),
-                        'status' => $eburol->status->value,
-                        'admin_notes' => $eburol->admin_notes,
-                    ];
+                    $appealableData = $eburol
+                        ? [
+                            'type' => 'eburol',
+                            'id' => $eburol->id,
+                            'deceased_name' => trim("{$eburol->deceased_first_name} {$eburol->deceased_middle_name} {$eburol->deceased_last_name}"),
+                            'inmate_name' => trim("{$eburol->inmate_first_name} {$eburol->inmate_middle_name} {$eburol->inmate_last_name}"),
+                            'wake_start_date' => $eburol->wake_start_date->format('Y-m-d'),
+                            'wake_end_date' => $eburol->wake_end_date->format('Y-m-d'),
+                            'status' => $eburol->status->value,
+                            'admin_notes' => $eburol->admin_notes,
+                        ]
+                        : ['type' => 'eburol', 'deleted' => true];
                 }
 
                 return [
@@ -75,8 +81,9 @@ class AppealsOversightController extends Controller
                         return [
                             'id' => $doc->id,
                             'file_name' => $doc->file_name,
-                            'file_path' => Storage::url($doc->file_path),
+                            'file_path' => Storage::disk('public')->url($doc->file_path),
                             'file_size' => $doc->file_size,
+                            'download_url' => route('admin.appeals.documents.download', $doc),
                         ];
                     }),
                     'created_at' => $appeal->created_at->format('Y-m-d H:i:s'),
@@ -123,7 +130,7 @@ class AppealsOversightController extends Controller
             'decision_notes' => $request->decision_notes,
         ]);
 
-        // If approved, reverse the original decision
+        // If approved, reverse the original decision (only if the appealable still exists)
         if ($request->status === 'approved') {
             $appealable = $appeal->appealable;
             if ($appealable instanceof Visit) {
@@ -170,7 +177,7 @@ class AppealsOversightController extends Controller
             'decision_notes' => $request->decision_notes ?? $appeal->decision_notes,
         ]);
 
-        // If approved, reverse the original decision
+        // If approved, reverse the original decision (only if the appealable still exists)
         if ($request->status === 'approved') {
             $appealable = $appeal->appealable;
             if ($appealable instanceof Visit) {
@@ -222,5 +229,19 @@ class AppealsOversightController extends Controller
             // Notify user
             NotificationService::createAppealStatusNotification($appeal);
         }
+    }
+
+    /**
+     * Serve appeal supporting document for viewing (super admin).
+     */
+    public function downloadDocument(AppealDocument $appealDocument): BinaryFileResponse
+    {
+        if (! $appealDocument->file_path || ! Storage::disk('public')->exists($appealDocument->file_path)) {
+            abort(404, 'Document not found.');
+        }
+
+        return response()->file(Storage::disk('public')->path($appealDocument->file_path), [
+            'Content-Disposition' => 'inline; filename="'.basename($appealDocument->file_name).'"',
+        ]);
     }
 }

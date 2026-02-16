@@ -49,7 +49,8 @@ class VisitSessionChatController extends Controller
     }
 
     /**
-     * Visitor sends a message. Stored in chat_logs; keyword filter may auto-flag; broadcast.
+     * Visitor sends a message. Automatically recorded in chat_logs (tied to visit_session_id for this session).
+     * Keyword filter may auto-flag; broadcast to other participants.
      */
     public function store(SendChatMessageRequest $request, VisitSession $session): JsonResponse
     {

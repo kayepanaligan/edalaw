@@ -7,6 +7,8 @@ use App\Http\Controllers\Controller;
 use App\Models\InmateTunnel;
 use App\Models\SystemLog;
 use App\Models\VisitSession;
+use App\Services\VideoSdkService;
+use App\Services\VisitSessionCompletionService;
 use App\Services\VisitSessionRecordingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -70,6 +72,7 @@ class AssignedSessionsController extends Controller
                     'started_at' => $session->started_at?->toIso8601String(),
                     'ended_at' => $session->ended_at?->toIso8601String(),
                     'has_active_tunnel' => $session->inmateTunnels()->where('is_used', false)->where('expires_at', '>', now())->exists(),
+                    'has_tunnel' => $session->inmateTunnels()->exists(),
                     'chat_locked' => (bool) $session->chat_locked,
                 ];
             });
@@ -91,7 +94,7 @@ class AssignedSessionsController extends Controller
             abort(403);
         }
         if (! $session->isWithinScheduleForTunnel()) {
-            return response()->json(['error' => 'Session is not within the scheduled window. You can generate the inmate link from 15 minutes before the session start until the session end.'], 422);
+            return response()->json(['error' => 'Session is not within the scheduled window. You can generate the inmate link from the start of the scheduled date until the session end.'], 422);
         }
         if ($session->isCompleted()) {
             return response()->json(['error' => 'Session has ended.'], 422);
@@ -133,6 +136,9 @@ class AssignedSessionsController extends Controller
         if ($session->isCompleted()) {
             return response()->json(['error' => 'Session has ended.'], 422);
         }
+        if (! $session->inmateTunnels()->exists()) {
+            return response()->json(['error' => 'An inmate tunnel link must exist before starting the session. Generate an inmate link first or ensure the visit was approved with a tunnel.'], 422);
+        }
 
         $session->update([
             'status' => 'active',
@@ -165,19 +171,26 @@ class AssignedSessionsController extends Controller
         }
 
         $endedAt = now();
-        $durationSeconds = $session->started_at ? $endedAt->diffInSeconds($session->started_at) : null;
+        $durationSeconds = null;
+        if ($session->started_at) {
+            $raw = (int) round($endedAt->diffInSeconds($session->started_at, false));
+            $durationSeconds = max(0, $raw);
+        }
 
         if ($session->recording_status === 'recording' && $session->visitor_participant_id) {
             app(VisitSessionRecordingService::class)->stopRecordingAndSave($session, $session->visitor_participant_id);
         }
 
         $session->update([
-            'status' => 'completed',
             'recording_status' => $session->recording_status === 'recording' ? 'saved' : $session->recording_status,
             'ended_at' => $endedAt,
             'duration_seconds' => $durationSeconds,
-            'end_reason' => $request->input('reason', 'monitor_ended'),
         ]);
+
+        app(VisitSessionCompletionService::class)->endSessionWithOutcome(
+            $session->fresh(),
+            $request->input('reason', 'monitor_ended')
+        );
 
         SystemLog::create([
             'visit_session_id' => $session->id,
@@ -241,5 +254,41 @@ class AssignedSessionsController extends Controller
         VisitSessionChatLockChanged::dispatch($session->fresh(), false);
 
         return response()->json(['ok' => true, 'chat_locked' => false]);
+    }
+
+    /**
+     * Monitoring officer joins the video call as observer (no camera/mic; view-only).
+     * Redirects to VideoSDK with viewer token and params to disable webcam/mic.
+     */
+    public function joinAsObserver(Request $request, VisitSession $session): RedirectResponse|Response
+    {
+        $user = $request->user();
+        $isMonitor = $session->monitor_id === $user->id;
+        $isSuperAdmin = $user->role?->slug === 'super_admin';
+        if (! $isMonitor && ! $isSuperAdmin) {
+            abort(403);
+        }
+        if ($session->isCompleted()) {
+            return redirect()->route('monitoring-officer.assigned-sessions.index')
+                ->with('error', 'This session has ended.');
+        }
+        if (! $session->isWithinSchedule() && $session->status !== 'active') {
+            return redirect()->route('monitoring-officer.assigned-sessions.index')
+                ->with('error', 'You can only join during the scheduled window or when the session is active.');
+        }
+
+        $videoSdk = new VideoSdkService;
+        $participantId = 'monitor-'.$request->user()->id.'-'.$session->id;
+        $result = $videoSdk->generateViewerParticipantToken($session->room_id, $participantId, 120);
+
+        if (! ($result['success'] ?? false) || empty($result['token'])) {
+            return redirect()->route('monitoring-officer.assigned-sessions.index')
+                ->with('error', 'Unable to generate join link. Please try again.');
+        }
+
+        $query = 'token='.rawurlencode($result['token']);
+        $url = 'https://app.videosdk.live/meetings/'.$session->room_id.'?'.$query;
+
+        return redirect()->away($url);
     }
 }

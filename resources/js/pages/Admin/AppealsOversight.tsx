@@ -54,7 +54,8 @@ type Appeal = {
     appealable_type: string;
     appealable_data: {
         type: 'visit' | 'eburol';
-        id: number;
+        id?: number;
+        deleted?: boolean;
         scheduled_date?: string;
         scheduled_time?: string;
         visit_type?: string;
@@ -78,6 +79,7 @@ type Appeal = {
         file_name: string;
         file_path: string;
         file_size: number;
+        download_url?: string;
     }>;
     created_at: string;
 };
@@ -255,6 +257,13 @@ export default function AppealsOversight({ appeals, stats }: Props) {
                 header: 'Details',
                 cell: ({ row }) => {
                     const data = row.original.appealable_data;
+                    if (data.deleted) {
+                        return (
+                            <span className="text-sm text-muted-foreground italic">
+                                Original {data.type === 'visit' ? 'visit schedule' : 'e-burol application'} no longer available
+                            </span>
+                        );
+                    }
                     if (data.type === 'visit') {
                         return (
                             <div className="text-sm">
@@ -514,7 +523,7 @@ export default function AppealsOversight({ appeals, stats }: Props) {
                                             {selectedAppeal.documents.map((doc) => (
                                                 <a
                                                     key={doc.id}
-                                                    href={doc.file_path}
+                                                    href={doc.download_url ?? doc.file_path}
                                                     target="_blank"
                                                     rel="noopener noreferrer"
                                                     className="flex items-center gap-2 text-sm text-blue-600 hover:underline"

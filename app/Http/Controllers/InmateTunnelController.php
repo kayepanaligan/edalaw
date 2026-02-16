@@ -19,6 +19,70 @@ use Inertia\Response;
 class InmateTunnelController extends Controller
 {
     /**
+     * Show the inmate tunnel entry form (no auth). From login page, inmate enters token or full join URL.
+     */
+    public function showEnterToken(Request $request): Response
+    {
+        return Inertia::render('Inmate/EnterTunnelToken', [
+            'verifyUrl' => route('inmate.verify-token'),
+            'csrfToken' => csrf_token(),
+        ]);
+    }
+
+    /**
+     * Verify tunnel token/URL and redirect to join page (no auth).
+     */
+    public function verifyToken(Request $request): RedirectResponse
+    {
+        $request->validate([
+            'token_or_url' => ['required', 'string', 'max:2048'],
+        ], [
+            'token_or_url.required' => 'Please enter the inmate tunnel link or token.',
+        ]);
+
+        $input = trim($request->input('token_or_url'));
+        $token = $this->extractTunnelToken($input);
+
+        if (! $token) {
+            return redirect()->route('inmate.enter-token')
+                ->withErrors(['token_or_url' => 'The link or token you entered is invalid. Please paste the full link or the token you received.']);
+        }
+
+        $tunnel = InmateTunnel::where('tunnel_token', $token)->first();
+        if (! $tunnel) {
+            return redirect()->route('inmate.enter-token')
+                ->withErrors(['token_or_url' => 'Invalid or expired link.']);
+        }
+        if ($tunnel->expires_at->isPast()) {
+            return redirect()->route('inmate.enter-token')
+                ->withErrors(['token_or_url' => 'This link has expired.']);
+        }
+
+        return redirect()->route('inmate.join', ['token' => $token]);
+    }
+
+    /**
+     * Extract tunnel token from user input (full URL or raw token).
+     */
+    private function extractTunnelToken(string $input): ?string
+    {
+        $input = trim($input);
+        if ($input === '') {
+            return null;
+        }
+        if (str_contains($input, 'inmate/join/')) {
+            $parts = explode('inmate/join/', $input);
+            $after = end($parts);
+            $token = trim(explode('?', $after)[0]);
+            if ($token !== '') {
+                return $token;
+            }
+        }
+
+        return $input;
+    }
+
+    /**
      * Public page: inmate joins via tunnel token (no auth). Validate token and show Join/End UI.
      */
     public function join(Request $request, string $token): Response|RedirectResponse

@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\VisitSession;
+use App\Services\VisitSessionCompletionService;
 use App\Services\VisitSessionRecordingService;
 use Illuminate\Console\Command;
 
@@ -12,8 +13,10 @@ class EndExpiredVisitSessionsCommand extends Command
 
     protected $description = 'End visit sessions past scheduled_end and stop recording';
 
-    public function handle(VisitSessionRecordingService $recordingService): int
-    {
+    public function handle(
+        VisitSessionRecordingService $recordingService,
+        VisitSessionCompletionService $completionService
+    ): int {
         $sessions = VisitSession::whereIn('status', ['scheduled', 'active'])
             ->where('scheduled_end', '<', now())
             ->get();
@@ -24,15 +27,19 @@ class EndExpiredVisitSessionsCommand extends Command
             }
 
             $endedAt = now();
-            $durationSeconds = $session->started_at ? $endedAt->diffInSeconds($session->started_at) : null;
+            $durationSeconds = null;
+            if ($session->started_at) {
+                $raw = (int) round($endedAt->diffInSeconds($session->started_at, false));
+                $durationSeconds = max(0, $raw);
+            }
 
             $session->update([
-                'status' => 'completed',
                 'recording_status' => $session->recording_status === 'recording' ? 'saved' : $session->recording_status,
                 'ended_at' => $endedAt,
                 'duration_seconds' => $durationSeconds,
-                'end_reason' => 'scheduled_end',
             ]);
+
+            $completionService->endSessionWithOutcome($session->fresh(), 'scheduled_end');
         }
 
         $this->info("Ended {$sessions->count()} expired session(s).");

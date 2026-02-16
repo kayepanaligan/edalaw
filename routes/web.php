@@ -53,6 +53,12 @@ Route::get('/', function () {
 Route::post('webhooks/daily-co', [\App\Http\Controllers\Webhook\DailyCoWebhookController::class, 'handle'])
     ->name('webhooks.daily-co');
 
+// Inmate tunnel entry from login page (no auth)
+Route::get('inmate-tunnel', [\App\Http\Controllers\InmateTunnelController::class, 'showEnterToken'])
+    ->name('inmate.enter-token');
+Route::post('inmate-tunnel', [\App\Http\Controllers\InmateTunnelController::class, 'verifyToken'])
+    ->name('inmate.verify-token');
+
 // Inmate join (no auth - tunnel token validates access)
 Route::get('inmate/join/{token}', [\App\Http\Controllers\InmateTunnelController::class, 'join'])
     ->name('inmate.join');
@@ -169,6 +175,10 @@ Route::middleware(['auth', 'verified', 'approved'])->group(function () {
             ->name('inmate-tunnels.index');
     });
 
+    // Join as observer: monitoring officer or super admin (same privileges)
+    Route::middleware(['role:monitoring_officer,super_admin'])->get('monitoring-officer/assigned-sessions/{session}/join', [\App\Http\Controllers\MonitoringOfficer\AssignedSessionsController::class, 'joinAsObserver'])
+        ->name('monitoring-officer.assigned-sessions.join');
+
     Route::get('visit/session/{session}/chat', [\App\Http\Controllers\VisitSessionChatController::class, 'index'])
         ->name('visit-session.chat.index');
     Route::post('visit/session/{session}/chat', [\App\Http\Controllers\VisitSessionChatController::class, 'store'])
@@ -226,6 +236,10 @@ Route::middleware(['auth', 'verified', 'approved'])->group(function () {
             ->name('eburols.reject');
         Route::post('eburols/{eburol}/update-status', [\App\Http\Controllers\Admin\EburolManagementController::class, 'updateStatus'])
             ->name('eburols.update-status');
+        Route::get('eburols/{eburol}/document/death-certificate', [\App\Http\Controllers\Admin\EburolManagementController::class, 'deathCertificate'])
+            ->name('eburols.document.death-certificate');
+        Route::get('eburols/{eburol}/document/relationship-proof', [\App\Http\Controllers\Admin\EburolManagementController::class, 'relationshipProof'])
+            ->name('eburols.document.relationship-proof');
 
         Route::get('time-slot-capacities', [\App\Http\Controllers\Admin\TimeSlotConfigurationController::class, 'index'])
             ->name('time-slot-capacities.index');
@@ -340,6 +354,8 @@ Route::middleware(['auth', 'verified', 'approved'])->group(function () {
             ->name('appeals.review');
         Route::put('appeals/{appeal}/update-status', [\App\Http\Controllers\Admin\AppealsOversightController::class, 'updateStatus'])
             ->name('appeals.update-status');
+        Route::get('appeals/documents/{appealDocument}/download', [\App\Http\Controllers\Admin\AppealsOversightController::class, 'downloadDocument'])
+            ->name('appeals.documents.download');
         Route::get('account-appeals', [\App\Http\Controllers\Admin\AccountAppealReviewController::class, 'index'])
             ->name('account-appeals.index');
         Route::post('account-appeals/{appeal}/review', [\App\Http\Controllers\Admin\AccountAppealReviewController::class, 'review'])

@@ -80,6 +80,22 @@ class Visit extends Model
     }
 
     /**
+     * Whether the scheduled slot has started (current time is at or after scheduled start).
+     */
+    public function isScheduleStarted(): bool
+    {
+        $start = $this->scheduled_date->copy();
+        if ($this->scheduled_time) {
+            [$h, $m] = explode(':', $this->scheduled_time);
+            $start->setTime((int) $h, (int) $m);
+        } else {
+            $start->startOfDay();
+        }
+
+        return now()->gte($start);
+    }
+
+    /**
      * Whether the scheduled date and time have passed (no longer valid for approval or joining).
      */
     public function isScheduleInPast(): bool

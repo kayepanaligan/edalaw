@@ -55,12 +55,25 @@ class VisitorDashboardController extends Controller
             ->where('visit_type', VisitType::Virtual)
             ->count();
 
-        // Recent schedules
-        $recentSchedules = Visit::where('user_id', $userId)
+        // Recent schedules (with session info so dashboard can show/hide Join call correctly)
+        $recentSchedules = Visit::with(['visitSessions' => fn ($q) => $q->orderBy('scheduled_start', 'desc')->limit(1)])
+            ->where('user_id', $userId)
             ->orderBy('created_at', 'desc')
             ->limit(5)
             ->get()
             ->map(function ($visit) {
+                $latestSession = $visit->visitSessions->first();
+                $canJoinVideo = false;
+                $sessionEnded = false;
+                if ($latestSession && $visit->visit_type === VisitType::Virtual) {
+                    $sessionEnded = in_array($latestSession->status, ['completed', 'terminated', 'no_show', 'unsuccessful'], true)
+                        || now()->isAfter($latestSession->scheduled_end);
+                    $canJoinVideo = $visit->status === VisitStatus::Approved
+                        && $visit->meeting_link
+                        && ! $sessionEnded
+                        && now()->between($latestSession->scheduled_start, $latestSession->scheduled_end);
+                }
+
                 return [
                     'id' => $visit->id,
                     'scheduled_date' => $visit->scheduled_date->format('Y-m-d'),
@@ -72,6 +85,8 @@ class VisitorDashboardController extends Controller
                     'status' => $visit->status->value,
                     'meeting_link' => $visit->meeting_link ?? $visit->daily_co_room_url,
                     'created_at' => $visit->created_at->format('Y-m-d H:i:s'),
+                    'can_join_video' => $canJoinVideo,
+                    'session_ended' => $sessionEnded,
                 ];
             });
 

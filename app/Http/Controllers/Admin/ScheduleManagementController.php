@@ -28,7 +28,14 @@ class ScheduleManagementController extends Controller
             ->get()
             ->map(function ($visit) {
                 $latestSession = $visit->visitSessions->first();
-                $scheduleEnded = $visit->isScheduleInPast();
+                $now = now();
+                if ($latestSession) {
+                    $scheduleStarted = $now->gte($latestSession->scheduled_start);
+                    $scheduleEnded = $now->isAfter($latestSession->scheduled_end);
+                } else {
+                    $scheduleStarted = $visit->isScheduleStarted();
+                    $scheduleEnded = $visit->isScheduleInPast();
+                }
 
                 return [
                     'id' => $visit->id,
@@ -50,6 +57,7 @@ class ScheduleManagementController extends Controller
                     'monitoring_officer_id' => $visit->monitoring_officer_id,
                     'monitoring_officer_name' => $visit->monitoringOfficer ? trim("{$visit->monitoringOfficer->first_name} {$visit->monitoringOfficer->middle_name} {$visit->monitoringOfficer->last_name}") : null,
                     'created_at' => $visit->created_at->format('Y-m-d H:i:s'),
+                    'schedule_started' => $scheduleStarted,
                     'schedule_ended' => $scheduleEnded,
                     'visit_session_id' => $latestSession?->id,
                 ];
@@ -104,8 +112,8 @@ class ScheduleManagementController extends Controller
                 'rejection_reason' => 'This scheduled time has passed. Please submit a new visit schedule.',
             ]);
 
-            return redirect()->route('admin.schedules.index')
-                ->with('error', 'This schedule has passed and could not be approved. The application has been marked as not reviewed. Please ask the visitor to submit a new schedule.');
+            return redirect()->back()
+                ->withErrors(['approve' => 'This schedule has passed and could not be approved. The application has been marked as not reviewed. Please ask the visitor to submit a new schedule.']);
         }
 
         $rules = [

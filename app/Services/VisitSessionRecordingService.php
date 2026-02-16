@@ -13,7 +13,9 @@ class VisitSessionRecordingService
     ) {}
 
     /**
-     * Start recording when both visitor and inmate have joined. Uses visitor's participant ID.
+     * Start recording automatically when the call has started (both visitor and inmate have joined).
+     * No manual "Start recording" action is required; recording begins as soon as both parties are in the room.
+     * Uses visitor's participant ID for the VideoSDK recording API.
      */
     public function tryStartRecording(VisitSession $session, string $visitorParticipantId): bool
     {
@@ -69,7 +71,11 @@ class VisitSessionRecordingService
         }
 
         $endedAt = now();
-        $durationSeconds = $session->started_at ? $endedAt->diffInSeconds($session->started_at) : null;
+        $durationSeconds = null;
+        if ($session->started_at) {
+            $raw = (int) round($endedAt->diffInSeconds($session->started_at, false));
+            $durationSeconds = max(0, $raw);
+        }
 
         VideoRecording::create([
             'visit_session_id' => $session->id,

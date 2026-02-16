@@ -299,6 +299,19 @@ class VideoSdkService
     }
 
     /**
+     * Generate a participant JWT for viewer/observer join (e.g. monitoring officer).
+     * Uses only allow_join; no allow_mod. Client should join with webcam and mic disabled
+     * so the participant does not appear on camera (view-only observer).
+     */
+    public function generateViewerParticipantToken(
+        string $roomId,
+        string $participantId,
+        int $expiryMinutes = 120
+    ): array {
+        return $this->generateParticipantToken($roomId, $participantId, ['allow_join'], $expiryMinutes);
+    }
+
+    /**
      * Start participant recording for a room.
      *
      * @return array{success: bool, error?: string}

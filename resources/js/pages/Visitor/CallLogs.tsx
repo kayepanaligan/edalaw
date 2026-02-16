@@ -1,6 +1,6 @@
 import { Head } from '@inertiajs/react';
 import type { ColumnDef } from '@tanstack/react-table';
-import { Clock, Eye, MoreVertical, Phone, PhoneIncoming, PhoneOutgoing } from 'lucide-react';
+import { Clock, Eye, MoreVertical, Phone, PhoneIncoming, PhoneOutgoing, Video } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { DataTable } from '@/components/data-table';
@@ -27,8 +27,8 @@ import type { BreadcrumbItem } from '@/types';
 
 type CallLog = {
     id: number;
-    phone_number: string;
-    call_type: 'incoming' | 'outgoing';
+    phone_number: string | null;
+    call_type: 'incoming' | 'outgoing' | 'video';
     call_date: string;
     duration: number | null;
     notes: string | null;
@@ -65,6 +65,9 @@ export default function CallLogs({ callLogs }: Props) {
     };
 
     const getCallTypeIcon = (type: string) => {
+        if (type === 'video') {
+            return <Video className="h-4 w-4 text-purple-600" />;
+        }
         return type === 'incoming' ? (
             <PhoneIncoming className="h-4 w-4 text-green-600" />
         ) : (
@@ -105,11 +108,14 @@ export default function CallLogs({ callLogs }: Props) {
                 header: 'Phone Number',
                 cell: ({ row }) => {
                     const callLog = row.original;
+                    const label = callLog.call_type === 'video'
+                        ? (callLog.notes ?? 'Video visit')
+                        : (callLog.phone_number ?? '—');
                     return (
                         <div className="flex items-center gap-2">
                             {getCallTypeIcon(callLog.call_type)}
                             <div>
-                                <div className="font-medium">{callLog.phone_number}</div>
+                                <div className="font-medium">{label}</div>
                                 <Badge variant="outline" className="text-xs capitalize mt-1">
                                     {callLog.call_type}
                                 </Badge>
@@ -225,11 +231,15 @@ export default function CallLogs({ callLogs }: Props) {
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
                                         <label className="text-sm font-medium text-muted-foreground">
-                                            Phone Number
+                                            {selectedCallLog.call_type === 'video' ? 'Call' : 'Phone Number'}
                                         </label>
                                         <div className="flex items-center gap-2 mt-1">
                                             {getCallTypeIcon(selectedCallLog.call_type)}
-                                            <span className="font-medium">{selectedCallLog.phone_number}</span>
+                                            <span className="font-medium">
+                                                {selectedCallLog.call_type === 'video'
+                                                    ? (selectedCallLog.notes ?? 'Video visit')
+                                                    : (selectedCallLog.phone_number ?? '—')}
+                                            </span>
                                             <Badge variant="outline" className="text-xs capitalize">
                                                 {selectedCallLog.call_type}
                                             </Badge>

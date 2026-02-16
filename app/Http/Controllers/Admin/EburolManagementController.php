@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class EburolManagementController extends Controller
 {
@@ -52,8 +53,8 @@ class EburolManagementController extends Controller
                     'rejection_reason' => $eburol->rejection_reason,
                     'monitoring_officer_id' => $eburol->monitoring_officer_id,
                     'monitoring_officer_name' => $eburol->monitoringOfficer ? trim("{$eburol->monitoringOfficer->first_name} {$eburol->monitoringOfficer->middle_name} {$eburol->monitoringOfficer->last_name}") : null,
-                    'death_certificate_path' => $eburol->death_certificate_path ? Storage::disk('public')->url($eburol->death_certificate_path) : null,
-                    'relationship_proof_path' => $eburol->relationship_proof_path ? Storage::disk('public')->url($eburol->relationship_proof_path) : null,
+                    'death_certificate_path' => $eburol->death_certificate_path ? route('admin.eburols.document.death-certificate', $eburol) : null,
+                    'relationship_proof_path' => $eburol->relationship_proof_path ? route('admin.eburols.document.relationship-proof', $eburol) : null,
                     'created_at' => $eburol->created_at->format('Y-m-d H:i:s'),
                 ];
             });
@@ -300,6 +301,34 @@ class EburolManagementController extends Controller
 
         return redirect()->route('admin.eburols.index')
             ->with('success', 'E-Burol application deleted successfully.');
+    }
+
+    /**
+     * Serve death certificate file for viewing (super admin).
+     */
+    public function deathCertificate(Eburol $eburol): BinaryFileResponse
+    {
+        if (! $eburol->death_certificate_path || ! Storage::disk('public')->exists($eburol->death_certificate_path)) {
+            abort(404, 'Document not found.');
+        }
+
+        return response()->file(Storage::disk('public')->path($eburol->death_certificate_path), [
+            'Content-Disposition' => 'inline; filename="'.basename($eburol->death_certificate_path).'"',
+        ]);
+    }
+
+    /**
+     * Serve relationship proof file for viewing (super admin).
+     */
+    public function relationshipProof(Eburol $eburol): BinaryFileResponse
+    {
+        if (! $eburol->relationship_proof_path || ! Storage::disk('public')->exists($eburol->relationship_proof_path)) {
+            abort(404, 'Document not found.');
+        }
+
+        return response()->file(Storage::disk('public')->path($eburol->relationship_proof_path), [
+            'Content-Disposition' => 'inline; filename="'.basename($eburol->relationship_proof_path).'"',
+        ]);
     }
 
     /**
