@@ -236,7 +236,7 @@ export default function TimeSlotConfiguration({ capacities }: Props) {
                     <CardHeader>
                         <CardTitle>Time Slot Capacities</CardTitle>
                         <CardDescription>
-                            Set the maximum number of visitors for each 10-minute time slot. Default capacity is 4 visitors per slot.
+                            Virtual visits: 10-minute slots (7:00–7:10, 7:10–7:20, …). Physical visits: 1-hour slots (7:00–8:00, 8:00–9:00, …). Set max visitors per slot; default is 4.
                         </CardDescription>
                     </CardHeader>
                     <CardContent>

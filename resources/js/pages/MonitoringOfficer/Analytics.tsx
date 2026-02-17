@@ -206,29 +206,22 @@ export default function Analytics({
                             <Label className="text-xs">To</Label>
                             <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="w-36" />
                         </div>
-                        <Select value={groupBy} onValueChange={setGroupBy}>
-                            <SelectTrigger className="w-32">
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="day">By day</SelectItem>
-                                <SelectItem value="week">By week</SelectItem>
-                                <SelectItem value="month">By month</SelectItem>
-                            </SelectContent>
-                        </Select>
-                        <Select value={visitType} onValueChange={setVisitType}>
-                            <SelectTrigger className="w-32">
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">All types</SelectItem>
-                                <SelectItem value="visit">Visit</SelectItem>
-                                <SelectItem value="eburol">E-Burol</SelectItem>
-                            </SelectContent>
-                        </Select>
                         <Button variant="outline" size="sm" onClick={applyFilters}>
                             <Calendar className="mr-1 h-4 w-4" />
                             Apply
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                                const today = new Date().toISOString().slice(0, 10);
+                                const monthAgo = new Date();
+                                monthAgo.setDate(monthAgo.getDate() - 30);
+                                setDateFrom(monthAgo.toISOString().slice(0, 10));
+                                setDateTo(today);
+                            }}
+                        >
+                            Clear
                         </Button>
                         <Button variant="outline" size="sm" onClick={exportCsv}>
                             <Download className="mr-1 h-4 w-4" />

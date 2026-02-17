@@ -66,12 +66,13 @@ export default function AdminInmateTunnels({ tunnels, filters: initialFilters }:
 
     const columns: ColumnDef<TunnelRow>[] = useMemo(
         () => [
-            { accessorKey: 'created_at', header: 'Created', cell: ({ row }) => row.original.created_at.slice(0, 19).replace('T', ' ') },
-            { accessorKey: 'visit_session_id', header: 'Session ID', cell: ({ row }) => <span className="font-mono text-sm">{row.original.visit_session_id}</span> },
-            { accessorKey: 'session_type', header: 'Type', cell: ({ row }) => <span className="capitalize">{row.original.session_type}</span> },
+            { accessorKey: 'created_at', header: 'Created', cell: ({ row }) => row.original.created_at.slice(0, 19).replace('T', ' '), size: 140 },
+            { accessorKey: 'visit_session_id', header: 'Session ID', cell: ({ row }) => <span className="font-mono text-sm">{row.original.visit_session_id}</span>, size: 100 },
+            { accessorKey: 'session_type', header: 'Type', cell: ({ row }) => <span className="capitalize">{row.original.session_type}</span>, size: 80 },
             {
                 accessorKey: 'short_code',
-                header: 'Inmate tunnel code',
+                header: 'Tunnel',
+                size: 180,
                 cell: ({ row }) => {
                     const code = row.original.short_code;
                     const link = row.original.tunnel_link ?? '';
@@ -93,15 +94,15 @@ export default function AdminInmateTunnels({ tunnels, filters: initialFilters }:
                             >
                                 <Copy className="h-4 w-4" />
                             </Button>
-                        </div>
-                    );
+                    </div>
+                );
                 },
             },
-            { accessorKey: 'visitor_name', header: 'Visitor', cell: ({ row }) => row.original.visitor_name ?? '—' },
-            { accessorKey: 'inmate_name', header: 'Inmate', cell: ({ row }) => row.original.inmate_name ?? '—' },
-            { accessorKey: 'monitor_name', header: 'Monitoring Officer', cell: ({ row }) => row.original.monitor_name ?? '—' },
-            { accessorKey: 'expires_at', header: 'Expires', cell: ({ row }) => <div><div className="text-sm">{row.original.expires_at.slice(0, 16).replace('T', ' ')}</div><div className="text-xs text-muted-foreground">{row.original.expires_at_human}</div></div> },
-            { accessorKey: 'status', header: 'Status', cell: ({ row }) => <StatusBadge status={row.original.status} /> },
+            { accessorKey: 'visitor_name', header: 'Visitor', cell: ({ row }) => <span className="truncate max-w-[140px] block" title={row.original.visitor_name ?? ''}>{row.original.visitor_name ?? '—'}</span>, size: 140 },
+            { accessorKey: 'inmate_name', header: 'Inmate', cell: ({ row }) => <span className="truncate max-w-[140px] block" title={row.original.inmate_name ?? ''}>{row.original.inmate_name ?? '—'}</span>, size: 140 },
+            { accessorKey: 'monitor_name', header: 'Monitor', cell: ({ row }) => <span className="truncate max-w-[120px] block" title={row.original.monitor_name ?? ''}>{row.original.monitor_name ?? '—'}</span>, size: 120 },
+            { accessorKey: 'expires_at', header: 'Expires', cell: ({ row }) => <div className="min-w-0"><div className="text-sm">{row.original.expires_at.slice(0, 16).replace('T', ' ')}</div><div className="text-xs text-muted-foreground">{row.original.expires_at_human}</div></div>, size: 140 },
+            { accessorKey: 'status', header: 'Status', cell: ({ row }) => <StatusBadge status={row.original.status} />, size: 90 },
         ],
         [copy]
     );

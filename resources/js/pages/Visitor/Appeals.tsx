@@ -534,8 +534,10 @@ export default function Appeals({ appeals, rejected_visits, rejected_eburols }: 
                             <DataTable
                                 columns={columns}
                                 data={filteredAppeals}
-                                enableGlobalFilter={true}
+                                searchKey="appeal_search"
                                 searchPlaceholder="Search appeals by type, reason, or details..."
+                                initialSorting={[{ id: 'submitted_at', desc: true }]}
+                                enableGlobalFilter={true}
                                 headerActions={headerActions}
                             />
                         )}
@@ -552,67 +554,48 @@ export default function Appeals({ appeals, rejected_visits, rejected_eburols }: 
                             </DialogDescription>
                         </DialogHeader>
                         {selectedAppeal && (
-                            <div className="space-y-6">
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <Label className="text-muted-foreground">Type</Label>
-                                        <p className="font-medium">{selectedAppeal.appealable_type}</p>
-                                    </div>
-                                    <div>
-                                        <Label className="text-muted-foreground">Status</Label>
-                                        <div className="mt-1">{getStatusBadge(selectedAppeal.status)}</div>
-                                    </div>
-                                    <div className="col-span-2">
-                                        <Label className="text-muted-foreground">Details</Label>
-                                        {selectedAppeal.appealable_data.type === 'visit' ? (
-                                            <p className="font-medium">
-                                                Inmate: {selectedAppeal.appealable_data.inmate_name} | 
-                                                Date: {selectedAppeal.appealable_data.scheduled_date} {selectedAppeal.appealable_data.scheduled_time && `at ${selectedAppeal.appealable_data.scheduled_time}`} | 
-                                                Type: {selectedAppeal.appealable_data.visit_type}
-                                            </p>
-                                        ) : (
-                                            <p className="font-medium">
-                                                Deceased: {selectedAppeal.appealable_data.deceased_name} | 
-                                                Inmate: {selectedAppeal.appealable_data.inmate_name} | 
-                                                Wake: {selectedAppeal.appealable_data.wake_start_date} to {selectedAppeal.appealable_data.wake_end_date}
-                                            </p>
-                                        )}
-                                    </div>
-                                    <div>
-                                        <Label className="text-muted-foreground">Submitted</Label>
-                                        <p className="font-medium">
-                                            {new Date(selectedAppeal.submitted_at).toLocaleString()}
-                                        </p>
-                                    </div>
-                                    {selectedAppeal.deadline && (
-                                        <div>
-                                            <Label className="text-muted-foreground">Deadline</Label>
-                                            <p className="font-medium">
-                                                {new Date(selectedAppeal.deadline).toLocaleString()}
-                                            </p>
-                                        </div>
-                                    )}
+                            <div className="flex flex-col gap-3">
+                                <div className="space-y-1">
+                                    <Label className="text-muted-foreground">Type</Label>
+                                    <Input readOnly value={selectedAppeal.appealable_type} className="bg-muted" />
                                 </div>
-                                <div>
-                                    <Label className="text-muted-foreground">Appeal Reason</Label>
-                                    <p className="font-medium mt-1 whitespace-pre-wrap">{selectedAppeal.reason}</p>
+                                <div className="space-y-1">
+                                    <Label className="text-muted-foreground">Status</Label>
+                                    <div className="pt-2">{getStatusBadge(selectedAppeal.status)}</div>
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-muted-foreground">Details</Label>
+                                    <Input
+                                        readOnly
+                                        className="bg-muted"
+                                        value={
+                                            selectedAppeal.appealable_data.type === 'visit'
+                                                ? `Inmate: ${selectedAppeal.appealable_data.inmate_name} | Date: ${selectedAppeal.appealable_data.scheduled_date} ${selectedAppeal.appealable_data.scheduled_time ? `at ${selectedAppeal.appealable_data.scheduled_time}` : ''} | Type: ${selectedAppeal.appealable_data.visit_type}`
+                                                : `Deceased: ${selectedAppeal.appealable_data.deceased_name} | Inmate: ${selectedAppeal.appealable_data.inmate_name} | Wake: ${selectedAppeal.appealable_data.wake_start_date} to ${selectedAppeal.appealable_data.wake_end_date}`
+                                        }
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-muted-foreground">Submitted</Label>
+                                    <Input readOnly value={new Date(selectedAppeal.submitted_at).toLocaleString()} className="bg-muted" />
+                                </div>
+                                {selectedAppeal.deadline && (
+                                    <div className="space-y-1">
+                                        <Label className="text-muted-foreground">Deadline</Label>
+                                        <Input readOnly value={new Date(selectedAppeal.deadline).toLocaleString()} className="bg-muted" />
+                                    </div>
+                                )}
+                                <div className="space-y-1">
+                                    <Label className="text-muted-foreground">Appeal reason</Label>
+                                    <Textarea readOnly value={selectedAppeal.reason} className="bg-muted min-h-[80px]" />
                                 </div>
                                 {selectedAppeal.documents.length > 0 && (
-                                    <div>
-                                        <Label className="text-muted-foreground">Supporting Documents</Label>
-                                        <div className="flex flex-wrap gap-2 mt-2">
+                                    <div className="space-y-1">
+                                        <Label className="text-muted-foreground">Supporting documents</Label>
+                                        <div className="flex flex-wrap gap-2 pt-2">
                                             {selectedAppeal.documents.map((doc) => (
-                                                <Button
-                                                    key={doc.id}
-                                                    variant="outline"
-                                                    size="sm"
-                                                    asChild
-                                                >
-                                                    <a
-                                                        href={doc.file_path}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                    >
+                                                <Button key={doc.id} variant="outline" size="sm" asChild>
+                                                    <a href={doc.file_path} target="_blank" rel="noopener noreferrer">
                                                         <FileText className="mr-2 h-4 w-4" />
                                                         {doc.file_name}
                                                     </a>
@@ -622,31 +605,20 @@ export default function Appeals({ appeals, rejected_visits, rejected_eburols }: 
                                     </div>
                                 )}
                                 {selectedAppeal.status !== 'pending' && (
-                                    <div className="rounded-lg bg-muted p-4 border-l-4 border-l-primary">
-                                        <div className="flex items-center gap-2 mb-2">
-                                            {selectedAppeal.status === 'approved' ? (
-                                                <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
-                                            ) : (
-                                                <XCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
-                                            )}
-                                            <Label className="text-sm font-semibold">
-                                                {selectedAppeal.status === 'approved' ? 'Approved' : 'Rejected'} Decision
-                                            </Label>
-                                        </div>
+                                    <>
                                         {selectedAppeal.decision_notes && (
-                                            <p className="text-sm mt-1 whitespace-pre-wrap">
-                                                {selectedAppeal.decision_notes}
-                                            </p>
+                                            <div className="space-y-1">
+                                                <Label className="text-muted-foreground">{selectedAppeal.status === 'approved' ? 'Approved' : 'Rejected'} decision notes</Label>
+                                                <Textarea readOnly value={selectedAppeal.decision_notes} className="bg-muted min-h-[60px]" />
+                                            </div>
                                         )}
-                                        {selectedAppeal.reviewed_by && (
-                                            <p className="text-xs text-muted-foreground mt-2">
-                                                Reviewed by: {selectedAppeal.reviewed_by}
-                                                {selectedAppeal.reviewed_at && (
-                                                    <> on {new Date(selectedAppeal.reviewed_at).toLocaleString()}</>
-                                                )}
-                                            </p>
+                                        {(selectedAppeal.reviewed_by || selectedAppeal.reviewed_at) && (
+                                            <div className="space-y-1">
+                                                <Label className="text-muted-foreground">Reviewed by</Label>
+                                                <Input readOnly value={`BJMP officer${selectedAppeal.reviewed_at ? ` on ${new Date(selectedAppeal.reviewed_at).toLocaleString()}` : ''}`} className="bg-muted" />
+                                            </div>
                                         )}
-                                    </div>
+                                    </>
                                 )}
                             </div>
                         )}

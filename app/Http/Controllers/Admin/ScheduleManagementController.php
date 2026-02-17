@@ -9,6 +9,7 @@ use App\Services\AuditLogService;
 use App\Services\NotificationService;
 use App\VisitStatus;
 use App\VisitType;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -98,6 +99,68 @@ class ScheduleManagementController extends Controller
             'visitors' => $visitors,
             'monitoringOfficers' => $monitoringOfficers,
             'today_unavailable' => now()->format('H:i') >= '21:50',
+        ]);
+    }
+
+    /**
+     * Get booked time slots / slot capacities for a date (virtual: 10-min slots, physical: 1-hour slots).
+     */
+    public function getBookedTimeSlots(Request $request): JsonResponse
+    {
+        $request->validate([
+            'date' => ['required', 'date'],
+            'visit_type' => ['nullable', 'string', 'in:physical,virtual'],
+        ]);
+
+        $visitType = $request->visit_type ?? 'physical';
+        $date = $request->date;
+        $isPhysical = $visitType === 'physical';
+
+        $dateCarbon = \Carbon\Carbon::parse($date)->startOfDay();
+        $nowTime = now()->format('H:i');
+        $dayCutoff = '21:50';
+        $latestSlotEnd = $isPhysical ? '17:00' : '17:50';
+        $isDayUnavailable = $dateCarbon->isToday() && (
+            $nowTime >= $dayCutoff || $nowTime > $latestSlotEnd
+        );
+
+        $allTimeSlots = [];
+        if ($isPhysical) {
+            for ($hour = 7; $hour < 18; $hour++) {
+                $allTimeSlots[] = sprintf('%02d:00', $hour);
+            }
+        } else {
+            for ($hour = 7; $hour < 18; $hour++) {
+                for ($minute = 0; $minute < 60; $minute += 10) {
+                    $allTimeSlots[] = sprintf('%02d:%02d', $hour, $minute);
+                }
+            }
+        }
+
+        $slotCapacities = [];
+        foreach ($allTimeSlots as $timeSlot) {
+            if ($isDayUnavailable) {
+                $slotCapacities[$timeSlot] = [
+                    'current' => 999,
+                    'max' => 1,
+                    'isFull' => true,
+                ];
+            } else {
+                $capacity = \App\Models\TimeSlotCapacity::getCapacity($timeSlot, $visitType);
+                $currentBookings = \App\Models\TimeSlotCapacity::getCurrentBookings($date, $timeSlot, $visitType);
+                $isFull = $currentBookings >= $capacity;
+
+                $slotCapacities[$timeSlot] = [
+                    'current' => $currentBookings,
+                    'max' => $capacity,
+                    'isFull' => $isFull,
+                ];
+            }
+        }
+
+        return response()->json([
+            'slotCapacities' => $slotCapacities,
+            'isDayUnavailable' => $isDayUnavailable,
         ]);
     }
 
@@ -389,7 +452,7 @@ class ScheduleManagementController extends Controller
     }
 
     /**
-     * Create a new schedule (auto-approved).
+     * Create a new schedule (auto-approved). Virtual: tunnel + meeting link generated. Physical: access key generated.
      */
     public function store(Request $request): RedirectResponse
     {
@@ -402,7 +465,7 @@ class ScheduleManagementController extends Controller
             'inmate_middle_name' => ['nullable', 'string', 'max:255'],
             'inmate_last_name' => ['required', 'string', 'max:255'],
             'notes' => ['nullable', 'string', 'max:1000'],
-            'meeting_link' => ['nullable', 'url', 'required_if:visit_type,virtual'],
+            'monitoring_officer_id' => ['nullable', 'exists:users,id', 'required_if:visit_type,virtual'],
         ]);
 
         if ($validator->fails()) {
@@ -417,7 +480,6 @@ class ScheduleManagementController extends Controller
                 ->withInput();
         }
 
-        // Check if the user is a visitor
         $user = User::findOrFail($request->user_id);
         if ($user->role?->slug !== 'visitor') {
             return redirect()->back()
@@ -425,7 +487,6 @@ class ScheduleManagementController extends Controller
                 ->withInput();
         }
 
-        // Check for time slot conflicts
         $conflictingVisit = Visit::where('scheduled_date', $request->scheduled_date)
             ->where('scheduled_time', $request->scheduled_time)
             ->whereIn('status', [VisitStatus::Pending, VisitStatus::Approved])
@@ -445,13 +506,68 @@ class ScheduleManagementController extends Controller
             'inmate_first_name' => $request->inmate_first_name,
             'inmate_middle_name' => $request->inmate_middle_name,
             'inmate_last_name' => $request->inmate_last_name,
-            'status' => VisitStatus::Approved, // Auto-approved when created by super admin
+            'status' => VisitStatus::Approved,
             'notes' => $request->notes,
-            'meeting_link' => $request->meeting_link,
+            'monitoring_officer_id' => $request->visit_type === 'virtual' ? $request->monitoring_officer_id : null,
         ]);
 
-        // Send notification to the visitor
-        NotificationService::createVisitNotification($visit, 'approved');
+        $roomId = null;
+
+        if ($visit->visit_type === VisitType::Virtual) {
+            $videoSdkService = new \App\Services\VideoSdkService;
+            $roomName = "visit-{$visit->id}-".uniqid();
+            $roomResult = $videoSdkService->createRoom($roomName);
+
+            if ($roomResult['success']) {
+                $roomId = $roomResult['room_id'] ?? null;
+                $visit->update([
+                    'meeting_link' => $roomResult['room_url'] ?? null,
+                    'daily_co_room_id' => $roomId,
+                    'daily_co_room_name' => $roomResult['room_name'] ?? $roomName,
+                    'daily_co_room_url' => $roomResult['room_url'] ?? null,
+                    'room_created_at' => now(),
+                ]);
+
+                \App\Models\MonitoringSession::create([
+                    'visit_id' => $visit->id,
+                    'visitor_id' => $visit->user_id,
+                    'session_type' => 'visit',
+                    'session_token' => $roomId ?? $roomName,
+                    'status' => 'pending',
+                    'started_at' => now(),
+                ]);
+            } else {
+                \Illuminate\Support\Facades\Log::error('VideoSDK room creation failed during admin schedule create', [
+                    'visit_id' => $visit->id,
+                    'error' => $roomResult['error'] ?? 'Unknown error',
+                ]);
+
+                return redirect()->back()
+                    ->withErrors(['meeting_link' => 'Video room creation failed: '.($roomResult['error'] ?? 'Unknown error').'. Please check VideoSDK configuration and try again.'])
+                    ->withInput();
+            }
+        }
+
+        if ($visit->visit_type === VisitType::Physical) {
+            $visit->update([
+                'access_key' => Visit::generateAccessKey(),
+                'access_key_expires_at' => $visit->scheduled_date->copy()->setTime(
+                    (int) explode(':', $visit->scheduled_time ?? '08:00')[0],
+                    (int) explode(':', $visit->scheduled_time ?? '08:00')[1]
+                ),
+            ]);
+        }
+
+        if ($roomId && $visit->visit_type === VisitType::Virtual) {
+            $visit->refresh();
+            app(\App\Services\VisitSessionService::class)->createForVisit($visit, $roomId);
+        }
+
+        if ($request->visit_type === 'virtual' && $request->monitoring_officer_id) {
+            \App\Services\NotificationService::notifyMonitoringOfficerAboutVisit($visit->fresh());
+        }
+
+        NotificationService::createVisitNotification($visit->fresh(), 'approved');
 
         AuditLogService::logAction(
             'visit_created',
@@ -478,7 +594,8 @@ class ScheduleManagementController extends Controller
             'inmate_middle_name' => ['nullable', 'string', 'max:255'],
             'inmate_last_name' => ['required', 'string', 'max:255'],
             'notes' => ['nullable', 'string', 'max:1000'],
-            'meeting_link' => ['nullable', 'url', 'required_if:visit_type,virtual'],
+            'meeting_link' => ['nullable', 'url'],
+            'monitoring_officer_id' => ['nullable', 'exists:users,id'],
         ]);
 
         if ($validator->fails()) {
@@ -506,7 +623,7 @@ class ScheduleManagementController extends Controller
                 ->withInput();
         }
 
-        $visit->update([
+        $updateData = [
             'scheduled_date' => $request->scheduled_date,
             'scheduled_time' => $request->scheduled_time,
             'visit_type' => VisitType::from($request->visit_type),
@@ -514,8 +631,14 @@ class ScheduleManagementController extends Controller
             'inmate_middle_name' => $request->inmate_middle_name,
             'inmate_last_name' => $request->inmate_last_name,
             'notes' => $request->notes,
-            'meeting_link' => $request->meeting_link,
-        ]);
+        ];
+        if ($request->has('meeting_link')) {
+            $updateData['meeting_link'] = $request->meeting_link;
+        }
+        if ($request->has('monitoring_officer_id')) {
+            $updateData['monitoring_officer_id'] = $request->monitoring_officer_id ?: null;
+        }
+        $visit->update($updateData);
 
         AuditLogService::logAction(
             'visit_updated',

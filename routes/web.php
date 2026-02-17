@@ -45,6 +45,7 @@ Route::get('/', function () {
         'canRegister' => Features::enabled(Features::registration()),
         'status' => session('status'),
         'loginUrl' => route('login.store'),
+        'forgotPasswordUrl' => route('password.forgot.show'),
         'csrfToken' => csrf_token(),
         'oldEmail' => request()->old('email'),
     ]);
@@ -89,6 +90,20 @@ Route::middleware('guest')->group(function () {
         ->name('otp-verification.verify');
     Route::post('otp-verification/resend', [\App\Http\Controllers\Auth\OtpVerificationController::class, 'resend'])
         ->name('otp-verification.resend');
+
+    // Password reset via OTP (send OTP to contact number, verify, then reset and logout other sessions)
+    Route::get('password/forgot', [\App\Http\Controllers\Auth\PasswordResetOtpController::class, 'showForgotForm'])
+        ->name('password.forgot.show');
+    Route::post('password/forgot', [\App\Http\Controllers\Auth\PasswordResetOtpController::class, 'sendOtp'])
+        ->name('password.forgot.send');
+    Route::get('password/verify-otp', [\App\Http\Controllers\Auth\PasswordResetOtpController::class, 'showVerifyOtp'])
+        ->name('password.verify-otp.show');
+    Route::post('password/verify-otp', [\App\Http\Controllers\Auth\PasswordResetOtpController::class, 'verifyOtp'])
+        ->name('password.verify-otp.submit');
+    Route::get('password/reset', [\App\Http\Controllers\Auth\PasswordResetOtpController::class, 'showResetForm'])
+        ->name('password.reset.show');
+    Route::post('password/reset', [\App\Http\Controllers\Auth\PasswordResetOtpController::class, 'reset'])
+        ->name('password.reset.submit');
 });
 
 Route::middleware('auth')->group(function () {
@@ -150,7 +165,7 @@ Route::middleware(['auth', 'verified', 'approved'])->group(function () {
     Route::middleware(['role:monitoring_officer'])->get('monitoring-officer/eburol-monitoring', \App\Http\Controllers\MonitoringOfficer\EburolMonitoringController::class)
         ->name('monitoring-officer.eburol-monitoring');
 
-    Route::middleware(['role:monitoring_officer'])->prefix('monitoring-officer')->name('monitoring-officer.')->group(function () {
+    Route::middleware(['role:monitoring_officer,super_admin'])->prefix('monitoring-officer')->name('monitoring-officer.')->group(function () {
         Route::get('assigned-sessions', [\App\Http\Controllers\MonitoringOfficer\AssignedSessionsController::class, 'index'])
             ->name('assigned-sessions.index');
         Route::post('assigned-sessions/{session}/generate-tunnel', [\App\Http\Controllers\MonitoringOfficer\AssignedSessionsController::class, 'generateTunnel'])
@@ -177,6 +192,12 @@ Route::middleware(['auth', 'verified', 'approved'])->group(function () {
             ->name('history.index');
         Route::get('inmate-tunnels', [\App\Http\Controllers\MonitoringOfficer\InmateTunnelController::class, 'index'])
             ->name('inmate-tunnels.index');
+        Route::get('notifications', [\App\Http\Controllers\MonitoringOfficer\NotificationController::class, 'index'])
+            ->name('notifications.index');
+        Route::post('notifications/{notification}/read', [\App\Http\Controllers\MonitoringOfficer\NotificationController::class, 'markAsRead'])
+            ->name('notifications.read');
+        Route::post('notifications/read-all', [\App\Http\Controllers\MonitoringOfficer\NotificationController::class, 'markAllAsRead'])
+            ->name('notifications.read-all');
     });
 
     // Join as observer: monitoring officer or super admin (same privileges)
@@ -209,6 +230,8 @@ Route::middleware(['auth', 'verified', 'approved'])->group(function () {
 
         Route::get('schedules', [\App\Http\Controllers\Admin\ScheduleManagementController::class, 'index'])
             ->name('schedules.index');
+        Route::get('schedules/booked-slots', [\App\Http\Controllers\Admin\ScheduleManagementController::class, 'getBookedTimeSlots'])
+            ->name('schedules.booked-slots');
         Route::post('schedules', [\App\Http\Controllers\Admin\ScheduleManagementController::class, 'store'])
             ->name('schedules.store');
         Route::put('schedules/{visit}', [\App\Http\Controllers\Admin\ScheduleManagementController::class, 'update'])
@@ -276,6 +299,10 @@ Route::middleware(['auth', 'verified', 'approved'])->group(function () {
             ->name('eburol.store');
         Route::get('eburol/{eburol}', [\App\Http\Controllers\Visitor\EburolController::class, 'show'])
             ->name('eburol.show');
+        Route::get('eburol/{eburol}/document/death-certificate', [\App\Http\Controllers\Visitor\EburolController::class, 'deathCertificate'])
+            ->name('eburol.document.death-certificate');
+        Route::get('eburol/{eburol}/document/relationship-proof', [\App\Http\Controllers\Visitor\EburolController::class, 'relationshipProof'])
+            ->name('eburol.document.relationship-proof');
         Route::put('eburol/{eburol}', [\App\Http\Controllers\Visitor\EburolController::class, 'update'])
             ->name('eburol.update');
         Route::post('eburol/{eburol}/reschedule', [\App\Http\Controllers\Visitor\EburolController::class, 'reschedule'])

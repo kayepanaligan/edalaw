@@ -24,8 +24,13 @@ class AuthenticateUser
      */
     public function __invoke(Request $request): ?User
     {
+        $login = trim((string) $request->input(Fortify::username()));
         $user = User::with('role')
-            ->where(Fortify::username(), $request->{Fortify::username()})
+            ->where(function ($q) use ($login) {
+                $q->where('email', $login)
+                    ->orWhere('contact_number', $login)
+                    ->orWhere('contact_number', ltrim($login, '0'));
+            })
             ->first();
 
         if (! $user || ! Hash::check($request->password, $user->password)) {

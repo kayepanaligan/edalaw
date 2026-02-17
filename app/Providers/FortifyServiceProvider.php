@@ -56,6 +56,7 @@ class FortifyServiceProvider extends ServiceProvider
             'canRegister' => Features::enabled(Features::registration()),
             'status' => $request->session()->get('status'),
             'loginUrl' => route('login.store'),
+            'forgotPasswordUrl' => route('password.forgot.show'),
             'csrfToken' => csrf_token(),
             'oldEmail' => $request->old('email'),
         ]));

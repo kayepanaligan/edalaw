@@ -37,6 +37,7 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 import { Spinner } from '@/components/ui/spinner';
 import { Textarea } from '@/components/ui/textarea';
+import { RelationshipPicker } from '@/components/RelationshipPicker';
 import { useToast } from '@/hooks/use-toast';
 import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
@@ -197,22 +198,6 @@ export default function EburolManagement({ eburols }: Props) {
         appealable_id: 0,
         reason: '',
         documents: [] as File[],
-        // E-burol application fields for appeal
-        inmate_first_name: '',
-        inmate_middle_name: '',
-        inmate_last_name: '',
-        deceased_first_name: '',
-        deceased_middle_name: '',
-        deceased_last_name: '',
-        deceased_date_of_death: '',
-        relationship_to_inmate: '',
-        wake_start_date: '',
-        wake_end_date: '',
-        preferred_time: '',
-        wake_location: '',
-        additional_details: '',
-        death_certificate: null as File | null,
-        relationship_proof: null as File | null,
     });
 
     useEffect(() => {
@@ -229,6 +214,7 @@ export default function EburolManagement({ eburols }: Props) {
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+        form.setData('wake_end_date', form.data.wake_start_date);
         form.post('/visitor/eburol', {
             forceFormData: true,
             onSuccess: () => {
@@ -308,22 +294,6 @@ export default function EburolManagement({ eburols }: Props) {
             appealable_id: eburol.id,
             reason: '',
             documents: [],
-            // Pre-fill with rejected e-burol data
-            inmate_first_name: eburol.inmate_first_name,
-            inmate_middle_name: eburol.inmate_middle_name || '',
-            inmate_last_name: eburol.inmate_last_name,
-            deceased_first_name: eburol.deceased_first_name,
-            deceased_middle_name: eburol.deceased_middle_name || '',
-            deceased_last_name: eburol.deceased_last_name,
-            deceased_date_of_death: eburol.deceased_date_of_death,
-            relationship_to_inmate: eburol.relationship_to_inmate,
-            wake_start_date: eburol.wake_start_date,
-            wake_end_date: eburol.wake_end_date,
-            preferred_time: eburol.preferred_time || '',
-            wake_location: eburol.wake_location,
-            additional_details: eburol.additional_details || '',
-            death_certificate: null,
-            relationship_proof: null,
         });
         setIsAppealModalOpen(true);
     }, [appealForm]);
@@ -336,57 +306,15 @@ export default function EburolManagement({ eburols }: Props) {
 
     const handleAppealSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        
-        // Build comprehensive appeal reason including updated e-burol information
-        const updatedInfo = `Updated E-Burol Application Details:
-- Inmate: ${appealForm.data.inmate_first_name} ${appealForm.data.inmate_middle_name || ''} ${appealForm.data.inmate_last_name}
-- Deceased: ${appealForm.data.deceased_first_name} ${appealForm.data.deceased_middle_name || ''} ${appealForm.data.deceased_last_name}
-- Date of Death: ${appealForm.data.deceased_date_of_death}
-- Relationship: ${appealForm.data.relationship_to_inmate}
-- Wake Period: ${appealForm.data.wake_start_date} to ${appealForm.data.wake_end_date}
-- Preferred Time: ${appealForm.data.preferred_time ? formatEburolTimeSlot(appealForm.data.preferred_time) : 'Not specified'}
-- Wake Location: ${appealForm.data.wake_location}
-${appealForm.data.additional_details ? `- Additional Details: ${appealForm.data.additional_details}` : ''}
-
-Appeal Reason:
-${appealForm.data.reason}`;
-
-        // Create form data with all fields
         const formData = new FormData();
         formData.append('appealable_type', 'eburol');
         formData.append('appealable_id', selectedEburol?.id.toString() || '');
-        formData.append('reason', updatedInfo);
-        
-        // Add e-burol application fields as metadata
-        formData.append('inmate_first_name', appealForm.data.inmate_first_name);
-        formData.append('inmate_middle_name', appealForm.data.inmate_middle_name || '');
-        formData.append('inmate_last_name', appealForm.data.inmate_last_name);
-        formData.append('deceased_first_name', appealForm.data.deceased_first_name);
-        formData.append('deceased_middle_name', appealForm.data.deceased_middle_name || '');
-        formData.append('deceased_last_name', appealForm.data.deceased_last_name);
-        formData.append('deceased_date_of_death', appealForm.data.deceased_date_of_death);
-        formData.append('relationship_to_inmate', appealForm.data.relationship_to_inmate);
-        formData.append('wake_start_date', appealForm.data.wake_start_date);
-        formData.append('wake_end_date', appealForm.data.wake_end_date);
-        formData.append('preferred_time', appealForm.data.preferred_time || '');
-        formData.append('wake_location', appealForm.data.wake_location);
-        formData.append('additional_details', appealForm.data.additional_details || '');
-        
-        // Add files
-        if (appealForm.data.death_certificate) {
-            formData.append('death_certificate', appealForm.data.death_certificate);
-        }
-        if (appealForm.data.relationship_proof) {
-            formData.append('relationship_proof', appealForm.data.relationship_proof);
-        }
-        
-        // Add appeal documents
+        formData.append('reason', appealForm.data.reason);
         if (appealForm.data.documents && appealForm.data.documents.length > 0) {
             appealForm.data.documents.forEach((file: File) => {
                 formData.append('documents[]', file);
             });
         }
-
         appealForm.transform(() => formData).post('/visitor/appeals', {
             preserveScroll: true,
             forceFormData: true,
@@ -561,21 +489,17 @@ ${appealForm.data.reason}`;
         },
         {
             accessorKey: 'wake_start_date',
-            header: 'Wake Period',
+            header: 'Wake schedule',
             cell: ({ row }) => {
                 const eburol = row.original;
                 return (
                     <div className="space-y-1">
                         <div className="flex items-center gap-2">
                             <Clock className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-sm">
-                                {new Date(eburol.wake_start_date).toLocaleDateString()} - {new Date(eburol.wake_end_date).toLocaleDateString()}
-                            </span>
+                            <span className="text-sm">{new Date(eburol.wake_start_date).toLocaleDateString()}</span>
                         </div>
                         {eburol.preferred_time && (
-                            <div className="text-xs text-muted-foreground">
-                                Preferred: {formatEburolTimeSlot(eburol.preferred_time)}
-                            </div>
+                            <div className="text-xs text-muted-foreground">{formatEburolTimeSlot(eburol.preferred_time)}</div>
                         )}
                     </div>
                 );
@@ -951,21 +875,19 @@ ${appealForm.data.reason}`;
                                             <InputError message={form.errors.deceased_date_of_death} />
                                         </div>
                                         <div className="space-y-2">
-                                            <Label htmlFor="relationship_to_inmate">Relationship to Inmate *</Label>
-                                            <Input
+                                            <RelationshipPicker
                                                 id="relationship_to_inmate"
-                                                name="relationship_to_inmate"
-                                                placeholder="e.g., Father, Mother, Spouse, Sibling"
                                                 value={form.data.relationship_to_inmate}
-                                                onChange={(e) => form.setData('relationship_to_inmate', e.target.value)}
+                                                onChange={(v) => form.setData('relationship_to_inmate', v)}
+                                                error={form.errors.relationship_to_inmate}
+                                                label="Relationship to Inmate"
                                                 required
                                             />
-                                            <InputError message={form.errors.relationship_to_inmate} />
                                         </div>
                                     </div>
                                 </div>
 
-                                {/* Wake Schedule */}
+                                {/* Wake Schedule: single date + clickable 1-hour slots */}
                                 <div className="space-y-4">
                                     <h3 className="text-lg font-semibold flex items-center gap-2">
                                         <Calendar className="h-5 w-5" />
@@ -973,7 +895,7 @@ ${appealForm.data.reason}`;
                                     </h3>
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                         <div className="space-y-2">
-                                            <Label htmlFor="wake_start_date">Start Date *</Label>
+                                            <Label htmlFor="wake_start_date">Wake schedule date *</Label>
                                             <Input
                                                 id="wake_start_date"
                                                 type="date"
@@ -985,49 +907,40 @@ ${appealForm.data.reason}`;
                                             />
                                             <InputError message={form.errors.wake_start_date} />
                                         </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="wake_end_date">End Date *</Label>
-                                            <Input
-                                                id="wake_end_date"
-                                                type="date"
-                                                name="wake_end_date"
-                                                value={form.data.wake_end_date}
-                                                onChange={(e) => form.setData('wake_end_date', e.target.value)}
-                                                min={form.data.wake_start_date || today}
-                                                required
-                                            />
-                                            <InputError message={form.errors.wake_end_date} />
-                                        </div>
-                                        <div className="space-y-2 md:col-span-3">
-                                            <Label>Preferred time (1-hour slot)</Label>
+                                        <div className="space-y-2 md:col-span-2">
+                                            <Label>Preferred time (1-hour slot, e.g. 7:00 – 8:00 AM)</Label>
                                             {form.data.wake_start_date ? (
-                                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
-                                                    {Array.from({ length: 10 }, (_, i) => {
-                                                        const hour = 8 + i;
+                                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                                                    {Array.from({ length: 11 }, (_, i) => {
+                                                        const hour = 7 + i;
                                                         const slot = `${hour.toString().padStart(2, '0')}:00`;
-                                                        const cap = eburolSlotAvailability[slot] ?? { current: 0, max: 4, isFull: false };
+                                                        const cap = eburolSlotAvailability[slot] ?? { current: 0, max: 4, isFull: false, isPast: false };
                                                         const label = formatEburolTimeSlot(slot);
                                                         const isSelected = form.data.preferred_time === slot;
+                                                        const disabled = cap.isFull || cap.isPast;
                                                         return (
                                                             <Button
                                                                 key={slot}
                                                                 type="button"
                                                                 variant={isSelected ? 'default' : 'outline'}
                                                                 size="sm"
-                                                                disabled={cap.isFull}
+                                                                disabled={disabled}
                                                                 className="text-xs flex flex-col h-auto py-2"
-                                                                onClick={() => form.setData('preferred_time', slot)}
+                                                                onClick={() => !disabled && form.setData('preferred_time', slot)}
                                                             >
-                                                                <span>{label.split(' – ')[0]}</span>
-                                                                <span className="text-muted-foreground text-[10px]">
-                                                                    {cap.current}/{cap.max}
-                                                                </span>
+                                                                <span>{label}</span>
+                                                                {!cap.isPast && (
+                                                                    <span className="text-muted-foreground text-[10px]">
+                                                                        {cap.current}/{cap.max}
+                                                                    </span>
+                                                                )}
+                                                                {cap.isPast && <span className="text-muted-foreground text-[10px]">Past</span>}
                                                             </Button>
                                                         );
                                                     })}
                                                 </div>
                                             ) : (
-                                                <p className="text-sm text-muted-foreground">Select start date first to see available time slots.</p>
+                                                <p className="text-sm text-muted-foreground">Select wake schedule date first to see available time slots.</p>
                                             )}
                                             <InputError message={form.errors.preferred_time} />
                                         </div>
@@ -1153,7 +1066,8 @@ ${appealForm.data.reason}`;
                                 columns={columns}
                                 data={filteredEburols}
                                 searchKey="eburol_search"
-                                searchPlaceholder="Search by deceased name, PDL name, or date (e.g., February 10, 2026)..."
+                                searchPlaceholder="Search by deceased name, PDL name, or date..."
+                                initialSorting={[{ id: 'created_at', desc: true }]}
                                 enableGlobalFilter={true}
                                 globalFilterFn={eburolGlobalFilterFn}
                                 headerActions={
@@ -1241,97 +1155,92 @@ ${appealForm.data.reason}`;
                             </DialogDescription>
                         </DialogHeader>
                         {selectedEburol && (
-                            <div className="space-y-6">
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <Label className="text-muted-foreground">Status</Label>
-                                        <div className="mt-1">{getStatusBadge(selectedEburol.status)}</div>
-                                    </div>
-                                    <div>
+                            <div className="space-y-4">
+                                <div className="flex gap-2 mb-2">{getStatusBadge(selectedEburol.status)}</div>
+                                <div className="flex flex-col gap-3">
+                                    <div className="space-y-1">
                                         <Label className="text-muted-foreground">Submitted</Label>
-                                        <p className="font-medium">
-                                            {new Date(selectedEburol.created_at).toLocaleString()}
-                                        </p>
+                                        <Input readOnly value={new Date(selectedEburol.created_at).toLocaleString()} className="bg-muted" />
                                     </div>
-                                    <div className="col-span-2">
-                                        <Label className="text-muted-foreground">Inmate Name</Label>
-                                        <p className="font-medium">
-                                            {`${selectedEburol.inmate_first_name} ${selectedEburol.inmate_middle_name || ''} ${selectedEburol.inmate_last_name}`.trim()}
-                                        </p>
+                                    <div className="space-y-1">
+                                        <Label className="text-muted-foreground">Inmate first name</Label>
+                                        <Input readOnly value={selectedEburol.inmate_first_name} className="bg-muted" />
                                     </div>
-                                    <div className="col-span-2">
-                                        <Label className="text-muted-foreground">Deceased Name</Label>
-                                        <p className="font-medium">
-                                            {`${selectedEburol.deceased_first_name} ${selectedEburol.deceased_middle_name || ''} ${selectedEburol.deceased_last_name}`.trim()}
-                                        </p>
+                                    <div className="space-y-1">
+                                        <Label className="text-muted-foreground">Inmate middle name</Label>
+                                        <Input readOnly value={selectedEburol.inmate_middle_name || '—'} className="bg-muted" />
                                     </div>
-                                    <div>
-                                        <Label className="text-muted-foreground">Date of Death</Label>
-                                        <p className="font-medium">
-                                            {new Date(selectedEburol.deceased_date_of_death).toLocaleDateString()}
-                                        </p>
+                                    <div className="space-y-1">
+                                        <Label className="text-muted-foreground">Inmate last name</Label>
+                                        <Input readOnly value={selectedEburol.inmate_last_name} className="bg-muted" />
                                     </div>
-                                    <div>
-                                        <Label className="text-muted-foreground">Relationship</Label>
-                                        <p className="font-medium">{selectedEburol.relationship_to_inmate}</p>
+                                    <div className="space-y-1">
+                                        <Label className="text-muted-foreground">Deceased first name</Label>
+                                        <Input readOnly value={selectedEburol.deceased_first_name} className="bg-muted" />
                                     </div>
-                                    <div>
-                                        <Label className="text-muted-foreground">Wake Start Date</Label>
-                                        <p className="font-medium">
-                                            {new Date(selectedEburol.wake_start_date).toLocaleDateString()}
-                                        </p>
+                                    <div className="space-y-1">
+                                        <Label className="text-muted-foreground">Deceased middle name</Label>
+                                        <Input readOnly value={selectedEburol.deceased_middle_name || '—'} className="bg-muted" />
                                     </div>
-                                    <div>
-                                        <Label className="text-muted-foreground">Wake End Date</Label>
-                                        <p className="font-medium">
-                                            {new Date(selectedEburol.wake_end_date).toLocaleDateString()}
-                                        </p>
+                                    <div className="space-y-1">
+                                        <Label className="text-muted-foreground">Deceased last name</Label>
+                                        <Input readOnly value={selectedEburol.deceased_last_name} className="bg-muted" />
                                     </div>
-                                    {selectedEburol.preferred_time && (
-                                        <div>
-                                            <Label className="text-muted-foreground">Preferred Time</Label>
-                                            <p className="font-medium">{formatEburolTimeSlot(selectedEburol.preferred_time)}</p>
-                                        </div>
-                                    )}
-                                    <div className="col-span-2">
-                                        <Label className="text-muted-foreground">Wake Location</Label>
-                                        <p className="font-medium">{selectedEburol.wake_location}</p>
+                                    <div className="space-y-1">
+                                        <Label className="text-muted-foreground">Date of death</Label>
+                                        <Input readOnly value={new Date(selectedEburol.deceased_date_of_death).toLocaleDateString()} className="bg-muted" />
                                     </div>
-                                    {selectedEburol.additional_details && (
-                                        <div className="col-span-2">
-                                            <Label className="text-muted-foreground">Additional Details</Label>
-                                            <p className="font-medium">{selectedEburol.additional_details}</p>
-                                        </div>
-                                    )}
+                                    <div className="space-y-1">
+                                        <Label className="text-muted-foreground">Relationship to inmate</Label>
+                                        <Input readOnly value={selectedEburol.relationship_to_inmate} className="bg-muted" />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label className="text-muted-foreground">Wake schedule date</Label>
+                                        <Input readOnly value={new Date(selectedEburol.wake_start_date).toLocaleDateString()} className="bg-muted" />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label className="text-muted-foreground">Preferred time</Label>
+                                        <Input readOnly value={selectedEburol.preferred_time ? formatEburolTimeSlot(selectedEburol.preferred_time) : '—'} className="bg-muted" />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label className="text-muted-foreground">Wake location</Label>
+                                        <Input readOnly value={selectedEburol.wake_location} className="bg-muted" />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label className="text-muted-foreground">Additional details</Label>
+                                        <Input readOnly value={selectedEburol.additional_details || '—'} className="bg-muted" />
+                                    </div>
                                     {selectedEburol.rejection_reason && (
-                                        <div className="col-span-2">
-                                            <Label className="text-muted-foreground">Rejection Reason</Label>
-                                            <p className="font-medium text-destructive">{selectedEburol.rejection_reason}</p>
+                                        <div className="space-y-1">
+                                            <Label className="text-muted-foreground">Rejection reason</Label>
+                                            <Input readOnly value={selectedEburol.rejection_reason} className="bg-muted text-destructive" />
                                         </div>
                                     )}
                                     {selectedEburol.admin_notes && (
-                                        <div className="col-span-2">
-                                            <Label className="text-muted-foreground">Admin Notes</Label>
-                                            <p className="font-medium">{selectedEburol.admin_notes}</p>
+                                        <div className="space-y-1">
+                                            <Label className="text-muted-foreground">Admin notes</Label>
+                                            <Input readOnly value={selectedEburol.admin_notes} className="bg-muted" />
                                         </div>
                                     )}
-                                    <div className="col-span-2 flex gap-2">
+                                    <div className="flex gap-2 pt-2">
                                         {selectedEburol.death_certificate_path && (
                                             <Button
+                                                type="button"
                                                 variant="outline"
                                                 onClick={() => window.open(selectedEburol.death_certificate_path!, '_blank')}
                                             >
                                                 <FileText className="h-4 w-4 mr-2" />
-                                                View Death Certificate
+                                                View death certificate
                                             </Button>
                                         )}
                                         {selectedEburol.relationship_proof_path && (
                                             <Button
+                                                type="button"
                                                 variant="outline"
                                                 onClick={() => window.open(selectedEburol.relationship_proof_path!, '_blank')}
                                             >
                                                 <FileText className="h-4 w-4 mr-2" />
-                                                View Relationship Proof
+                                                View proof of relationship
                                             </Button>
                                         )}
                                     </div>
@@ -1452,14 +1361,14 @@ ${appealForm.data.reason}`;
                                             <InputError message={editForm.errors.deceased_date_of_death} />
                                         </div>
                                         <div className="space-y-2">
-                                            <Label htmlFor="edit_relationship_to_inmate">Relationship to Inmate *</Label>
-                                            <Input
+                                            <RelationshipPicker
                                                 id="edit_relationship_to_inmate"
                                                 value={editForm.data.relationship_to_inmate}
-                                                onChange={(e) => editForm.setData('relationship_to_inmate', e.target.value)}
+                                                onChange={(v) => editForm.setData('relationship_to_inmate', v)}
+                                                error={editForm.errors.relationship_to_inmate}
+                                                label="Relationship to Inmate"
                                                 required
                                             />
-                                            <InputError message={editForm.errors.relationship_to_inmate} />
                                         </div>
                                     </div>
                                 </div>
@@ -1658,265 +1567,52 @@ ${appealForm.data.reason}`;
                     </DialogContent>
                 </Dialog>
 
-                {/* Appeal Modal */}
+                {/* Appeal Modal - read-only eburol summary; only appeal statement and supporting docs editable */}
                 <Dialog open={isAppealModalOpen} onOpenChange={setIsAppealModalOpen}>
-                    <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                    <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
                         <DialogHeader>
                             <DialogTitle>Submit Appeal for E-Burol Application</DialogTitle>
                             <DialogDescription>
-                                Review and update your e-burol application details, then provide a reason for your appeal.
+                                Provide your appeal statement and optional supporting documents. You cannot change the e-burol application details.
                                 Appeals must be submitted within 48 hours after rejection.
                             </DialogDescription>
                         </DialogHeader>
                         {selectedEburol && selectedEburol.rejection_reason && (
-                            <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-4 mb-4">
-                                <Label className="text-sm font-semibold text-destructive">Rejection Reason:</Label>
+                            <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-4">
+                                <Label className="text-sm font-semibold text-destructive">Rejection Reason</Label>
                                 <p className="text-sm text-destructive mt-1">{selectedEburol.rejection_reason}</p>
                             </div>
                         )}
-                        <form onSubmit={handleAppealSubmit} className="space-y-6">
-                            {/* Inmate Information */}
-                            <div className="space-y-4">
-                                <h3 className="text-lg font-semibold flex items-center gap-2">
-                                    <User className="h-5 w-5" />
-                                    Inmate Information
-                                </h3>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="appeal_inmate_first_name">First Name *</Label>
-                                        <Input
-                                            id="appeal_inmate_first_name"
-                                            value={appealForm.data.inmate_first_name}
-                                            onChange={(e) => appealForm.setData('inmate_first_name', e.target.value)}
-                                            required
-                                        />
-                                        <InputError message={appealForm.errors.inmate_first_name} />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="appeal_inmate_middle_name">Middle Name</Label>
-                                        <Input
-                                            id="appeal_inmate_middle_name"
-                                            value={appealForm.data.inmate_middle_name}
-                                            onChange={(e) => appealForm.setData('inmate_middle_name', e.target.value)}
-                                        />
-                                        <InputError message={appealForm.errors.inmate_middle_name} />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="appeal_inmate_last_name">Last Name *</Label>
-                                        <Input
-                                            id="appeal_inmate_last_name"
-                                            value={appealForm.data.inmate_last_name}
-                                            onChange={(e) => appealForm.setData('inmate_last_name', e.target.value)}
-                                            required
-                                        />
-                                        <InputError message={appealForm.errors.inmate_last_name} />
-                                    </div>
-                                </div>
+                        {selectedEburol && (
+                            <div className="rounded-lg border bg-muted/30 p-4 space-y-2">
+                                <p className="text-sm font-medium">Application you are appealing (read-only)</p>
+                                <p className="text-sm text-muted-foreground">Inmate: {getInmateFullName(selectedEburol)}</p>
+                                <p className="text-sm text-muted-foreground">Deceased: {getDeceasedFullName(selectedEburol)}</p>
+                                <p className="text-sm text-muted-foreground">Date of death: {selectedEburol.deceased_date_of_death}</p>
+                                <p className="text-sm text-muted-foreground">Wake: {selectedEburol.wake_start_date} to {selectedEburol.wake_end_date}</p>
+                                <p className="text-sm text-muted-foreground">Location: {selectedEburol.wake_location}</p>
                             </div>
-
-                            {/* Deceased Information */}
-                            <div className="space-y-4">
-                                <h3 className="text-lg font-semibold flex items-center gap-2">
-                                    <Users className="h-5 w-5" />
-                                    Deceased Information
-                                </h3>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="appeal_deceased_first_name">First Name *</Label>
-                                        <Input
-                                            id="appeal_deceased_first_name"
-                                            value={appealForm.data.deceased_first_name}
-                                            onChange={(e) => appealForm.setData('deceased_first_name', e.target.value)}
-                                            required
-                                        />
-                                        <InputError message={appealForm.errors.deceased_first_name} />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="appeal_deceased_middle_name">Middle Name</Label>
-                                        <Input
-                                            id="appeal_deceased_middle_name"
-                                            value={appealForm.data.deceased_middle_name}
-                                            onChange={(e) => appealForm.setData('deceased_middle_name', e.target.value)}
-                                        />
-                                        <InputError message={appealForm.errors.deceased_middle_name} />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="appeal_deceased_last_name">Last Name *</Label>
-                                        <Input
-                                            id="appeal_deceased_last_name"
-                                            value={appealForm.data.deceased_last_name}
-                                            onChange={(e) => appealForm.setData('deceased_last_name', e.target.value)}
-                                            required
-                                        />
-                                        <InputError message={appealForm.errors.deceased_last_name} />
-                                    </div>
-                                </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="appeal_deceased_date_of_death">Date of Death *</Label>
-                                        <Input
-                                            id="appeal_deceased_date_of_death"
-                                            type="date"
-                                            value={appealForm.data.deceased_date_of_death}
-                                            onChange={(e) => appealForm.setData('deceased_date_of_death', e.target.value)}
-                                            max={today}
-                                            required
-                                        />
-                                        <InputError message={appealForm.errors.deceased_date_of_death} />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="appeal_relationship_to_inmate">Relationship to Inmate *</Label>
-                                        <Input
-                                            id="appeal_relationship_to_inmate"
-                                            placeholder="e.g., Father, Mother, Spouse, Sibling"
-                                            value={appealForm.data.relationship_to_inmate}
-                                            onChange={(e) => appealForm.setData('relationship_to_inmate', e.target.value)}
-                                            required
-                                        />
-                                        <InputError message={appealForm.errors.relationship_to_inmate} />
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Wake Schedule */}
-                            <div className="space-y-4">
-                                <h3 className="text-lg font-semibold flex items-center gap-2">
-                                    <Calendar className="h-5 w-5" />
-                                    Wake Schedule
-                                </h3>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="appeal_wake_start_date">Start Date *</Label>
-                                        <Input
-                                            id="appeal_wake_start_date"
-                                            type="date"
-                                            value={appealForm.data.wake_start_date}
-                                            onChange={(e) => appealForm.setData('wake_start_date', e.target.value)}
-                                            min={today}
-                                            required
-                                        />
-                                        <InputError message={appealForm.errors.wake_start_date} />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="appeal_wake_end_date">End Date *</Label>
-                                        <Input
-                                            id="appeal_wake_end_date"
-                                            type="date"
-                                            value={appealForm.data.wake_end_date}
-                                            onChange={(e) => appealForm.setData('wake_end_date', e.target.value)}
-                                            min={appealForm.data.wake_start_date || today}
-                                            required
-                                        />
-                                        <InputError message={appealForm.errors.wake_end_date} />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="appeal_preferred_time">Preferred Time</Label>
-                                        <Input
-                                            id="appeal_preferred_time"
-                                            type="time"
-                                            value={appealForm.data.preferred_time}
-                                            onChange={(e) => appealForm.setData('preferred_time', e.target.value)}
-                                        />
-                                        <InputError message={appealForm.errors.preferred_time} />
-                                    </div>
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="appeal_wake_location">Wake Location *</Label>
-                                    <Textarea
-                                        id="appeal_wake_location"
-                                        placeholder="Enter the complete address of the wake location"
-                                        value={appealForm.data.wake_location}
-                                        onChange={(e) => appealForm.setData('wake_location', e.target.value)}
-                                        required
-                                        rows={3}
-                                    />
-                                    <InputError message={appealForm.errors.wake_location} />
-                                </div>
-                            </div>
-
-                            {/* Documents */}
-                            <div className="space-y-4">
-                                <h3 className="text-lg font-semibold flex items-center gap-2">
-                                    <FileText className="h-5 w-5" />
-                                    Required Documents
-                                </h3>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="appeal_death_certificate">Death Certificate *</Label>
-                                        <Input
-                                            id="appeal_death_certificate"
-                                            type="file"
-                                            accept=".pdf,.jpg,.jpeg,.png"
-                                            onChange={(e) => {
-                                                const file = e.target.files?.[0] || null;
-                                                appealForm.setData('death_certificate', file);
-                                            }}
-                                            required
-                                        />
-                                        <p className="text-xs text-muted-foreground">
-                                            Accepted formats: PDF, JPG, PNG (Max 10MB)
-                                        </p>
-                                        <InputError message={appealForm.errors.death_certificate} />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="appeal_relationship_proof">Proof of Relationship *</Label>
-                                        <Input
-                                            id="appeal_relationship_proof"
-                                            type="file"
-                                            accept=".pdf,.jpg,.jpeg,.png"
-                                            onChange={(e) => {
-                                                const file = e.target.files?.[0] || null;
-                                                appealForm.setData('relationship_proof', file);
-                                            }}
-                                            required
-                                        />
-                                        <p className="text-xs text-muted-foreground">
-                                            Accepted formats: PDF, JPG, PNG (Max 10MB)
-                                        </p>
-                                        <InputError message={appealForm.errors.relationship_proof} />
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Additional Details */}
-                            <div className="space-y-2">
-                                <Label htmlFor="appeal_additional_details">Additional Details</Label>
-                                <Textarea
-                                    id="appeal_additional_details"
-                                    placeholder="Any additional information that may help with the approval process"
-                                    value={appealForm.data.additional_details}
-                                    onChange={(e) => appealForm.setData('additional_details', e.target.value)}
-                                    rows={4}
-                                />
-                                <InputError message={appealForm.errors.additional_details} />
-                            </div>
-
-                            {/* Appeal Reason */}
-                            <div className="space-y-2">
+                        )}
+                        <form onSubmit={handleAppealSubmit} className="flex flex-col gap-4">
+                            <div className="flex flex-col gap-2">
                                 <Label htmlFor="appeal_reason">
-                                    Appeal Reason <span className="text-destructive">*</span>
+                                    Appeal statement <span className="text-destructive">*</span>
                                 </Label>
                                 <Textarea
                                     id="appeal_reason"
                                     required
-                                    rows={6}
+                                    rows={5}
                                     value={appealForm.data.reason}
                                     onChange={(e) => appealForm.setData('reason', e.target.value)}
-                                    placeholder="Please provide a detailed reason for your appeal. Explain why you believe the rejection should be reconsidered..."
+                                    placeholder="Explain why you believe the rejection should be reconsidered..."
                                     minLength={10}
                                     maxLength={2000}
                                 />
                                 <InputError message={appealForm.errors.reason} />
-                                <p className="text-xs text-muted-foreground">
-                                    Minimum 10 characters, maximum 2000 characters
-                                </p>
+                                <p className="text-xs text-muted-foreground">Minimum 10 characters, maximum 2000 characters</p>
                             </div>
-
-                            {/* Supporting Documents */}
-                            <div className="space-y-2">
-                                <Label htmlFor="appeal_documents">
-                                    Additional Supporting Documents (Optional)
-                                </Label>
+                            <div className="flex flex-col gap-2">
+                                <Label htmlFor="appeal_documents">Supporting documents (optional)</Label>
                                 <Input
                                     id="appeal_documents"
                                     type="file"
@@ -1930,17 +1626,12 @@ ${appealForm.data.reason}`;
                                         {Array.isArray(appealForm.errors.appeal) ? appealForm.errors.appeal[0] : appealForm.errors.appeal}
                                     </div>
                                 )}
-                                <p className="text-xs text-muted-foreground">
-                                    You can upload up to 5 files (PDF, DOC, DOCX, JPG, JPEG, PNG). Max 5MB per file.
-                                </p>
+                                <p className="text-xs text-muted-foreground">Up to 5 files (PDF, DOC, DOCX, JPG, PNG). Max 5MB per file.</p>
                                 {appealForm.data.documents.length > 0 && (
-                                    <div className="text-sm text-muted-foreground">
-                                        Selected: {appealForm.data.documents.length} file(s)
-                                    </div>
+                                    <p className="text-sm text-muted-foreground">Selected: {appealForm.data.documents.length} file(s)</p>
                                 )}
                             </div>
-
-                            <DialogFooter className="mt-6">
+                            <DialogFooter className="mt-2">
                                 <Button type="button" variant="outline" onClick={handleAppealModalClose}>
                                     Cancel
                                 </Button>

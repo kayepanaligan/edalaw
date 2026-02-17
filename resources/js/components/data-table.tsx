@@ -31,6 +31,8 @@ interface DataTableProps<TData, TValue> {
     headerActions?: ReactNode;
     enableGlobalFilter?: boolean;
     globalFilterFn?: (row: any, columnId: string, filterValue: string) => boolean;
+    /** Default sort: e.g. [{ id: 'created_at', desc: true }] for latest first */
+    initialSorting?: SortingState;
 }
 
 export function DataTable<TData, TValue>({
@@ -41,8 +43,9 @@ export function DataTable<TData, TValue>({
     headerActions,
     enableGlobalFilter = true,
     globalFilterFn: customGlobalFilterFn,
+    initialSorting = [],
 }: DataTableProps<TData, TValue>) {
-    const [sorting, setSorting] = useState<SortingState>([]);
+    const [sorting, setSorting] = useState<SortingState>(initialSorting);
     const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
     const [globalFilter, setGlobalFilter] = useState('');
 
@@ -78,6 +81,7 @@ export function DataTable<TData, TValue>({
             pagination: {
                 pageSize: 10,
             },
+            sorting: initialSorting,
         },
     });
 

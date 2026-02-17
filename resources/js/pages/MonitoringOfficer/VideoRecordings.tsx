@@ -103,7 +103,13 @@ export default function VideoRecordings({ recordings, filters }: Props) {
                         <CardDescription>{recordings.length} recording(s)</CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <DataTable columns={columns} data={recordings} />
+                        <DataTable
+                            columns={columns}
+                            data={recordings}
+                            searchKey="video_search"
+                            searchPlaceholder="Search by session, visitor, inmate..."
+                            initialSorting={[{ id: 'ended_at', desc: true }]}
+                        />
                     </CardContent>
                 </Card>
             </div>

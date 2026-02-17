@@ -9,12 +9,14 @@ use App\Models\Appeal;
 use App\Models\Eburol;
 use App\Services\AuditLogService;
 use App\Services\NotificationService;
+use App\Services\VisitorScheduleConflictService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class EburolController extends Controller
 {
@@ -92,8 +94,8 @@ class EburolController extends Controller
                     'preferred_time' => $eburol->preferred_time,
                     'wake_location' => $eburol->wake_location,
                     'additional_details' => $eburol->additional_details,
-                    'death_certificate_path' => $eburol->death_certificate_path ? Storage::disk('public')->url($eburol->death_certificate_path) : null,
-                    'relationship_proof_path' => $eburol->relationship_proof_path ? Storage::disk('public')->url($eburol->relationship_proof_path) : null,
+                    'death_certificate_path' => $eburol->death_certificate_path ? route('visitor.eburol.document.death-certificate', $eburol) : null,
+                    'relationship_proof_path' => $eburol->relationship_proof_path ? route('visitor.eburol.document.relationship-proof', $eburol) : null,
                     'status' => $eburol->status->value,
                     'admin_notes' => $eburol->admin_notes,
                     'rejection_reason' => $eburol->rejection_reason,
@@ -119,13 +121,24 @@ class EburolController extends Controller
         $date = $request->input('date');
         $slots = [];
         $maxPerSlot = 4;
-        for ($hour = 8; $hour < 18; $hour++) {
+        $tz = config('app.timezone');
+        $isToday = $date === now($tz)->format('Y-m-d');
+        $nowMinutes = $isToday ? (int) now($tz)->format('G') * 60 + (int) now($tz)->format('i') : 0;
+
+        for ($hour = 7; $hour < 18; $hour++) {
             $slot = sprintf('%02d:00', $hour);
+            $slotMinutes = $hour * 60;
+            $isPast = $isToday && $slotMinutes < $nowMinutes;
             $current = Eburol::where('wake_start_date', $date)
                 ->where('preferred_time', $slot)
                 ->whereIn('status', [EburolStatus::Pending, EburolStatus::Approved])
                 ->count();
-            $slots[$slot] = ['current' => $current, 'max' => $maxPerSlot, 'isFull' => $current >= $maxPerSlot];
+            $slots[$slot] = [
+                'current' => $current,
+                'max' => $maxPerSlot,
+                'isFull' => $current >= $maxPerSlot,
+                'isPast' => $isPast,
+            ];
         }
 
         return response()->json($slots);
@@ -146,7 +159,7 @@ class EburolController extends Controller
             'deceased_date_of_death' => ['required', 'date', 'before_or_equal:today'],
             'relationship_to_inmate' => ['required', 'string', 'max:255'],
             'wake_start_date' => ['required', 'date', 'after_or_equal:today'],
-            'wake_end_date' => ['required', 'date', 'after_or_equal:wake_start_date'],
+            'wake_end_date' => ['nullable', 'date', 'after_or_equal:wake_start_date'],
             'preferred_time' => ['nullable', 'date_format:H:i'],
             'wake_location' => ['required', 'string', 'max:500'],
             'additional_details' => ['nullable', 'string', 'max:2000'],
@@ -158,6 +171,15 @@ class EburolController extends Controller
             return redirect()->back()
                 ->withErrors($validator)
                 ->withInput();
+        }
+
+        if ($request->filled('preferred_time')) {
+            $conflictService = new VisitorScheduleConflictService;
+            if ($conflictService->hasConflict(auth()->id(), $request->wake_start_date, $request->preferred_time, 60)) {
+                return redirect()->back()
+                    ->withErrors(['preferred_time' => 'You already have a virtual visit or e-burol scheduled in this time range. Please choose another slot.'])
+                    ->withInput();
+            }
         }
 
         // Store uploaded files
@@ -172,6 +194,8 @@ class EburolController extends Controller
             $relationshipProofPath = $request->file('relationship_proof')->store('eburols/relationship_proofs', 'public');
         }
 
+        $wakeEndDate = $request->filled('wake_end_date') ? $request->wake_end_date : $request->wake_start_date;
+
         $eburol = Eburol::create([
             'user_id' => auth()->id(),
             'inmate_first_name' => $request->inmate_first_name,
@@ -183,7 +207,7 @@ class EburolController extends Controller
             'deceased_date_of_death' => $request->deceased_date_of_death,
             'relationship_to_inmate' => $request->relationship_to_inmate,
             'wake_start_date' => $request->wake_start_date,
-            'wake_end_date' => $request->wake_end_date,
+            'wake_end_date' => $wakeEndDate,
             'preferred_time' => $request->preferred_time,
             'wake_location' => $request->wake_location,
             'additional_details' => $request->additional_details,
@@ -203,7 +227,7 @@ class EburolController extends Controller
             'eburol_submitted',
             $eburol,
             'E-Burol Management',
-            "E-Burol application submitted for deceased {$deceasedName}, inmate {$inmateName}. Wake period: {$eburol->wake_start_date->format('M d, Y')} - {$eburol->wake_end_date->format('M d, Y')}",
+            "E-Burol application submitted for deceased {$deceasedName}, inmate {$inmateName}. Wake: {$eburol->wake_start_date->format('M d, Y')} {$eburol->preferred_time}",
             $request,
             [
                 'deceased_name' => $deceasedName,
@@ -241,8 +265,8 @@ class EburolController extends Controller
             'preferred_time' => $eburol->preferred_time,
             'wake_location' => $eburol->wake_location,
             'additional_details' => $eburol->additional_details,
-            'death_certificate_path' => $eburol->death_certificate_path ? Storage::url($eburol->death_certificate_path) : null,
-            'relationship_proof_path' => $eburol->relationship_proof_path ? Storage::url($eburol->relationship_proof_path) : null,
+            'death_certificate_path' => $eburol->death_certificate_path ? route('visitor.eburol.document.death-certificate', $eburol) : null,
+            'relationship_proof_path' => $eburol->relationship_proof_path ? route('visitor.eburol.document.relationship-proof', $eburol) : null,
             'status' => $eburol->status->value,
             'admin_notes' => $eburol->admin_notes,
             'created_at' => $eburol->created_at->format('Y-m-d H:i:s'),
@@ -294,6 +318,8 @@ class EburolController extends Controller
                 ->withInput();
         }
 
+        $wakeEndDate = $request->filled('wake_end_date') ? $request->wake_end_date : $request->wake_start_date;
+
         $updateData = [
             'inmate_first_name' => $request->inmate_first_name,
             'inmate_middle_name' => $request->inmate_middle_name,
@@ -304,7 +330,7 @@ class EburolController extends Controller
             'deceased_date_of_death' => $request->deceased_date_of_death,
             'relationship_to_inmate' => $request->relationship_to_inmate,
             'wake_start_date' => $request->wake_start_date,
-            'wake_end_date' => $request->wake_end_date,
+            'wake_end_date' => $wakeEndDate,
             'preferred_time' => $request->preferred_time,
             'wake_location' => $request->wake_location,
             'additional_details' => $request->additional_details,
@@ -454,5 +480,39 @@ class EburolController extends Controller
 
         return redirect()->route('visitor.eburol.index')
             ->with('success', 'E-burol application deleted successfully.');
+    }
+
+    /**
+     * Serve death certificate file for viewing (visitor's own eburol only).
+     */
+    public function deathCertificate(Eburol $eburol): BinaryFileResponse
+    {
+        if ($eburol->user_id !== auth()->id()) {
+            abort(403);
+        }
+        if (! $eburol->death_certificate_path || ! Storage::disk('public')->exists($eburol->death_certificate_path)) {
+            abort(404, 'Document not found.');
+        }
+
+        return response()->file(Storage::disk('public')->path($eburol->death_certificate_path), [
+            'Content-Disposition' => 'inline; filename="'.basename($eburol->death_certificate_path).'"',
+        ]);
+    }
+
+    /**
+     * Serve relationship proof file for viewing (visitor's own eburol only).
+     */
+    public function relationshipProof(Eburol $eburol): BinaryFileResponse
+    {
+        if ($eburol->user_id !== auth()->id()) {
+            abort(403);
+        }
+        if (! $eburol->relationship_proof_path || ! Storage::disk('public')->exists($eburol->relationship_proof_path)) {
+            abort(404, 'Document not found.');
+        }
+
+        return response()->file(Storage::disk('public')->path($eburol->relationship_proof_path), [
+            'Content-Disposition' => 'inline; filename="'.basename($eburol->relationship_proof_path).'"',
+        ]);
     }
 }

@@ -201,7 +201,7 @@ export default function EburolManagement({ eburols, stats, monitoringOfficers }:
             return;
         }
 
-        const data: { status: string; rejection_reason?: string } = {
+        const data: { status: string; rejection_reason?: string; monitoring_officer_id?: string } = {
             status: statusForm.data.status,
         };
 
@@ -211,6 +211,13 @@ export default function EburolManagement({ eburols, stats, monitoringOfficers }:
                 return;
             }
             data.rejection_reason = statusForm.data.rejection_reason;
+        }
+        if (statusForm.data.status === 'approved') {
+            if (!statusForm.data.monitoring_officer_id) {
+                toast.error('Monitoring officer is required when approving.');
+                return;
+            }
+            data.monitoring_officer_id = statusForm.data.monitoring_officer_id;
         }
 
         statusForm.post(`/bjmp-officer/eburols/${selectedEburol.id}/update-status`, {
@@ -455,8 +462,10 @@ export default function EburolManagement({ eburols, stats, monitoringOfficers }:
                             <DataTable
                                 columns={columns}
                                 data={filteredEburols}
-                                enableGlobalFilter={true}
+                                searchKey="eburol_search"
                                 searchPlaceholder="Search by visitor, inmate, deceased..."
+                                initialSorting={[{ id: 'created_at', desc: true }]}
+                                enableGlobalFilter={true}
                                 headerActions={headerActions}
                             />
                         )}
@@ -473,95 +482,80 @@ export default function EburolManagement({ eburols, stats, monitoringOfficers }:
                             </DialogDescription>
                         </DialogHeader>
                         {selectedEburol && (
-                            <div className="space-y-6">
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <Label className="text-muted-foreground">Visitor</Label>
-                                        <p className="font-medium">{selectedEburol.visitor_name}</p>
-                                        <p className="text-sm text-muted-foreground">{selectedEburol.visitor_email}</p>
+                            <div className="flex flex-col gap-3">
+                                <div className="space-y-1">
+                                    <Label className="text-muted-foreground">Visitor</Label>
+                                    <Input readOnly value={selectedEburol.visitor_name ?? '—'} className="bg-muted" />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-muted-foreground">Visitor email</Label>
+                                    <Input readOnly value={selectedEburol.visitor_email ?? '—'} className="bg-muted" />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-muted-foreground">Status</Label>
+                                    <div className="pt-2">{getStatusBadge(selectedEburol.status)}</div>
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-muted-foreground">Inmate name</Label>
+                                    <Input readOnly value={selectedEburol.inmate_name ?? '—'} className="bg-muted" />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-muted-foreground">Deceased name</Label>
+                                    <Input readOnly value={selectedEburol.deceased_name ?? '—'} className="bg-muted" />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-muted-foreground">Date of death</Label>
+                                    <Input readOnly value={new Date(selectedEburol.deceased_date_of_death).toLocaleDateString()} className="bg-muted" />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-muted-foreground">Relationship</Label>
+                                    <Input readOnly value={selectedEburol.relationship_to_inmate ?? '—'} className="bg-muted" />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-muted-foreground">Wake start date</Label>
+                                    <Input readOnly value={new Date(selectedEburol.wake_start_date).toLocaleDateString()} className="bg-muted" />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-muted-foreground">Wake end date</Label>
+                                    <Input readOnly value={new Date(selectedEburol.wake_end_date).toLocaleDateString()} className="bg-muted" />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-muted-foreground">Preferred time</Label>
+                                    <Input readOnly value={selectedEburol.preferred_time ?? '—'} className="bg-muted" />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-muted-foreground">Wake location</Label>
+                                    <Input readOnly value={selectedEburol.wake_location ?? '—'} className="bg-muted" />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-muted-foreground">Additional details</Label>
+                                    <Input readOnly value={selectedEburol.additional_details ?? '—'} className="bg-muted" />
+                                </div>
+                                {selectedEburol.rejection_reason && (
+                                    <div className="space-y-1">
+                                        <Label className="text-muted-foreground">Rejection reason</Label>
+                                        <Input readOnly value={selectedEburol.rejection_reason} className="bg-muted text-destructive" />
                                     </div>
-                                    <div>
-                                        <Label className="text-muted-foreground">Status</Label>
-                                        <div className="mt-1">{getStatusBadge(selectedEburol.status)}</div>
+                                )}
+                                {selectedEburol.admin_notes && (
+                                    <div className="space-y-1">
+                                        <Label className="text-muted-foreground">Admin notes</Label>
+                                        <Input readOnly value={selectedEburol.admin_notes} className="bg-muted" />
                                     </div>
-                                    <div>
-                                        <Label className="text-muted-foreground">Inmate Name</Label>
-                                        <p className="font-medium">{selectedEburol.inmate_name}</p>
-                                    </div>
-                                    <div>
-                                        <Label className="text-muted-foreground">Deceased Name</Label>
-                                        <p className="font-medium">{selectedEburol.deceased_name}</p>
-                                    </div>
-                                    <div>
-                                        <Label className="text-muted-foreground">Date of Death</Label>
-                                        <p className="font-medium">
-                                            {new Date(selectedEburol.deceased_date_of_death).toLocaleDateString()}
-                                        </p>
-                                    </div>
-                                    <div>
-                                        <Label className="text-muted-foreground">Relationship</Label>
-                                        <p className="font-medium">{selectedEburol.relationship_to_inmate}</p>
-                                    </div>
-                                    <div>
-                                        <Label className="text-muted-foreground">Wake Start Date</Label>
-                                        <p className="font-medium">
-                                            {new Date(selectedEburol.wake_start_date).toLocaleDateString()}
-                                        </p>
-                                    </div>
-                                    <div>
-                                        <Label className="text-muted-foreground">Wake End Date</Label>
-                                        <p className="font-medium">
-                                            {new Date(selectedEburol.wake_end_date).toLocaleDateString()}
-                                        </p>
-                                    </div>
-                                    {selectedEburol.preferred_time && (
-                                        <div>
-                                            <Label className="text-muted-foreground">Preferred Time</Label>
-                                            <p className="font-medium">{selectedEburol.preferred_time}</p>
-                                        </div>
+                                )}
+                                <div className="flex gap-2 pt-2">
+                                    {selectedEburol.death_certificate_path && (
+                                        <Button variant="outline" onClick={() => window.open(selectedEburol.death_certificate_path!, '_blank')}>
+                                            <FileText className="h-4 w-4 mr-2" />
+                                            View death certificate
+                                        </Button>
                                     )}
-                                    <div className="col-span-2">
-                                        <Label className="text-muted-foreground">Wake Location</Label>
-                                        <p className="font-medium">{selectedEburol.wake_location}</p>
-                                    </div>
-                                    {selectedEburol.additional_details && (
-                                        <div className="col-span-2">
-                                            <Label className="text-muted-foreground">Additional Details</Label>
-                                            <p className="font-medium">{selectedEburol.additional_details}</p>
-                                        </div>
+                                    {selectedEburol.relationship_proof_path && (
+                                        <Button variant="outline" onClick={() => window.open(selectedEburol.relationship_proof_path!, '_blank')}>
+                                            <FileText className="h-4 w-4 mr-2" />
+                                            View relationship proof
+                                        </Button>
                                     )}
-                                    {selectedEburol.rejection_reason && (
-                                        <div className="col-span-2">
-                                            <Label className="text-muted-foreground">Rejection Reason</Label>
-                                            <p className="font-medium text-destructive">{selectedEburol.rejection_reason}</p>
-                                        </div>
-                                    )}
-                                    {selectedEburol.admin_notes && (
-                                        <div className="col-span-2">
-                                            <Label className="text-muted-foreground">Admin Notes</Label>
-                                            <p className="font-medium">{selectedEburol.admin_notes}</p>
-                                        </div>
-                                    )}
-                                    <div className="col-span-2 flex gap-2">
-                                        {selectedEburol.death_certificate_path && (
-                                            <Button
-                                                variant="outline"
-                                                onClick={() => window.open(selectedEburol.death_certificate_path!, '_blank')}
-                                            >
-                                                <FileText className="h-4 w-4 mr-2" />
-                                                View Death Certificate
-                                            </Button>
-                                        )}
-                                        {selectedEburol.relationship_proof_path && (
-                                            <Button
-                                                variant="outline"
-                                                onClick={() => window.open(selectedEburol.relationship_proof_path!, '_blank')}
-                                            >
-                                                <FileText className="h-4 w-4 mr-2" />
-                                                View Relationship Proof
-                                            </Button>
-                                        )}
-                                    </div>
                                 </div>
                             </div>
                         )}
@@ -707,7 +701,16 @@ export default function EburolManagement({ eburols, stats, monitoringOfficers }:
                                 <Label htmlFor="status">Status</Label>
                                 <Select
                                     value={statusForm.data.status}
-                                    onValueChange={(value) => statusForm.setData('status', value as 'pending' | 'approved' | 'rejected' | 'completed')}
+                                    onValueChange={(value) => {
+                                        const v = value as 'pending' | 'approved' | 'rejected' | 'completed';
+                                        statusForm.setData('status', v);
+                                        if (v !== 'approved') {
+                                            statusForm.setData('monitoring_officer_id', '');
+                                        }
+                                        if (v !== 'rejected') {
+                                            statusForm.setData('rejection_reason', '');
+                                        }
+                                    }}
                                 >
                                     <SelectTrigger>
                                         <SelectValue />
@@ -742,10 +745,10 @@ export default function EburolManagement({ eburols, stats, monitoringOfficers }:
                                     </p>
                                 </div>
                             )}
-                            {monitoringOfficers && monitoringOfficers.length > 0 && (
+                            {statusForm.data.status === 'approved' && monitoringOfficers && monitoringOfficers.length > 0 && (
                                 <div className="space-y-2">
                                     <Label htmlFor="status_monitoring_officer_id">
-                                        Monitoring Officer
+                                        Monitoring Officer <span className="text-destructive">*</span>
                                     </Label>
                                     <Select
                                         value={statusForm.data.monitoring_officer_id}
@@ -764,7 +767,7 @@ export default function EburolManagement({ eburols, stats, monitoringOfficers }:
                                     </Select>
                                     <InputError message={statusForm.errors.monitoring_officer_id} />
                                     <p className="text-xs text-muted-foreground">
-                                        Officer responsible for overseeing this e-burol
+                                        Required when approving. Officer responsible for overseeing this e-burol.
                                     </p>
                                 </div>
                             )}

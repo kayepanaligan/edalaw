@@ -44,9 +44,7 @@ class VisitSessionCompletionService
         ]);
 
         $this->syncVisitOrEburolStatus($session, $status);
-        if ($status === 'completed') {
-            $this->createVideoCallLogForVisitor($session);
-        }
+        $this->createVideoCallLogForVisitor($session, $status);
 
         $actuallyUsed = $bothJoined || $session->chatLogs()->exists();
         if ($actuallyUsed) {
@@ -74,12 +72,19 @@ class VisitSessionCompletionService
         }
     }
 
-    private function createVideoCallLogForVisitor(VisitSession $session): void
+    private function createVideoCallLogForVisitor(VisitSession $session, string $sessionStatus): void
     {
         $visitor = $session->visitor;
         if (! $visitor) {
             return;
         }
+
+        $callLogStatus = match ($sessionStatus) {
+            'completed' => 'completed',
+            'no_show' => 'missed',
+            'unsuccessful' => 'failed',
+            default => 'failed',
+        };
 
         CallLog::create([
             'user_id' => $visitor->id,
@@ -87,9 +92,9 @@ class VisitSessionCompletionService
             'phone_number' => null,
             'call_type' => 'video',
             'call_date' => $session->ended_at ?? now(),
-            'duration' => $session->duration_seconds,
-            'notes' => 'Virtual visit',
-            'status' => 'completed',
+            'duration' => $sessionStatus === 'completed' ? $session->duration_seconds : null,
+            'notes' => $sessionStatus === 'completed' ? 'Virtual visit' : ($sessionStatus === 'no_show' ? 'No show' : 'Unsuccessful (recording not saved)'),
+            'status' => $callLogStatus,
         ]);
     }
 }

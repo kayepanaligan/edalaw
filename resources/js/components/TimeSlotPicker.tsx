@@ -18,6 +18,8 @@ type TimeSlotPickerProps = {
     selectedTime?: string;
     bookedSlots?: string[];
     slotCapacities?: Record<string, { current: number; max: number; isFull: boolean }>;
+    /** Slots where the current user already has a visit (unclickable, tooltip explains) */
+    userBookedSlots?: string[];
     onTimeSelect: (time: string) => void;
     className?: string;
     visitType?: 'physical' | 'virtual';
@@ -27,6 +29,7 @@ export function TimeSlotPicker({
     selectedTime,
     bookedSlots = [],
     slotCapacities = {},
+    userBookedSlots = [],
     onTimeSelect,
     className,
     visitType,
@@ -40,26 +43,52 @@ export function TimeSlotPicker({
         return `${displayHour}${displayMinute} ${period}`;
     };
 
-    // Generate time slots: 1-hour slots for both virtual and physical (e.g. 7:00 AM – 8:00 AM)
+    // Virtual: 10-min slots (7:00–7:10, 7:10–7:20, … 17:50–18:00). Physical: 1-hour slots (7:00–8:00, … 17:00–18:00).
     const generateTimeSlots = (): TimeSlot[] => {
         const slots: TimeSlot[] = [];
-        for (let hour = 7; hour < 18; hour++) {
-            const time24 = `${hour.toString().padStart(2, '0')}:00`;
-            const period: 'AM' | 'PM' = hour < 12 ? 'AM' : 'PM';
-            const endHour = hour + 1;
-            const startLabel = formatTime(hour, 0, period);
-            const endLabel = formatTime(endHour, 0, endHour < 12 ? 'AM' : 'PM');
-            const rangeLabel = `${startLabel} - ${endLabel}`;
-            const capacity = slotCapacities[time24] || { current: 0, max: 4, isFull: false };
-            slots.push({
-                value: time24,
-                label: rangeLabel,
-                rangeLabel: rangeLabel,
-                period: hour < 12 ? 'AM' : 'PM',
-                currentBookings: capacity.current,
-                maxCapacity: capacity.max,
-                isFull: capacity.isFull,
-            });
+        const isVirtual = visitType === 'virtual';
+        if (isVirtual) {
+            for (let hour = 7; hour < 18; hour++) {
+                for (let min = 0; min < 60; min += 10) {
+                    const time24 = `${hour.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}`;
+                    const period: 'AM' | 'PM' = hour < 12 ? 'AM' : 'PM';
+                    const endMin = min + 10;
+                    const endHour = endMin === 60 ? hour + 1 : hour;
+                    const endMinAdj = endMin === 60 ? 0 : endMin;
+                    const startLabel = formatTime(hour, min, period);
+                    const endLabel = formatTime(endHour, endMinAdj, endHour < 12 ? 'AM' : 'PM');
+                    const rangeLabel = `${startLabel} - ${endLabel}`;
+                    const capacity = slotCapacities[time24] || { current: 0, max: 4, isFull: false };
+                    slots.push({
+                        value: time24,
+                        label: rangeLabel,
+                        rangeLabel: rangeLabel,
+                        period: hour < 12 ? 'AM' : 'PM',
+                        currentBookings: capacity.current,
+                        maxCapacity: capacity.max,
+                        isFull: capacity.isFull,
+                    });
+                }
+            }
+        } else {
+            for (let hour = 7; hour < 18; hour++) {
+                const time24 = `${hour.toString().padStart(2, '0')}:00`;
+                const period: 'AM' | 'PM' = hour < 12 ? 'AM' : 'PM';
+                const endHour = hour + 1;
+                const startLabel = formatTime(hour, 0, period);
+                const endLabel = formatTime(endHour, 0, endHour < 12 ? 'AM' : 'PM');
+                const rangeLabel = `${startLabel} - ${endLabel}`;
+                const capacity = slotCapacities[time24] || { current: 0, max: 4, isFull: false };
+                slots.push({
+                    value: time24,
+                    label: rangeLabel,
+                    rangeLabel: rangeLabel,
+                    period: hour < 12 ? 'AM' : 'PM',
+                    currentBookings: capacity.current,
+                    maxCapacity: capacity.max,
+                    isFull: capacity.isFull,
+                });
+            }
         }
         return slots;
     };
@@ -68,14 +97,24 @@ export function TimeSlotPicker({
     const amSlots = timeSlots.filter((slot) => slot.period === 'AM');
     const pmSlots = timeSlots.filter((slot) => slot.period === 'PM');
 
+    const isUserBooked = (slot: TimeSlot): boolean => userBookedSlots.includes(slot.value);
+
     const isDisabled = (slot: TimeSlot): boolean => {
-        return slot.isFull || false;
+        return slot.isFull || isUserBooked(slot);
+    };
+
+    const getDisabledTooltip = (slot: TimeSlot): string => {
+        if (isUserBooked(slot)) {
+            return 'You already have a visit in this time slot. Please choose another.';
+        }
+        if (slot.isFull) {
+            return 'This time slot is full';
+        }
+        return '';
     };
 
     const handleSlotClick = (slot: TimeSlot) => {
-        if (slot.isFull) {
-            return;
-        }
+        if (isDisabled(slot)) return;
         onTimeSelect(slot.value);
     };
 
@@ -89,10 +128,14 @@ export function TimeSlotPicker({
                 <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 rounded-md p-3">
                     <p className="text-xs text-blue-900 dark:text-blue-100 font-medium mb-1">
                         <AlertCircle className="size-3 inline mr-1" />
-                        Select one 1-hour time range per schedule.
+                        {visitType === 'virtual'
+                            ? 'Select one 10-minute time slot per schedule.'
+                            : 'Select one 1-hour time range per schedule.'}
                     </p>
                     <p className="text-xs text-blue-700 dark:text-blue-300">
-                        Each time slot is 1 hour. Once a slot reaches its maximum capacity, it will be unavailable.
+                        {visitType === 'virtual'
+                            ? 'Virtual visits use 10-minute slots. Once a slot reaches capacity, it will be unavailable.'
+                            : 'Physical visits use 1-hour slots. Once a slot reaches capacity, it will be unavailable.'}
                     </p>
                 </div>
             </div>
@@ -123,7 +166,7 @@ export function TimeSlotPicker({
                                             disabled && 'opacity-40 cursor-not-allowed hover:opacity-40',
                                             !disabled && !isSelected && 'hover:bg-accent'
                                         )}
-                                        title={disabled ? `This time slot is full` : `${slot.rangeLabel} — ${Math.max(0, (slot.maxCapacity ?? 0) - (slot.currentBookings ?? 0))}/${slot.maxCapacity} available`}
+                                        title={disabled ? getDisabledTooltip(slot) : `${slot.rangeLabel} — ${Math.max(0, (slot.maxCapacity ?? 0) - (slot.currentBookings ?? 0))}/${slot.maxCapacity} available`}
                                     >
                                         <div className="flex flex-col items-center gap-1">
                                             <span>{slot.label}</span>
@@ -139,7 +182,7 @@ export function TimeSlotPicker({
                                     </Button>
                                     {disabled && (
                                         <div className="absolute inset-0 flex items-center justify-center bg-destructive/10 rounded-md pointer-events-none">
-                                            <span className="text-[10px] font-medium text-destructive">Full</span>
+                                            <span className="text-[10px] font-medium text-destructive">{isUserBooked(slot) ? 'Your slot' : 'Full'}</span>
                                         </div>
                                     )}
                                 </div>
@@ -168,7 +211,7 @@ export function TimeSlotPicker({
                                             disabled && 'opacity-40 cursor-not-allowed hover:opacity-40',
                                             !disabled && !isSelected && 'hover:bg-accent'
                                         )}
-                                        title={disabled ? `This time slot is full` : `${slot.rangeLabel} — ${Math.max(0, (slot.maxCapacity ?? 0) - (slot.currentBookings ?? 0))}/${slot.maxCapacity} available`}
+                                        title={disabled ? getDisabledTooltip(slot) : `${slot.rangeLabel} — ${Math.max(0, (slot.maxCapacity ?? 0) - (slot.currentBookings ?? 0))}/${slot.maxCapacity} available`}
                                     >
                                         <div className="flex flex-col items-center gap-1">
                                             <span>{slot.label}</span>
@@ -184,7 +227,7 @@ export function TimeSlotPicker({
                                     </Button>
                                     {disabled && (
                                         <div className="absolute inset-0 flex items-center justify-center bg-destructive/10 rounded-md pointer-events-none">
-                                            <span className="text-[10px] font-medium text-destructive">Full</span>
+                                            <span className="text-[10px] font-medium text-destructive">{isUserBooked(slot) ? 'Your slot' : 'Full'}</span>
                                         </div>
                                     )}
                                 </div>

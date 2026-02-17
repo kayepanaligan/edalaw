@@ -26,6 +26,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { TimeSlotPicker } from '@/components/TimeSlotPicker';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -660,8 +661,10 @@ export default function ScheduleManagement({ visits, stats, monitoringOfficers }
                             <DataTable
                                 columns={columns}
                                 data={filteredVisits}
-                                enableGlobalFilter={true}
+                                searchKey="visit_search"
                                 searchPlaceholder="Search by visitor, inmate, date..."
+                                initialSorting={[{ id: 'scheduled_date', desc: true }, { id: 'created_at', desc: true }]}
+                                enableGlobalFilter={true}
                                 headerActions={headerActions}
                             />
                         )}
@@ -678,81 +681,78 @@ export default function ScheduleManagement({ visits, stats, monitoringOfficers }
                             </DialogDescription>
                         </DialogHeader>
                         {selectedVisit && (
-                            <div className="space-y-6">
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <Label className="text-muted-foreground">Visitor</Label>
-                                        <p className="font-medium">{selectedVisit.visitor_name}</p>
-                                        <p className="text-sm text-muted-foreground">{selectedVisit.visitor_email}</p>
-                                    </div>
-                                    <div>
-                                        <Label className="text-muted-foreground">Status</Label>
-                                        <div className="mt-1">{getStatusBadge(selectedVisit.status)}</div>
-                                    </div>
-                                    <div>
-                                        <Label className="text-muted-foreground">Inmate Name</Label>
-                                        <p className="font-medium">{selectedVisit.inmate_name}</p>
-                                    </div>
-                                    <div>
-                                        <Label className="text-muted-foreground">Visit Type</Label>
-                                        <div className="mt-1">{getVisitTypeBadge(selectedVisit.visit_type)}</div>
-                                    </div>
-                                    <div>
-                                        <Label className="text-muted-foreground">Scheduled Date</Label>
-                                        <p className="font-medium">
-                                            {new Date(selectedVisit.scheduled_date).toLocaleDateString()}
-                                        </p>
-                                    </div>
-                                    <div>
-                                        <Label className="text-muted-foreground">Scheduled Time</Label>
-                                        <p className="font-medium">{selectedVisit.scheduled_time || 'N/A'}</p>
-                                    </div>
-                                    {selectedVisit.visit_type === 'virtual' && selectedVisit.status === 'approved' && (
-                                        <div className="col-span-2">
-                                            <Label className="text-muted-foreground">Join video call</Label>
-                                            <p className="mt-1">
-                                                {selectedVisit.visit_session_id && selectedVisit.schedule_started && !selectedVisit.schedule_ended
-                                                    ? (
-                                                            <a
-                                                                href={`/bjmp-officer/visit-session/${selectedVisit.visit_session_id}/join`}
-                                                                target="_blank"
-                                                                rel="noopener noreferrer"
-                                                                className="inline-flex h-10 w-10 items-center justify-center rounded-md bg-green-600 text-white hover:bg-green-700"
-                                                                title="Join video call"
-                                                            >
-                                                                <VideoIcon className="h-5 w-5" />
-                                                            </a>
-                                                        )
-                                                    : (
-                                                            <span
-                                                                className="inline-flex h-10 w-10 cursor-not-allowed items-center justify-center rounded-md bg-muted text-muted-foreground"
-                                                                title={
-                                                                    !selectedVisit.schedule_started
-                                                                        ? 'Video call is available from the scheduled start time.'
-                                                                        : selectedVisit.schedule_ended
-                                                                            ? 'Schedule has ended.'
-                                                                            : 'Not available'
-                                                                }
-                                                            >
-                                                                <VideoIcon className="h-5 w-5" />
-                                                            </span>
-                                                        )}
-                                            </p>
-                                        </div>
-                                    )}
-                                    {selectedVisit.notes && (
-                                        <div className="col-span-2">
-                                            <Label className="text-muted-foreground">Notes</Label>
-                                            <p className="font-medium">{selectedVisit.notes}</p>
-                                        </div>
-                                    )}
-                                    {selectedVisit.rejection_reason && (
-                                        <div className="col-span-2">
-                                            <Label className="text-muted-foreground">Rejection Reason</Label>
-                                            <p className="font-medium text-destructive">{selectedVisit.rejection_reason}</p>
-                                        </div>
-                                    )}
+                            <div className="flex flex-col gap-3">
+                                <div className="space-y-1">
+                                    <Label className="text-muted-foreground">Visitor</Label>
+                                    <Input readOnly value={selectedVisit.visitor_name ?? '—'} className="bg-muted" />
                                 </div>
+                                <div className="space-y-1">
+                                    <Label className="text-muted-foreground">Visitor email</Label>
+                                    <Input readOnly value={selectedVisit.visitor_email ?? '—'} className="bg-muted" />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-muted-foreground">Status</Label>
+                                    <div className="pt-2">{getStatusBadge(selectedVisit.status)}</div>
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-muted-foreground">Inmate name</Label>
+                                    <Input readOnly value={selectedVisit.inmate_name ?? '—'} className="bg-muted" />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-muted-foreground">Visit type</Label>
+                                    <div className="pt-2">{getVisitTypeBadge(selectedVisit.visit_type)}</div>
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-muted-foreground">Scheduled date</Label>
+                                    <Input readOnly value={new Date(selectedVisit.scheduled_date).toLocaleDateString()} className="bg-muted" />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-muted-foreground">Scheduled time</Label>
+                                    <Input readOnly value={selectedVisit.scheduled_time ?? '—'} className="bg-muted" />
+                                </div>
+                                {selectedVisit.visit_type === 'virtual' && selectedVisit.status === 'approved' && (
+                                    <div className="space-y-1">
+                                        <Label className="text-muted-foreground">Join video call</Label>
+                                        <div className="pt-2">
+                                            {selectedVisit.visit_session_id && selectedVisit.schedule_started && !selectedVisit.schedule_ended
+                                                ? (
+                                                    <a
+                                                        href={`/bjmp-officer/visit-session/${selectedVisit.visit_session_id}/join`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="inline-flex h-10 w-10 items-center justify-center rounded-md bg-green-600 text-white hover:bg-green-700"
+                                                        title="Join video call"
+                                                    >
+                                                        <VideoIcon className="h-5 w-5" />
+                                                    </a>
+                                                )
+                                                : (
+                                                    <span
+                                                        className="inline-flex h-10 w-10 cursor-not-allowed items-center justify-center rounded-md bg-muted text-muted-foreground"
+                                                        title={
+                                                            !selectedVisit.schedule_started
+                                                                ? 'Video call is available from the scheduled start time.'
+                                                                : selectedVisit.schedule_ended
+                                                                    ? 'Schedule has ended.'
+                                                                    : 'Not available'
+                                                        }
+                                                    >
+                                                        <VideoIcon className="h-5 w-5" />
+                                                    </span>
+                                                )}
+                                        </div>
+                                    </div>
+                                )}
+                                <div className="space-y-1">
+                                    <Label className="text-muted-foreground">Notes</Label>
+                                    <Input readOnly value={selectedVisit.notes ?? '—'} className="bg-muted" />
+                                </div>
+                                {selectedVisit.rejection_reason && (
+                                    <div className="space-y-1">
+                                        <Label className="text-muted-foreground">Rejection reason</Label>
+                                        <Input readOnly value={selectedVisit.rejection_reason} className="bg-muted text-destructive" />
+                                    </div>
+                                )}
                             </div>
                         )}
                         <DialogFooter>
@@ -975,13 +975,13 @@ export default function ScheduleManagement({ visits, stats, monitoringOfficers }
                     </DialogContent>
                 </Dialog>
 
-                {/* Reschedule Modal */}
+                {/* Reschedule Modal — 10-min slots (virtual) / 1-hour (physical); past times disabled when date is today */}
                 <Dialog open={isRescheduleModalOpen} onOpenChange={setIsRescheduleModalOpen}>
-                    <DialogContent>
+                    <DialogContent className="max-h-[90vh] overflow-y-auto">
                         <DialogHeader>
                             <DialogTitle>Reschedule Visit</DialogTitle>
                             <DialogDescription>
-                                Update the date and time for this visit schedule
+                                Update the date and time for this visit schedule. Virtual: 10-minute slots. Physical: 1-hour slots. Past times are disabled when the selected date is today.
                             </DialogDescription>
                         </DialogHeader>
                         <div className="space-y-4">
@@ -994,22 +994,48 @@ export default function ScheduleManagement({ visits, stats, monitoringOfficers }
                                     type="date"
                                     required
                                     value={rescheduleForm.data.scheduled_date}
-                                    onChange={(e) => rescheduleForm.setData('scheduled_date', e.target.value)}
+                                    onChange={(e) => {
+                                        rescheduleForm.setData('scheduled_date', e.target.value);
+                                        rescheduleForm.setData('scheduled_time', '');
+                                    }}
                                     min={new Date().toISOString().split('T')[0]}
                                 />
                                 <InputError message={rescheduleForm.errors.scheduled_date} />
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="reschedule_time">
-                                    Scheduled Time <span className="text-destructive">*</span>
-                                </Label>
-                                <Input
-                                    id="reschedule_time"
-                                    type="time"
-                                    required
-                                    value={rescheduleForm.data.scheduled_time}
-                                    onChange={(e) => rescheduleForm.setData('scheduled_time', e.target.value)}
-                                />
+                                <Label>Scheduled Time <span className="text-destructive">*</span></Label>
+                                {rescheduleForm.data.scheduled_date ? (
+                                    <TimeSlotPicker
+                                        selectedTime={rescheduleForm.data.scheduled_time || ''}
+                                        bookedSlots={[]}
+                                        slotCapacities={selectedVisit && rescheduleForm.data.scheduled_date === new Date().toISOString().slice(0, 10)
+                                            ? (() => {
+                                                const now = new Date();
+                                                const nowMinutes = now.getHours() * 60 + now.getMinutes();
+                                                const isVirtual = selectedVisit.visit_type === 'virtual';
+                                                const cap: Record<string, { current: number; max: number; isFull: boolean }> = {};
+                                                if (isVirtual) {
+                                                    for (let h = 7; h < 18; h++) {
+                                                        for (let m = 0; m < 60; m += 10) {
+                                                            const key = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+                                                            cap[key] = { current: 0, max: 1, isFull: h * 60 + m <= nowMinutes };
+                                                        }
+                                                    }
+                                                } else {
+                                                    for (let h = 7; h < 18; h++) {
+                                                        const key = `${h.toString().padStart(2, '0')}:00`;
+                                                        cap[key] = { current: 0, max: 1, isFull: h * 60 <= nowMinutes };
+                                                    }
+                                                }
+                                                return cap;
+                                            })()
+                                            : {}}
+                                        visitType={selectedVisit?.visit_type}
+                                        onTimeSelect={(time) => rescheduleForm.setData('scheduled_time', time)}
+                                    />
+                                ) : (
+                                    <p className="text-sm text-muted-foreground">Select a date first.</p>
+                                )}
                                 <InputError message={rescheduleForm.errors.scheduled_time} />
                             </div>
                         </div>

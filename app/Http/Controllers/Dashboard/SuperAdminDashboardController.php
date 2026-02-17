@@ -16,6 +16,7 @@ use App\Models\Role;
 use App\Models\Suggestion;
 use App\Models\User;
 use App\Models\Visit;
+use App\Models\VisitSession;
 use App\SuggestionStatus;
 use App\VisitType;
 use Carbon\Carbon;
@@ -75,12 +76,13 @@ class SuperAdminDashboardController extends Controller
         $monitoringOfficerId = $request->input('monitoring_officer_id');
         $inmateSearch = $request->input('inmate');
 
-        $totalUsers = User::count();
-        $pendingUsers = User::where('approval_status', ApprovalStatus::Pending)->count();
-        $approvedUsers = User::where('approval_status', ApprovalStatus::Approved)->count();
-        $rejectedUsers = User::where('approval_status', ApprovalStatus::Rejected)->count();
+        $totalUsers = User::whereBetween('created_at', [$dateFrom, $dateTo])->count();
+        $pendingUsers = User::where('approval_status', ApprovalStatus::Pending)->whereBetween('created_at', [$dateFrom, $dateTo])->count();
+        $approvedUsers = User::where('approval_status', ApprovalStatus::Approved)->whereBetween('created_at', [$dateFrom, $dateTo])->count();
+        $rejectedUsers = User::where('approval_status', ApprovalStatus::Rejected)->whereBetween('created_at', [$dateFrom, $dateTo])->count();
 
         $recentUsers = User::with('role')
+            ->whereBetween('created_at', [$dateFrom, $dateTo])
             ->orderBy('created_at', 'desc')
             ->limit(10)
             ->get()
@@ -99,6 +101,7 @@ class SuperAdminDashboardController extends Controller
             });
 
         $usersByRole = User::with('role')
+            ->whereBetween('created_at', [$dateFrom, $dateTo])
             ->get()
             ->groupBy(function ($user) {
                 return $user->role?->slug ?? 'no_role';
@@ -108,44 +111,53 @@ class SuperAdminDashboardController extends Controller
             })
             ->toArray();
 
-        // Appeals statistics
+        // Appeals statistics (filtered by date range)
+        $appealDateFilter = fn ($q) => $q->whereBetween('created_at', [$dateFrom, $dateTo]);
         $appealsStats = [
-            'total' => Appeal::count(),
-            'pending' => Appeal::where('status', AppealStatus::Pending)->count(),
-            'approved' => Appeal::where('status', AppealStatus::Approved)->count(),
-            'rejected' => Appeal::where('status', AppealStatus::Rejected)->count(),
+            'total' => Appeal::whereBetween('created_at', [$dateFrom, $dateTo])->count(),
+            'pending' => Appeal::where('status', AppealStatus::Pending)->whereBetween('created_at', [$dateFrom, $dateTo])->count(),
+            'approved' => Appeal::where('status', AppealStatus::Approved)->whereBetween('created_at', [$dateFrom, $dateTo])->count(),
+            'rejected' => Appeal::where('status', AppealStatus::Rejected)->whereBetween('created_at', [$dateFrom, $dateTo])->count(),
             'by_type' => [
-                'visit' => Appeal::where('appealable_type', Visit::class)->count(),
-                'eburol' => Appeal::where('appealable_type', Eburol::class)->count(),
+                'visit' => Appeal::where('appealable_type', Visit::class)->whereBetween('created_at', [$dateFrom, $dateTo])->count(),
+                'eburol' => Appeal::where('appealable_type', Eburol::class)->whereBetween('created_at', [$dateFrom, $dateTo])->count(),
             ],
         ];
 
-        // Suggestions/Complaints statistics
+        // Suggestions/Complaints statistics (filtered by date range)
         $suggestionsStats = [
-            'total' => Suggestion::count(),
-            'pending' => Suggestion::where('status', SuggestionStatus::Pending)->count(),
-            'suggestions' => Suggestion::where('type', 'suggestion')->count(),
-            'complaints' => Suggestion::where('type', 'complaint')->count(),
-            'resolved' => Suggestion::where('status', SuggestionStatus::Resolved)->count(),
-            'reviewed' => Suggestion::where('status', SuggestionStatus::Reviewed)->count(),
-            'in_progress' => Suggestion::where('status', SuggestionStatus::InProgress)->count(),
-            'dismissed' => Suggestion::where('status', SuggestionStatus::Dismissed)->count(),
+            'total' => Suggestion::whereBetween('created_at', [$dateFrom, $dateTo])->count(),
+            'pending' => Suggestion::where('status', SuggestionStatus::Pending)->whereBetween('created_at', [$dateFrom, $dateTo])->count(),
+            'suggestions' => Suggestion::where('type', 'suggestion')->whereBetween('created_at', [$dateFrom, $dateTo])->count(),
+            'complaints' => Suggestion::where('type', 'complaint')->whereBetween('created_at', [$dateFrom, $dateTo])->count(),
+            'resolved' => Suggestion::where('status', SuggestionStatus::Resolved)->whereBetween('created_at', [$dateFrom, $dateTo])->count(),
+            'reviewed' => Suggestion::where('status', SuggestionStatus::Reviewed)->whereBetween('created_at', [$dateFrom, $dateTo])->count(),
+            'in_progress' => Suggestion::where('status', SuggestionStatus::InProgress)->whereBetween('created_at', [$dateFrom, $dateTo])->count(),
+            'dismissed' => Suggestion::where('status', SuggestionStatus::Dismissed)->whereBetween('created_at', [$dateFrom, $dateTo])->count(),
         ];
 
-        // E-Burol statistics
+        // E-Burol statistics (filtered by date range - created_at)
         $eburolStats = [
-            'total' => Eburol::count(),
-            'pending' => Eburol::where('status', EburolStatus::Pending)->count(),
-            'approved' => Eburol::where('status', EburolStatus::Approved)->count(),
-            'rejected' => Eburol::where('status', EburolStatus::Rejected)->count(),
-            'completed' => Eburol::where('status', EburolStatus::Completed)->count(),
+            'total' => Eburol::whereBetween('created_at', [$dateFrom, $dateTo])->count(),
+            'pending' => Eburol::where('status', EburolStatus::Pending)->whereBetween('created_at', [$dateFrom, $dateTo])->count(),
+            'approved' => Eburol::where('status', EburolStatus::Approved)->whereBetween('created_at', [$dateFrom, $dateTo])->count(),
+            'rejected' => Eburol::where('status', EburolStatus::Rejected)->whereBetween('created_at', [$dateFrom, $dateTo])->count(),
+            'completed' => Eburol::where('status', EburolStatus::Completed)->whereBetween('created_at', [$dateFrom, $dateTo])->count(),
         ];
 
-        // Get visitors only
+        // Get visitors only; restrict to those with visit or eburol activity in date range when showing charts
         $visitorRole = Role::where('slug', 'visitor')->first();
-        $visitors = $visitorRole ? User::where('role_id', $visitorRole->id)->get() : collect();
+        $visitorIdsWithActivity = collect();
+        if ($visitorRole) {
+            $visitUserIds = Visit::whereBetween('scheduled_date', [$dateFromStr, $dateToStr])->pluck('user_id')->unique();
+            $eburolUserIds = Eburol::whereBetween('created_at', [$dateFrom, $dateTo])->pluck('user_id')->unique();
+            $visitorIdsWithActivity = $visitUserIds->merge($eburolUserIds)->unique()->filter();
+            $visitors = User::where('role_id', $visitorRole->id)->whereIn('id', $visitorIdsWithActivity)->get();
+        } else {
+            $visitors = collect();
+        }
 
-        // Gender distribution of visitors
+        // Gender distribution of visitors (with activity in range)
         $genderDistribution = $visitors->groupBy('gender')
             ->map(fn ($group) => $group->count())
             ->toArray();
@@ -161,10 +173,10 @@ class SuperAdminDashboardController extends Controller
         // Appeals by type (already calculated above)
         $appealsByType = $appealsStats['by_type'];
 
-        // Feedback by type
+        // Feedback by type (filtered by date range)
         $feedbackByType = [
-            'suggestions' => Suggestion::where('type', 'suggestion')->count(),
-            'complaints' => Suggestion::where('type', 'complaint')->count(),
+            'suggestions' => Suggestion::where('type', 'suggestion')->whereBetween('created_at', [$dateFrom, $dateTo])->count(),
+            'complaints' => Suggestion::where('type', 'complaint')->whereBetween('created_at', [$dateFrom, $dateTo])->count(),
         ];
 
         // Location distribution (default: by barangay)
@@ -173,19 +185,21 @@ class SuperAdminDashboardController extends Controller
         $municipalityFilter = request()->input('municipality');
         $barangayFilter = request()->input('barangay');
 
-        // Location data for filters
-        $provinces = User::where('role_id', $visitorRole?->id)
-            ->whereNotNull('province')
-            ->distinct()
-            ->orderBy('province')
-            ->pluck('province')
-            ->filter()
-            ->values()
-            ->toArray();
+        // Location data for filters (visitors with activity in date range)
+        $provinces = $visitorRole
+            ? User::where('role_id', $visitorRole->id)->whereIn('id', $visitorIdsWithActivity)
+                ->whereNotNull('province')
+                ->distinct()
+                ->orderBy('province')
+                ->pluck('province')
+                ->filter()
+                ->values()
+                ->toArray()
+            : [];
 
-        // Get municipalities - filter by province if provided
-        $municipalityQuery = User::where('role_id', $visitorRole?->id)
-            ->whereNotNull('municipality');
+        $municipalityQuery = $visitorRole
+            ? User::where('role_id', $visitorRole->id)->whereIn('id', $visitorIdsWithActivity)->whereNotNull('municipality')
+            : User::query()->whereRaw('1 = 0');
         if ($provinceFilter && $provinceFilter !== 'all') {
             $municipalityQuery->where('province', $provinceFilter);
         }
@@ -197,9 +211,9 @@ class SuperAdminDashboardController extends Controller
             ->values()
             ->toArray();
 
-        // Get barangays - filter by province and municipality if provided
-        $barangayQuery = User::where('role_id', $visitorRole?->id)
-            ->whereNotNull('brgy');
+        $barangayQuery = $visitorRole
+            ? User::where('role_id', $visitorRole->id)->whereIn('id', $visitorIdsWithActivity)->whereNotNull('brgy')
+            : User::query()->whereRaw('1 = 0');
         if ($provinceFilter && $provinceFilter !== 'all') {
             $barangayQuery->where('province', $provinceFilter);
         }
@@ -283,18 +297,24 @@ class SuperAdminDashboardController extends Controller
 
         // Peak Usage Hours (sessions per hour/day, in date range)
         $peakUsageData = $this->getPeakUsageHours($dateFrom, $dateTo);
+        // Peak usage heatmap: hour (0-23) x day of week (0-6)
+        $peakUsageHeatmap = $this->getPeakUsageHeatmap($dateFrom, $dateTo);
+        // Top inmates by visit count (in date range)
+        $topInmatesByVisits = $this->getTopInmatesByVisits($dateFrom, $dateTo, $visitTypeFilter, $statusFilter);
+        // Distribution of monitoring officers (sessions supervised in date range)
+        $monitoringOfficerDistribution = $this->getMonitoringOfficerDistribution($dateFrom, $dateTo);
 
-        // Incident Reports Summary
-        $incidentReportsData = $this->getIncidentReportsSummary();
+        // Incident Reports Summary (filtered by date range)
+        $incidentReportsData = $this->getIncidentReportsSummary($dateFrom, $dateTo);
 
         // Flagged Chat Messages Over Time (date range)
         $flaggedMessagesData = $this->getFlaggedChatMessagesOverTime($dateFrom, $dateTo);
 
-        // Session Enforcement Actions
-        $enforcementActionsData = $this->getSessionEnforcementActions();
+        // Session Enforcement Actions (filtered by date range)
+        $enforcementActionsData = $this->getSessionEnforcementActions($dateFrom, $dateTo);
 
-        // Physical Visit Key Usage
-        $keyUsageData = $this->getPhysicalVisitKeyUsage();
+        // Physical Visit Key Usage (filtered by date range)
+        $keyUsageData = $this->getPhysicalVisitKeyUsage($dateFrom, $dateTo);
 
         // Complaints & Reviews Trend (date range)
         $complaintsTrendData = $this->getComplaintsAndReviewsTrend($dateFrom, $dateTo);
@@ -344,6 +364,9 @@ class SuperAdminDashboardController extends Controller
             'age_distribution' => $ageChartData,
             'visit_volume_over_time' => $visitVolumeData,
             'peak_usage_hours' => $peakUsageData,
+            'peak_usage_heatmap' => $peakUsageHeatmap,
+            'top_inmates_by_visits' => $topInmatesByVisits,
+            'monitoring_officer_distribution' => $monitoringOfficerDistribution,
             'incident_reports_summary' => $incidentReportsData,
             'flagged_messages_over_time' => $flaggedMessagesData,
             'enforcement_actions' => $enforcementActionsData,
@@ -461,11 +484,90 @@ class SuperAdminDashboardController extends Controller
     }
 
     /**
+     * Get peak usage heatmap: 24 hours x 7 days. Rows = hour (0-23), cols = day of week (0=Sun .. 6=Sat).
+     *
+     * @return array<int, array<int, int>>
+     */
+    private function getPeakUsageHeatmap(Carbon $dateFrom, Carbon $dateTo): array
+    {
+        $sessions = MonitoringSession::whereNotNull('started_at')
+            ->whereBetween('started_at', [$dateFrom, $dateTo])
+            ->get();
+
+        $grid = array_fill(0, 24, array_fill(0, 7, 0));
+        foreach ($sessions as $session) {
+            $hour = (int) $session->started_at->format('G');
+            $dow = (int) $session->started_at->format('w');
+            $grid[$hour][$dow]++;
+        }
+
+        return $grid;
+    }
+
+    /**
+     * Get top inmates by visit count in date range.
+     *
+     * @return array<int, array{inmate_name: string, visit_count: int, rank: int}>
+     */
+    private function getTopInmatesByVisits(Carbon $dateFrom, Carbon $dateTo, ?string $visitTypeFilter, ?string $statusFilter): array
+    {
+        $query = Visit::whereBetween('scheduled_date', [$dateFrom->format('Y-m-d'), $dateTo->format('Y-m-d')]);
+        $this->applyVisitFilters($query, $visitTypeFilter, $statusFilter, null, null);
+        $visits = $query->get();
+
+        $byInmate = $visits->groupBy(function ($v) {
+            $name = trim($v->inmate_first_name.' '.$v->inmate_middle_name.' '.$v->inmate_last_name);
+
+            return $name !== '' ? $name : 'Unknown';
+        })->map(fn ($group) => $group->count())->sortDesc()->take(10);
+
+        $result = [];
+        $rank = 1;
+        foreach ($byInmate as $inmateName => $count) {
+            $result[] = [
+                'inmate_name' => $inmateName,
+                'visit_count' => $count,
+                'rank' => $rank++,
+            ];
+        }
+
+        return $result;
+    }
+
+    /**
+     * Get distribution of monitoring officers (sessions supervised in date range). For pie chart.
+     *
+     * @return array<string, int>
+     */
+    private function getMonitoringOfficerDistribution(Carbon $dateFrom, Carbon $dateTo): array
+    {
+        $sessions = VisitSession::whereBetween('scheduled_start', [$dateFrom, $dateTo])
+            ->whereNotNull('monitor_id')
+            ->with('monitor')
+            ->get();
+
+        $byMonitor = $sessions->groupBy('monitor_id')->map(function ($group, $monitorId) {
+            $monitor = $group->first()->monitor;
+            $name = $monitor ? trim($monitor->first_name.' '.$monitor->middle_name.' '.$monitor->last_name) : 'Unknown';
+
+            return ['name' => $name ?: 'Unknown', 'count' => $group->count()];
+        });
+
+        $result = [];
+        foreach ($byMonitor as $data) {
+            $result[$data['name']] = $data['count'];
+        }
+
+        return $result;
+    }
+
+    /**
      * Get incident reports summary (minor, major, critical).
      */
-    private function getIncidentReportsSummary(): array
+    private function getIncidentReportsSummary(Carbon $dateFrom, Carbon $dateTo): array
     {
         $incidents = Incident::select('classification', DB::raw('count(*) as count'))
+            ->whereBetween('created_at', [$dateFrom, $dateTo])
             ->groupBy('classification')
             ->get()
             ->pluck('count', 'classification')
@@ -504,16 +606,11 @@ class SuperAdminDashboardController extends Controller
     /**
      * Get session enforcement actions (forced mutes, terminations, chat locks).
      */
-    private function getSessionEnforcementActions(): array
+    private function getSessionEnforcementActions(Carbon $dateFrom, Carbon $dateTo): array
     {
-        // Forced mutes (disabled microphone)
-        $forcedMutes = MonitoringLog::where('action', 'disabled_microphone')->count();
-
-        // Session terminations
-        $terminations = MonitoringLog::where('action', 'terminated_session')->count();
-
-        // Chat locks
-        $chatLocks = MonitoringLog::where('action', 'locked_chat')->count();
+        $forcedMutes = MonitoringLog::where('action', 'disabled_microphone')->whereBetween('created_at', [$dateFrom, $dateTo])->count();
+        $terminations = MonitoringLog::where('action', 'terminated_session')->whereBetween('created_at', [$dateFrom, $dateTo])->count();
+        $chatLocks = MonitoringLog::where('action', 'locked_chat')->whereBetween('created_at', [$dateFrom, $dateTo])->count();
 
         return [
             'forced_mutes' => $forcedMutes,
@@ -523,12 +620,13 @@ class SuperAdminDashboardController extends Controller
     }
 
     /**
-     * Get physical visit key usage (generated, used, expired).
+     * Get physical visit key usage (generated, used, expired) in date range.
      */
-    private function getPhysicalVisitKeyUsage(): array
+    private function getPhysicalVisitKeyUsage(Carbon $dateFrom, Carbon $dateTo): array
     {
         $physicalVisits = Visit::where('visit_type', VisitType::Physical)
             ->whereNotNull('access_key')
+            ->whereBetween('scheduled_date', [$dateFrom->format('Y-m-d'), $dateTo->format('Y-m-d')])
             ->get();
 
         $generated = $physicalVisits->count();

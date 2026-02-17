@@ -94,6 +94,11 @@ export function AppSidebar() {
                         icon: Monitor,
                     },
                     {
+                        title: 'Monitor Calls',
+                        href: '/monitoring-officer/assigned-sessions',
+                        icon: Video,
+                    },
+                    {
                         title: 'Video Recordings',
                         href: '/monitoring/video-recordings',
                         icon: Film,
@@ -169,7 +174,7 @@ export function AppSidebar() {
                 label: 'Applications',
                 items: [
                     {
-                        title: 'Visit Management',
+                        title: 'Apply for visit',
                         href: '/visitor/schedule',
                         icon: Calendar,
                     },
@@ -256,6 +261,7 @@ export function AppSidebar() {
     // Monitoring Officer navigation with categories
     let monitoringOfficerNavGroups: Array<{ label: string; items: NavItem[] }> | undefined;
     if (userRole === 'monitoring_officer') {
+        const unreadMoCount = page.props.unreadNotificationCount ?? 0;
         monitoringOfficerNavGroups = [
             {
                 label: 'Main',
@@ -269,6 +275,12 @@ export function AppSidebar() {
                         title: 'Assigned Sessions',
                         href: '/monitoring-officer/assigned-sessions',
                         icon: Video,
+                    },
+                    {
+                        title: 'Notifications',
+                        href: '/monitoring-officer/notifications',
+                        icon: Bell,
+                        badge: unreadMoCount > 0 ? unreadMoCount : undefined,
                     },
                 ],
             },

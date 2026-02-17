@@ -1,8 +1,7 @@
-import { Head, router } from '@inertiajs/react';
+import { Head } from '@inertiajs/react';
 import type { ColumnDef } from '@tanstack/react-table';
-import { Eye, Link2, Lock, Play, Square, Unlock } from 'lucide-react';
+import { Eye } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { toast } from 'sonner';
 
 import { useToast } from '@/hooks/use-toast';
 
@@ -12,14 +11,41 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { DataTable } from '@/components/data-table';
 import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import {
     Select,
     SelectContent,
     SelectItem,
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
 import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
+
+function formatTimeUntil(startIso: string): string {
+    const now = Date.now();
+    const start = new Date(startIso).getTime();
+    if (start <= now) return '';
+    const diffMs = start - now;
+    const totalMinutes = Math.floor(diffMs / 60_000);
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    if (hours > 0 && minutes > 0) return `${hours} hour${hours !== 1 ? 's' : ''} and ${minutes} minute${minutes !== 1 ? 's' : ''}`;
+    if (hours > 0) return `${hours} hour${hours !== 1 ? 's' : ''}`;
+    return `${minutes} minute${minutes !== 1 ? 's' : ''}`;
+}
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
@@ -31,6 +57,7 @@ type Session = {
     visit_id: number | null;
     eburol_id: number | null;
     room_id: string;
+    tunnel_short_code: string | null;
     visitor_name: string | null;
     inmate_name: string;
     type: string;
@@ -70,108 +97,16 @@ function getStatusBadge(status: string) {
 export default function AssignedSessions({ sessions, filters: initialFilters }: Props) {
     useToast();
     const [typeFilter, setTypeFilter] = useState(initialFilters?.type ?? 'all');
-    const [generatingTunnelFor, setGeneratingTunnelFor] = useState<number | null>(null);
-    const [endingFor, setEndingFor] = useState<number | null>(null);
-    const [lockingFor, setLockingFor] = useState<number | null>(null);
-
-    const getCsrfToken = () => {
-        const match = document.cookie.match(/XSRF-TOKEN=([^;]+)/);
-        return match ? decodeURIComponent(match[1]) : '';
-    };
-
-    const handleGenerateTunnel = async (sessionId: number) => {
-        setGeneratingTunnelFor(sessionId);
-        try {
-            const res = await fetch(`/monitoring-officer/assigned-sessions/${sessionId}/generate-tunnel`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Accept: 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'X-XSRF-TOKEN': getCsrfToken(),
-                },
-                body: '{}',
-                credentials: 'same-origin',
-            });
-            const data = await res.json();
-            if (res.ok && data.join_url) {
-                await navigator.clipboard.writeText(data.join_url);
-                toast.success('Inmate join link copied to clipboard.');
-            } else {
-                toast.error(data.error || 'Failed to generate link');
-            }
-        } catch {
-            toast.error('Failed to generate link');
-        }
-        setGeneratingTunnelFor(null);
-    };
-
-    const handleStartSession = (sessionId: number) => {
-        router.post(`/monitoring-officer/assigned-sessions/${sessionId}/start`, {}, {
-            preserveScroll: true,
-            onSuccess: () => toast.success('Session started'),
-            onError: () => toast.error('Failed to start session'),
-        });
-    };
-
-    const handleEndSession = (sessionId: number) => {
-        setEndingFor(sessionId);
-        router.post(`/monitoring-officer/assigned-sessions/${sessionId}/end`, {}, {
-            preserveScroll: true,
-            onSuccess: () => {
-                toast.success('Session ended');
-                setEndingFor(null);
-            },
-            onError: () => {
-                toast.error('Failed to end session');
-                setEndingFor(null);
-            },
-        });
-    };
-
-    const handleLockChat = async (sessionId: number) => {
-        setLockingFor(sessionId);
-        try {
-            const res = await fetch(`/monitoring-officer/assigned-sessions/${sessionId}/lock-chat`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-XSRF-TOKEN': getCsrfToken() },
-                credentials: 'same-origin',
-            });
-            if (res.ok) {
-                toast.success('Chat locked');
-                router.reload();
-            } else {
-                const d = await res.json();
-                toast.error(d.error || 'Failed to lock chat');
-            }
-        } catch {
-            toast.error('Failed to lock chat');
-        }
-        setLockingFor(null);
-    };
-
-    const handleUnlockChat = async (sessionId: number) => {
-        setLockingFor(sessionId);
-        try {
-            const res = await fetch(`/monitoring-officer/assigned-sessions/${sessionId}/unlock-chat`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-XSRF-TOKEN': getCsrfToken() },
-                credentials: 'same-origin',
-            });
-            if (res.ok) {
-                toast.success('Chat unlocked');
-                router.reload();
-            } else {
-                const d = await res.json();
-                toast.error(d.error || 'Failed to unlock chat');
-            }
-        } catch {
-            toast.error('Failed to unlock chat');
-        }
-        setLockingFor(null);
-    };
+    const [beforeScheduleSession, setBeforeScheduleSession] = useState<Session | null>(null);
 
     const columns: ColumnDef<Session>[] = useMemo(() => [
+        {
+            accessorKey: 'tunnel_short_code',
+            header: 'Tunnel code',
+            cell: ({ row }) => (
+                <span className="font-mono text-sm tracking-wider">{row.original.tunnel_short_code || '—'}</span>
+            ),
+        },
         { accessorKey: 'visitor_name', header: 'Visitor', cell: ({ row }) => <span className="font-medium">{row.original.visitor_name ?? '—'}</span> },
         { accessorKey: 'inmate_name', header: 'Inmate' },
         { accessorKey: 'type', header: 'Type', cell: ({ row }) => row.original.type === 'visit' ? 'Visit' : 'E-Burol' },
@@ -197,71 +132,55 @@ export default function AssignedSessions({ sessions, filters: initialFilters }: 
             header: 'Actions',
             cell: ({ row }) => {
                 const s = row.original;
-                const isScheduled = s.status === 'scheduled';
-                const isActive = s.status === 'active';
                 const isCompleted = s.status === 'completed' || s.status === 'terminated';
+                const joinDisabled = s.schedule_ended || s.status === 'no_show' || s.status === 'missed' || isCompleted;
+                const joinReason = joinDisabled
+                    ? (s.status === 'no_show' ? 'No show' : s.status === 'missed' ? 'Missed' : s.schedule_ended ? 'Session has ended' : 'Session ended')
+                    : '';
+                const handleJoinClick = () => {
+                    if (joinDisabled) return;
+                    const now = Date.now();
+                    const start = new Date(s.scheduled_start).getTime();
+                    if (start > now) {
+                        setBeforeScheduleSession(s);
+                        return;
+                    }
+                    window.location.href = `/monitoring-officer/assigned-sessions/${s.id}/join`;
+                };
                 return (
                     <div className="flex items-center gap-2">
                         {!isCompleted && (
-                            <>
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => handleGenerateTunnel(s.id)}
-                                    disabled={generatingTunnelFor === s.id || s.schedule_ended}
-                                    title={s.schedule_ended ? 'Session has ended' : undefined}
-                                >
-                                    <Link2 className="mr-1 h-4 w-4" />
-                                    {generatingTunnelFor === s.id ? '...' : 'Inmate Link'}
-                                </Button>
-                                {isScheduled && (
-                                    <Button
-                                        size="sm"
-                                        variant="default"
-                                        onClick={() => handleStartSession(s.id)}
-                                        disabled={!s.has_tunnel}
-                                        title={!s.has_tunnel ? 'Generate inmate link first' : undefined}
-                                    >
-                                        <Play className="mr-1 h-4 w-4" />
-                                        Start
-                                    </Button>
-                                )}
-                                {!isCompleted && !s.schedule_ended && (
-                                    <Button size="sm" variant="outline" asChild>
-                                        <a href={`/monitoring-officer/assigned-sessions/${s.id}/join`}>
-                                            <Eye className="mr-1 h-4 w-4" />
-                                            Join as observer
-                                        </a>
-                                    </Button>
-                                )}
-                                {isActive && (
-                                    <Button size="sm" variant="destructive" onClick={() => handleEndSession(s.id)} disabled={endingFor === s.id}>
-                                        <Square className="mr-1 h-4 w-4" />
-                                        {endingFor === s.id ? '...' : 'End'}
-                                    </Button>
-                                )}
-                                {isActive && (
-                                    s.chat_locked
-                                        ? (
-                                            <Button size="sm" variant="outline" onClick={() => handleUnlockChat(s.id)} disabled={lockingFor === s.id}>
-                                                <Unlock className="mr-1 h-4 w-4" />
-                                                {lockingFor === s.id ? '...' : 'Unlock chat'}
+                            <TooltipProvider>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <span className="inline-block">
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                disabled={joinDisabled}
+                                                onClick={handleJoinClick}
+                                            >
+                                                <Eye className="mr-1 h-4 w-4" />
+                                                Join as observer
                                             </Button>
-                                        )
-                                        : (
-                                            <Button size="sm" variant="outline" onClick={() => handleLockChat(s.id)} disabled={lockingFor === s.id}>
-                                                <Lock className="mr-1 h-4 w-4" />
-                                                {lockingFor === s.id ? '...' : 'Lock chat'}
-                                            </Button>
-                                        )
-                                )}
-                                                            </>
-                                                        )}
-                                                    </div>
+                                        </span>
+                                    </TooltipTrigger>
+                                    {joinDisabled && <TooltipContent>{joinReason}</TooltipContent>}
+                                </Tooltip>
+                            </TooltipProvider>
+                        )}
+                    </div>
                 );
             },
         },
-    ], [generatingTunnelFor, endingFor, lockingFor]);
+    ], []);
+
+    const timeUntilStr = beforeScheduleSession ? formatTimeUntil(beforeScheduleSession.scheduled_start) : '';
+
+    const filteredSessions = useMemo(() => {
+        if (typeFilter === 'all') return sessions;
+        return sessions.filter((s) => s.type === typeFilter);
+    }, [sessions, typeFilter]);
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -273,35 +192,57 @@ export default function AssignedSessions({ sessions, filters: initialFilters }: 
                 </div>
                 <Card>
                     <CardHeader>
-                        <div className="flex flex-wrap items-center justify-between gap-4">
-                            <div>
-                                <CardTitle>Sessions</CardTitle>
-                                <CardDescription>{sessions.length} session(s) assigned to you</CardDescription>
-                            </div>
-                            <Select
-                                value={typeFilter}
-                                onValueChange={(value) => {
-                                    setTypeFilter(value);
-                                    router.get('/monitoring-officer/assigned-sessions', {
-                                        type: value === 'all' ? undefined : value,
-                                    }, { preserveScroll: true });
-                                }}
-                            >
-                                <SelectTrigger className="w-[180px]">
-                                    <SelectValue placeholder="Session type" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">All sessions</SelectItem>
-                                    <SelectItem value="visit">Virtual visit</SelectItem>
-                                    <SelectItem value="eburol">E-Burol</SelectItem>
-                                </SelectContent>
-                            </Select>
+                        <div>
+                            <CardTitle>Sessions</CardTitle>
+                            <CardDescription>{filteredSessions.length} of {sessions.length} session(s) assigned to you</CardDescription>
                         </div>
                     </CardHeader>
                     <CardContent>
-                        <DataTable columns={columns} data={sessions} />
+                        <DataTable
+                            columns={columns}
+                            data={filteredSessions}
+                            searchKey="session_search"
+                            searchPlaceholder="Search by visitor, inmate, type..."
+                            initialSorting={[{ id: 'scheduled_start', desc: true }]}
+                            headerActions={
+                                <Select
+                                    value={typeFilter}
+                                    onValueChange={setTypeFilter}
+                                >
+                                    <SelectTrigger className="w-[180px]">
+                                        <SelectValue placeholder="Session type" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">All sessions</SelectItem>
+                                        <SelectItem value="visit">Virtual visit</SelectItem>
+                                        <SelectItem value="eburol">E-Burol</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            }
+                        />
                     </CardContent>
                 </Card>
+
+                <Dialog open={!!beforeScheduleSession} onOpenChange={(open) => !open && setBeforeScheduleSession(null)}>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Session not started yet</DialogTitle>
+                            <DialogDescription>
+                                {timeUntilStr
+                                    ? `This session starts in ${timeUntilStr}. You can wait and try again when it's time, or cancel.`
+                                    : 'This session has not started yet.'}
+                            </DialogDescription>
+                        </DialogHeader>
+                        <DialogFooter>
+                            <Button variant="outline" onClick={() => setBeforeScheduleSession(null)}>
+                                Wait
+                            </Button>
+                            <Button variant="secondary" onClick={() => setBeforeScheduleSession(null)}>
+                                Cancel
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
             </div>
         </AppLayout>
     );

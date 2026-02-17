@@ -190,6 +190,10 @@ class EburolManagementController extends Controller
      */
     public function updateStatus(Request $request, Eburol $eburol): RedirectResponse
     {
+        $request->merge([
+            'monitoring_officer_id' => $request->filled('monitoring_officer_id') ? $request->monitoring_officer_id : null,
+        ]);
+
         $request->validate([
             'status' => 'required|in:pending,approved,rejected,completed',
             'rejection_reason' => ['required_if:status,rejected', 'string', 'min:10', 'max:1000'],
@@ -208,8 +212,10 @@ class EburolManagementController extends Controller
             $updateData['rejection_reason'] = null;
         }
 
-        if ($request->has('monitoring_officer_id')) {
+        if ($request->filled('monitoring_officer_id')) {
             $updateData['monitoring_officer_id'] = $request->monitoring_officer_id;
+        } elseif (in_array($request->status, ['pending', 'rejected', 'completed'], true)) {
+            $updateData['monitoring_officer_id'] = null;
         }
 
         $eburol->update($updateData);

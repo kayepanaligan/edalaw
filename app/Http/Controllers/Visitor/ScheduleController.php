@@ -8,6 +8,7 @@ use App\Models\Appeal;
 use App\Models\Visit;
 use App\Services\AuditLogService;
 use App\Services\NotificationService;
+use App\Services\VisitorScheduleConflictService;
 use App\VisitStatus;
 use App\VisitType;
 use Illuminate\Http\RedirectResponse;
@@ -26,6 +27,7 @@ class ScheduleController extends Controller
         $visits = Visit::with(['monitoringOfficer', 'visitSessions' => fn ($q) => $q->orderBy('scheduled_start', 'desc')->limit(1)])
             ->where('user_id', auth()->id())
             ->orderBy('scheduled_date', 'desc')
+            ->orderBy('scheduled_time', 'desc')
             ->orderBy('created_at', 'desc')
             ->get()
             ->map(function ($visit) {
@@ -202,9 +204,33 @@ class ScheduleController extends Controller
             }
         }
 
+        // Slots where the current user already has a visit on this date (so they cannot book again)
+        $userBookedSlots = Visit::where('user_id', auth()->id())
+            ->where('scheduled_date', $date)
+            ->where('visit_type', VisitType::from($visitType))
+            ->whereIn('status', [VisitStatus::Pending, VisitStatus::Approved])
+            ->whereNotNull('scheduled_time')
+            ->get()
+            ->map(function ($visit) {
+                $t = $visit->scheduled_time;
+                if ($t instanceof \Carbon\Carbon) {
+                    return $t->format('H:i');
+                }
+                if (is_string($t) && preg_match('/^\d{2}:\d{2}/', $t)) {
+                    return substr($t, 0, 5);
+                }
+
+                return (string) $t;
+            })
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
         return response()->json([
             'slotCapacities' => $slotCapacities,
             'isDayUnavailable' => $isDayUnavailable,
+            'userBookedSlots' => $userBookedSlots,
         ]);
     }
 
@@ -266,6 +292,14 @@ class ScheduleController extends Controller
 
             return redirect()->back()
                 ->withErrors(['scheduled_time' => "This time slot is full (maximum capacity: {$capacity} visitors). Please select another time."])
+                ->withInput();
+        }
+
+        $durationMinutes = $isPhysical ? 60 : 10;
+        $conflictService = new VisitorScheduleConflictService;
+        if ($conflictService->hasConflict(auth()->id(), $request->scheduled_date, $scheduledTime, $durationMinutes)) {
+            return redirect()->back()
+                ->withErrors(['scheduled_time' => 'You already have a virtual visit or e-burol scheduled in this time range. Please choose another slot.'])
                 ->withInput();
         }
 

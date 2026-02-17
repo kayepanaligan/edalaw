@@ -32,6 +32,30 @@ class AppealReviewController extends Controller
                 $appealableType = $appeal->appealable_type === Visit::class ? 'Visit Schedule' : 'E-Burol Application';
                 $appealableData = null;
 
+                if ($appeal->appealable === null) {
+                    return [
+                        'id' => $appeal->id,
+                        'user_name' => $appeal->user ? trim("{$appeal->user->first_name} {$appeal->user->middle_name} {$appeal->user->last_name}") : '—',
+                        'user_email' => $appeal->user?->email ?? '—',
+                        'appealable_type' => $appealableType,
+                        'appealable_data' => ['type' => 'visit', 'id' => 0, 'status' => 'deleted', 'inmate_name' => '—'],
+                        'reason' => $appeal->reason,
+                        'status' => $appeal->status->value,
+                        'reviewed_by' => $appeal->reviewer ? trim("{$appeal->reviewer->first_name} {$appeal->reviewer->last_name}") : null,
+                        'reviewed_at' => $appeal->reviewed_at?->format('Y-m-d H:i:s'),
+                        'decision_notes' => $appeal->decision_notes,
+                        'submitted_at' => $appeal->submitted_at?->format('Y-m-d H:i:s'),
+                        'deadline' => $appeal->deadline?->format('Y-m-d H:i:s'),
+                        'documents' => $appeal->documents->map(fn ($doc) => [
+                            'id' => $doc->id,
+                            'file_name' => $doc->file_name,
+                            'file_path' => Storage::url($doc->file_path),
+                            'file_size' => $doc->file_size,
+                        ]),
+                        'created_at' => $appeal->created_at->format('Y-m-d H:i:s'),
+                    ];
+                }
+
                 if ($appeal->appealable_type === Visit::class) {
                     $visit = $appeal->appealable;
                     $appealableData = [

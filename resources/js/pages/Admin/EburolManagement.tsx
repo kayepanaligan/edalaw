@@ -25,6 +25,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
     Select,
@@ -136,6 +137,7 @@ export default function EburolManagement({ eburols, stats, visitors = [], monito
     const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
     const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
     const [isApproveModalOpen, setIsApproveModalOpen] = useState(false);
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [selectedEburol, setSelectedEburol] = useState<Eburol | null>(null);
     const [statusFilter, setStatusFilter] = useState<string>('all');
     useToast();
@@ -165,9 +167,7 @@ export default function EburolManagement({ eburols, stats, visitors = [], monito
             toast.error('Please select a monitoring officer.');
             return;
         }
-        router.post(`/admin/eburols/${selectedEburol.id}/approve`, {
-            monitoring_officer_id: approveForm.data.monitoring_officer_id,
-        }, {
+        approveForm.post(`/admin/eburols/${selectedEburol.id}/approve`, {
             preserveScroll: true,
             onSuccess: () => {
                 toast.success('E-Burol application approved successfully.');
@@ -209,19 +209,10 @@ export default function EburolManagement({ eburols, stats, visitors = [], monito
         if (!selectedEburol) {
             return;
         }
-
-        const data: { status: string; rejection_reason?: string } = {
-            status: statusForm.data.status,
-        };
-
-        if (statusForm.data.status === 'rejected') {
-            if (!statusForm.data.rejection_reason || statusForm.data.rejection_reason.trim().length < 10) {
-                toast.error('Rejection reason is required (minimum 10 characters)');
-                return;
-            }
-            data.rejection_reason = statusForm.data.rejection_reason;
+        if (statusForm.data.status === 'rejected' && (!statusForm.data.rejection_reason || statusForm.data.rejection_reason.trim().length < 10)) {
+            toast.error('Rejection reason is required (minimum 10 characters)');
+            return;
         }
-
         statusForm.post(`/admin/eburols/${selectedEburol.id}/update-status`, {
             preserveScroll: true,
             onSuccess: () => {
@@ -396,6 +387,17 @@ export default function EburolManagement({ eburols, stats, visitors = [], monito
                                     </DropdownMenuItem>
                                 </>
                             )}
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                                className="text-destructive focus:text-destructive"
+                                onClick={() => {
+                                    setSelectedEburol(eburol);
+                                    setIsDeleteModalOpen(true);
+                                }}
+                            >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Delete
+                            </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
                 );
@@ -485,9 +487,11 @@ export default function EburolManagement({ eburols, stats, visitors = [], monito
                             <DataTable
                                 columns={columns}
                                 data={filteredEburols}
-                                enableGlobalFilter={true}
+                                searchKey="visitor_name"
                                 searchPlaceholder="Search by visitor, inmate, deceased..."
+                                enableGlobalFilter
                                 headerActions={headerActions}
+                                initialSorting={[{ id: 'created_at', desc: true }]}
                             />
                         )}
                     </CardContent>
@@ -503,95 +507,80 @@ export default function EburolManagement({ eburols, stats, visitors = [], monito
                             </DialogDescription>
                         </DialogHeader>
                         {selectedEburol && (
-                            <div className="space-y-6">
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <Label className="text-muted-foreground">Visitor</Label>
-                                        <p className="font-medium">{selectedEburol.visitor_name}</p>
-                                        <p className="text-sm text-muted-foreground">{selectedEburol.visitor_email}</p>
+                            <div className="flex flex-col gap-3">
+                                <div className="space-y-1">
+                                    <Label className="text-muted-foreground">Visitor</Label>
+                                    <Input readOnly value={selectedEburol.visitor_name ?? '—'} className="bg-muted" />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-muted-foreground">Visitor email</Label>
+                                    <Input readOnly value={selectedEburol.visitor_email ?? '—'} className="bg-muted" />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-muted-foreground">Status</Label>
+                                    <div className="pt-2">{getStatusBadge(selectedEburol.status)}</div>
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-muted-foreground">Inmate name</Label>
+                                    <Input readOnly value={selectedEburol.inmate_name ?? '—'} className="bg-muted" />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-muted-foreground">Deceased name</Label>
+                                    <Input readOnly value={selectedEburol.deceased_name ?? '—'} className="bg-muted" />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-muted-foreground">Date of death</Label>
+                                    <Input readOnly value={new Date(selectedEburol.deceased_date_of_death).toLocaleDateString()} className="bg-muted" />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-muted-foreground">Relationship</Label>
+                                    <Input readOnly value={selectedEburol.relationship_to_inmate ?? '—'} className="bg-muted" />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-muted-foreground">Wake start date</Label>
+                                    <Input readOnly value={new Date(selectedEburol.wake_start_date).toLocaleDateString()} className="bg-muted" />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-muted-foreground">Wake end date</Label>
+                                    <Input readOnly value={new Date(selectedEburol.wake_end_date).toLocaleDateString()} className="bg-muted" />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-muted-foreground">Preferred time</Label>
+                                    <Input readOnly value={selectedEburol.preferred_time ?? '—'} className="bg-muted" />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-muted-foreground">Wake location</Label>
+                                    <Input readOnly value={selectedEburol.wake_location ?? '—'} className="bg-muted" />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-muted-foreground">Additional details</Label>
+                                    <Input readOnly value={selectedEburol.additional_details ?? '—'} className="bg-muted" />
+                                </div>
+                                {selectedEburol.rejection_reason && (
+                                    <div className="space-y-1">
+                                        <Label className="text-muted-foreground">Rejection reason</Label>
+                                        <Input readOnly value={selectedEburol.rejection_reason} className="bg-muted text-destructive" />
                                     </div>
-                                    <div>
-                                        <Label className="text-muted-foreground">Status</Label>
-                                        <div className="mt-1">{getStatusBadge(selectedEburol.status)}</div>
+                                )}
+                                {selectedEburol.admin_notes && (
+                                    <div className="space-y-1">
+                                        <Label className="text-muted-foreground">Admin notes</Label>
+                                        <Input readOnly value={selectedEburol.admin_notes} className="bg-muted" />
                                     </div>
-                                    <div>
-                                        <Label className="text-muted-foreground">Inmate Name</Label>
-                                        <p className="font-medium">{selectedEburol.inmate_name}</p>
-                                    </div>
-                                    <div>
-                                        <Label className="text-muted-foreground">Deceased Name</Label>
-                                        <p className="font-medium">{selectedEburol.deceased_name}</p>
-                                    </div>
-                                    <div>
-                                        <Label className="text-muted-foreground">Date of Death</Label>
-                                        <p className="font-medium">
-                                            {new Date(selectedEburol.deceased_date_of_death).toLocaleDateString()}
-                                        </p>
-                                    </div>
-                                    <div>
-                                        <Label className="text-muted-foreground">Relationship</Label>
-                                        <p className="font-medium">{selectedEburol.relationship_to_inmate}</p>
-                                    </div>
-                                    <div>
-                                        <Label className="text-muted-foreground">Wake Start Date</Label>
-                                        <p className="font-medium">
-                                            {new Date(selectedEburol.wake_start_date).toLocaleDateString()}
-                                        </p>
-                                    </div>
-                                    <div>
-                                        <Label className="text-muted-foreground">Wake End Date</Label>
-                                        <p className="font-medium">
-                                            {new Date(selectedEburol.wake_end_date).toLocaleDateString()}
-                                        </p>
-                                    </div>
-                                    {selectedEburol.preferred_time && (
-                                        <div>
-                                            <Label className="text-muted-foreground">Preferred Time</Label>
-                                            <p className="font-medium">{selectedEburol.preferred_time}</p>
-                                        </div>
+                                )}
+                                <div className="flex gap-2 pt-2">
+                                    {selectedEburol.death_certificate_path && (
+                                        <Button variant="outline" onClick={() => window.open(selectedEburol.death_certificate_path!, '_blank')}>
+                                            <FileText className="h-4 w-4 mr-2" />
+                                            View death certificate
+                                        </Button>
                                     )}
-                                    <div className="col-span-2">
-                                        <Label className="text-muted-foreground">Wake Location</Label>
-                                        <p className="font-medium">{selectedEburol.wake_location}</p>
-                                    </div>
-                                    {selectedEburol.additional_details && (
-                                        <div className="col-span-2">
-                                            <Label className="text-muted-foreground">Additional Details</Label>
-                                            <p className="font-medium">{selectedEburol.additional_details}</p>
-                                        </div>
+                                    {selectedEburol.relationship_proof_path && (
+                                        <Button variant="outline" onClick={() => window.open(selectedEburol.relationship_proof_path!, '_blank')}>
+                                            <FileText className="h-4 w-4 mr-2" />
+                                            View relationship proof
+                                        </Button>
                                     )}
-                                    {selectedEburol.rejection_reason && (
-                                        <div className="col-span-2">
-                                            <Label className="text-muted-foreground">Rejection Reason</Label>
-                                            <p className="font-medium text-destructive">{selectedEburol.rejection_reason}</p>
-                                        </div>
-                                    )}
-                                    {selectedEburol.admin_notes && (
-                                        <div className="col-span-2">
-                                            <Label className="text-muted-foreground">Admin Notes</Label>
-                                            <p className="font-medium">{selectedEburol.admin_notes}</p>
-                                        </div>
-                                    )}
-                                    <div className="col-span-2 flex gap-2">
-                                        {selectedEburol.death_certificate_path && (
-                                            <Button
-                                                variant="outline"
-                                                onClick={() => window.open(selectedEburol.death_certificate_path!, '_blank')}
-                                            >
-                                                <FileText className="h-4 w-4 mr-2" />
-                                                View Death Certificate
-                                            </Button>
-                                        )}
-                                        {selectedEburol.relationship_proof_path && (
-                                            <Button
-                                                variant="outline"
-                                                onClick={() => window.open(selectedEburol.relationship_proof_path!, '_blank')}
-                                            >
-                                                <FileText className="h-4 w-4 mr-2" />
-                                                View Relationship Proof
-                                            </Button>
-                                        )}
-                                    </div>
                                 </div>
                             </div>
                         )}
@@ -604,6 +593,51 @@ export default function EburolManagement({ eburols, stats, visitors = [], monito
                                 }}
                             >
                                 Close
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+
+                {/* Delete confirmation modal */}
+                <Dialog open={isDeleteModalOpen} onOpenChange={setIsDeleteModalOpen}>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Delete E-Burol application</DialogTitle>
+                            <DialogDescription>
+                                This action cannot be undone. This will permanently delete the e-burol application and any associated documents.
+                            </DialogDescription>
+                        </DialogHeader>
+                        {selectedEburol && (
+                            <p className="text-sm text-muted-foreground">
+                                Delete application #<strong>{selectedEburol.id}</strong> — Deceased: <strong>{selectedEburol.deceased_name}</strong>?
+                            </p>
+                        )}
+                        <DialogFooter>
+                            <Button
+                                variant="outline"
+                                onClick={() => {
+                                    setIsDeleteModalOpen(false);
+                                    setSelectedEburol(null);
+                                }}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                variant="destructive"
+                                onClick={() => {
+                                    if (!selectedEburol) return;
+                                    router.delete(`/admin/eburols/${selectedEburol.id}`, {
+                                        preserveScroll: true,
+                                        onSuccess: () => {
+                                            toast.success('E-Burol application deleted.');
+                                            setIsDeleteModalOpen(false);
+                                            setSelectedEburol(null);
+                                        },
+                                        onError: () => toast.error('Failed to delete E-Burol application.'),
+                                    });
+                                }}
+                            >
+                                Delete
                             </Button>
                         </DialogFooter>
                     </DialogContent>

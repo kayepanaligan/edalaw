@@ -24,9 +24,12 @@ class AssignedSessionsController extends Controller
     public function index(Request $request): Response
     {
         $user = $request->user();
+        $isSuperAdmin = $user->role?->slug === 'super_admin';
 
-        $query = VisitSession::with(['visit.user', 'eburol.user', 'visit', 'eburol'])
-            ->where('monitor_id', $user->id);
+        $query = VisitSession::with(['visit.user', 'eburol.user', 'visit', 'eburol']);
+        if (! $isSuperAdmin) {
+            $query->where('monitor_id', $user->id);
+        }
 
         $typeFilter = $request->input('type'); // 'visit' | 'eburol' | null = all
         if ($typeFilter === 'visit') {
@@ -55,11 +58,14 @@ class AssignedSessionsController extends Controller
                 }
                 $scheduleEnded = now()->isAfter($session->scheduled_end);
 
+                $tunnel = $session->inmateTunnels()->whereNotNull('short_code')->latest()->first();
+
                 return [
                     'id' => $session->id,
                     'visit_id' => $session->visit_id,
                     'eburol_id' => $session->eburol_id,
                     'room_id' => $session->room_id,
+                    'tunnel_short_code' => $tunnel?->short_code,
                     'visitor_name' => $visitor ? trim("{$visitor->first_name} {$visitor->middle_name} {$visitor->last_name}") : null,
                     'inmate_name' => $inmateName,
                     'type' => $session->session_type,
@@ -92,7 +98,8 @@ class AssignedSessionsController extends Controller
      */
     public function generateTunnel(Request $request, VisitSession $session): JsonResponse
     {
-        if ($session->monitor_id !== $request->user()->id) {
+        $user = $request->user();
+        if ($session->monitor_id !== $user->id && $user->role?->slug !== 'super_admin') {
             abort(403);
         }
         if (! $session->isWithinScheduleForTunnel()) {
@@ -103,11 +110,13 @@ class AssignedSessionsController extends Controller
         }
 
         $token = InmateTunnel::generateToken();
+        $shortCode = InmateTunnel::generateShortCode();
         $expiresAt = $session->scheduled_end->copy();
 
         InmateTunnel::create([
             'visit_session_id' => $session->id,
             'tunnel_token' => $token,
+            'short_code' => $shortCode,
             'expires_at' => $expiresAt,
             'is_used' => false,
         ]);
@@ -118,10 +127,10 @@ class AssignedSessionsController extends Controller
             'visit_session_id' => $session->id,
             'action' => 'generate_inmate_tunnel',
             'performed_by' => $request->user()->id,
-            'metadata' => ['expires_at' => $expiresAt->toIso8601String()],
+            'metadata' => ['expires_at' => $expiresAt->toIso8601String(), 'short_code' => $shortCode],
         ]);
 
-        return response()->json(['join_url' => $url, 'token' => $token]);
+        return response()->json(['join_url' => $url, 'token' => $token, 'short_code' => $shortCode]);
     }
 
     /**
@@ -129,7 +138,8 @@ class AssignedSessionsController extends Controller
      */
     public function startSession(Request $request, VisitSession $session): RedirectResponse|JsonResponse
     {
-        if ($session->monitor_id !== $request->user()->id) {
+        $user = $request->user();
+        if ($session->monitor_id !== $user->id && $user->role?->slug !== 'super_admin') {
             abort(403);
         }
         if ($session->status === 'active') {
@@ -165,7 +175,8 @@ class AssignedSessionsController extends Controller
      */
     public function endSession(Request $request, VisitSession $session): RedirectResponse|JsonResponse
     {
-        if ($session->monitor_id !== $request->user()->id) {
+        $user = $request->user();
+        if ($session->monitor_id !== $user->id && $user->role?->slug !== 'super_admin') {
             abort(403);
         }
         if ($session->isCompleted()) {
@@ -213,7 +224,8 @@ class AssignedSessionsController extends Controller
      */
     public function lockChat(Request $request, VisitSession $session): JsonResponse
     {
-        if ($session->monitor_id !== $request->user()->id) {
+        $user = $request->user();
+        if ($session->monitor_id !== $user->id && $user->role?->slug !== 'super_admin') {
             abort(403);
         }
         if ($session->isCompleted()) {
@@ -238,7 +250,8 @@ class AssignedSessionsController extends Controller
      */
     public function unlockChat(Request $request, VisitSession $session): JsonResponse
     {
-        if ($session->monitor_id !== $request->user()->id) {
+        $user = $request->user();
+        if ($session->monitor_id !== $user->id && $user->role?->slug !== 'super_admin') {
             abort(403);
         }
         if ($session->isCompleted()) {
@@ -298,8 +311,11 @@ class AssignedSessionsController extends Controller
             ? url('/video-room').'?room_id='.rawurlencode($session->room_id).'&token='.rawurlencode($result['token']).'&name='.rawurlencode($request->user()->name ?? 'Monitor').'&observer=1'
             : 'https://app.videosdk.live/meetings/'.$session->room_id.'?token='.rawurlencode($result['token']);
 
-        return Inertia::render('MonitoringOfficer/JoinObserverRedirect', [
-            'join_url' => $url,
-        ]);
+        $session->refresh();
+        if ($session->visitor_participant_id && $session->recording_status === 'pending') {
+            app(VisitSessionRecordingService::class)->tryStartRecording($session, $session->visitor_participant_id);
+        }
+
+        return redirect()->away($url);
     }
 }

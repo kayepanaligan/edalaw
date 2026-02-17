@@ -1,15 +1,5 @@
 import { Head } from '@inertiajs/react';
-import {
-    Activity,
-    AlertTriangle,
-    Calendar,
-    Download,
-    FileVideo,
-    MessageSquareWarning,
-    RefreshCw,
-    Users,
-    Video,
-} from 'lucide-react';
+import { Activity, Calendar, Download, FileVideo, RefreshCw, Users } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import {
     Bar,
@@ -96,17 +86,6 @@ type Props = {
 };
 
 const POLL_INTERVAL_MS = 60_000;
-const VISIT_TYPE_OPTIONS = [
-    { value: 'all', label: 'All types' },
-    { value: 'virtual', label: 'Virtual' },
-    { value: 'physical', label: 'Physical' },
-    { value: 'eburol', label: 'Eburol' },
-];
-const GROUP_BY_OPTIONS = [
-    { value: 'day', label: 'Day' },
-    { value: 'week', label: 'Week' },
-    { value: 'month', label: 'Month' },
-];
 
 const PIE_COLORS: Record<string, string> = {
     scheduled: 'var(--chart-1)',
@@ -171,7 +150,7 @@ export default function BjmpOfficerDashboard(props: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="BJMP Officer Dashboard - Overview" />
-            <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-4">
+            <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-[10px]">
                 <div className="flex flex-wrap items-center justify-between gap-4">
                     <div>
                         <h1 className="text-2xl font-semibold">BJMP Officer Dashboard</h1>
@@ -193,36 +172,19 @@ export default function BjmpOfficerDashboard(props: Props) {
                             onChange={(e) => setFilters((f) => ({ ...f, date_to: e.target.value }))}
                             className="rounded-md border border-input bg-background px-2 py-1.5 text-sm"
                         />
-                        <Select
-                            value={filters.visit_type ?? 'all'}
-                            onValueChange={(v) => setFilters((f) => ({ ...f, visit_type: v === 'all' ? null : v }))}
+                        <Button variant="outline" size="sm" onClick={() => fetchOverview()} disabled={loading}>
+                            Apply
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                                const today = new Date().toISOString().slice(0, 10);
+                                setFilters((f) => ({ ...f, date_from: today, date_to: today }));
+                            }}
                         >
-                            <SelectTrigger className="w-[140px]">
-                                <SelectValue placeholder="Visit type" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {VISIT_TYPE_OPTIONS.map((o) => (
-                                    <SelectItem key={o.value} value={o.value}>
-                                        {o.label}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                        <Select
-                            value={filters.group_by}
-                            onValueChange={(v) => setFilters((f) => ({ ...f, group_by: v }))}
-                        >
-                            <SelectTrigger className="w-[110px]">
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {GROUP_BY_OPTIONS.map((o) => (
-                                    <SelectItem key={o.value} value={o.value}>
-                                        {o.label}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                            Clear
+                        </Button>
                         <Button variant="outline" size="sm" onClick={() => fetchOverview()} disabled={loading}>
                             <RefreshCw className={loading ? 'size-4 animate-spin' : 'size-4'} />
                         </Button>
@@ -233,8 +195,8 @@ export default function BjmpOfficerDashboard(props: Props) {
                     </div>
                 </div>
 
-                {/* KPI Summary Cards */}
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+                {/* KPI Summary Cards — Total Visits Today, Active Sessions Now, Pending Approvals, Scheduled Today */}
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                             <CardTitle className="text-sm font-medium">Total Visits Today</CardTitle>
@@ -269,33 +231,6 @@ export default function BjmpOfficerDashboard(props: Props) {
                         </CardHeader>
                         <CardContent>
                             <div className="text-2xl font-bold">{data.kpis?.scheduled_sessions_today ?? 0}</div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium">Terminated Today</CardTitle>
-                            <AlertTriangle className="size-4 text-muted-foreground" />
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold">{data.kpis?.terminated_sessions_today ?? 0}</div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium">Flagged Messages</CardTitle>
-                            <MessageSquareWarning className="size-4 text-muted-foreground" />
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold">{data.kpis?.total_flagged_today ?? 0}</div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium">Recording Compliance</CardTitle>
-                            <Video className="size-4 text-muted-foreground" />
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold">{data.kpis?.recording_compliance_rate ?? 0}%</div>
                         </CardContent>
                     </Card>
                 </div>
@@ -358,7 +293,7 @@ export default function BjmpOfficerDashboard(props: Props) {
                 </div>
 
                 <div className="grid gap-4 lg:grid-cols-2">
-                    {/* Facility Utilization Bar */}
+                    {/* Facility Utilization Bar — yellow (scheduled) / green (available) */}
                     <Card>
                         <CardHeader>
                             <CardTitle>Facility Utilization</CardTitle>
@@ -371,10 +306,20 @@ export default function BjmpOfficerDashboard(props: Props) {
                                         <XAxis dataKey="date" fontSize={10} />
                                         <YAxis fontSize={11} />
                                         <Tooltip />
-                                        <Bar dataKey="scheduled" fill="var(--chart-1)" name="Scheduled" />
-                                        <Bar dataKey="available_slots" fill="var(--muted)" name="Available slots" />
+                                        <Bar dataKey="scheduled" fill="#eab308" name="Scheduled" />
+                                        <Bar dataKey="available_slots" fill="#22c55e" name="Available slots" />
                                     </BarChart>
                                 </ResponsiveContainer>
+                            </div>
+                            <div className="mt-2 flex flex-wrap gap-4 border-t pt-2 text-xs">
+                                <span className="flex items-center gap-1.5">
+                                    <span className="inline-block size-3 rounded bg-[#eab308]" aria-hidden />
+                                    Scheduled
+                                </span>
+                                <span className="flex items-center gap-1.5">
+                                    <span className="inline-block size-3 rounded bg-[#22c55e]" aria-hidden />
+                                    Available slots
+                                </span>
                             </div>
                         </CardContent>
                     </Card>

@@ -125,6 +125,9 @@ type Props = {
     age_distribution: Array<{ name: string; count: number }>;
     visit_volume_over_time: Array<{ date: string; physical: number; virtual: number }>;
     peak_usage_hours: Array<{ hour: string; sessions: number }>;
+    peak_usage_heatmap?: number[][];
+    top_inmates_by_visits?: Array<{ inmate_name: string; visit_count: number; rank: number }>;
+    monitoring_officer_distribution?: Record<string, number>;
     incident_reports_summary: { minor: number; major: number; critical: number };
     flagged_messages_over_time: Array<{ date: string; count: number }>;
     enforcement_actions: { forced_mutes: number; terminations: number; chat_locks: number };
@@ -207,6 +210,47 @@ function ChartTitleWithTooltip({ title, description }: { title: string; descript
 
 const COLORS = ['#facc15', '#22c55e', '#eab308', '#16a34a', '#fbbf24', '#10b981', '#fde047'];
 
+function PeakUsageHeatmap({ data }: { data: number[][] }) {
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const maxVal = Math.max(1, ...(data.flat() ?? []));
+    return (
+        <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-xs">
+                <thead>
+                    <tr>
+                        <th className="border border-border p-1 font-medium bg-muted/50">Hour</th>
+                        {days.map((d) => (
+                            <th key={d} className="border border-border p-1 font-medium bg-muted/50">{d}</th>
+                        ))}
+                    </tr>
+                </thead>
+                <tbody>
+                    {(data ?? []).map((row, hour) => (
+                        <tr key={hour}>
+                            <td className="border border-border p-1 font-medium bg-muted/30">{hour}:00</td>
+                            {(row ?? []).map((val, dow) => {
+                                const pct = maxVal ? (val / maxVal) * 100 : 0;
+                                return (
+                                    <td
+                                        key={dow}
+                                        className="border border-border p-1 text-center"
+                                        style={{
+                                            backgroundColor: `oklch(0.7 0.15 85 / ${0.2 + (pct / 100) * 0.8})`,
+                                        }}
+                                        title={`${val} sessions`}
+                                    >
+                                        {val > 0 ? val : ''}
+                                    </td>
+                                );
+                            })}
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </div>
+    );
+}
+
 export default function SuperAdminDashboard({
     stats,
     recent_users,
@@ -224,6 +268,9 @@ export default function SuperAdminDashboard({
     age_distribution,
     visit_volume_over_time = [],
     peak_usage_hours = [],
+    peak_usage_heatmap = [],
+    top_inmates_by_visits = [],
+    monitoring_officer_distribution = {},
     incident_reports_summary = { minor: 0, major: 0, critical: 0 },
     flagged_messages_over_time = [],
     enforcement_actions = { forced_mutes: 0, terminations: 0, chat_locks: 0 },
@@ -239,32 +286,30 @@ export default function SuperAdminDashboard({
     const [municipalities, setMunicipalities] = useState(initialMunicipalities);
     const [barangays, setBarangays] = useState(initialBarangays);
 
+    const defaultFrom = () => {
+        const d = new Date();
+        d.setDate(d.getDate() - 29);
+        return d.toISOString().slice(0, 10);
+    };
+    const defaultTo = () => new Date().toISOString().slice(0, 10);
     const [globalFilters, setGlobalFilters] = useState({
-        date_preset: initialFilters?.date_preset ?? 'last_30_days',
-        date_from: initialFilters?.date_from ?? '',
-        date_to: initialFilters?.date_to ?? '',
-        time_grouping: initialFilters?.time_grouping ?? 'daily',
-        visit_type: initialFilters?.visit_type ?? 'all',
-        status: initialFilters?.status ?? 'all',
-        recording_compliance: initialFilters?.recording_compliance ?? 'all',
-        violation: initialFilters?.violation ?? 'all',
-        monitoring_officer_id: initialFilters?.monitoring_officer_id || 'all',
-        inmate: initialFilters?.inmate ?? '',
+        date_from: initialFilters?.date_from || defaultFrom(),
+        date_to: initialFilters?.date_to || defaultTo(),
     });
 
     const applyGlobalFilters = () => {
-        const params: Record<string, string> = {};
-        if (globalFilters.date_preset) params.date_preset = globalFilters.date_preset;
-        if (globalFilters.date_from) params.date_from = globalFilters.date_from;
-        if (globalFilters.date_to) params.date_to = globalFilters.date_to;
-        if (globalFilters.time_grouping && globalFilters.time_grouping !== 'daily') params.time_grouping = globalFilters.time_grouping;
-        if (globalFilters.visit_type && globalFilters.visit_type !== 'all') params.visit_type = globalFilters.visit_type;
-        if (globalFilters.status && globalFilters.status !== 'all') params.status = globalFilters.status;
-        if (globalFilters.recording_compliance && globalFilters.recording_compliance !== 'all') params.recording_compliance = globalFilters.recording_compliance;
-        if (globalFilters.violation && globalFilters.violation !== 'all') params.violation = globalFilters.violation;
-        if (globalFilters.monitoring_officer_id && globalFilters.monitoring_officer_id !== 'all') params.monitoring_officer_id = globalFilters.monitoring_officer_id;
-        if (globalFilters.inmate) params.inmate = globalFilters.inmate;
-        router.get('/dashboard/super-admin', params, { preserveState: false });
+        router.get('/dashboard/super-admin', {
+            date_preset: 'custom',
+            date_from: globalFilters.date_from,
+            date_to: globalFilters.date_to,
+        }, { preserveState: false });
+    };
+
+    const clearFilters = () => {
+        setGlobalFilters({ date_from: defaultFrom(), date_to: defaultTo() });
+        router.get('/dashboard/super-admin', {
+            date_preset: 'last_30_days',
+        }, { preserveState: false });
     };
 
     useToast();
@@ -387,116 +432,29 @@ export default function SuperAdminDashboard({
                     </div>
                 </div>
 
-                {/* Global filters — control all charts and KPIs via URL params */}
-                <Card>
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-sm">Overview filters</CardTitle>
-                        <CardDescription>Apply to all charts and reports. Changes update the dashboard via server.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="flex flex-wrap items-end gap-3">
-                        <div className="flex flex-col gap-1">
-                            <label className="text-xs text-muted-foreground">Date range</label>
-                            <Select value={globalFilters.date_preset} onValueChange={(v) => setGlobalFilters((f) => ({ ...f, date_preset: v }))}>
-                                <SelectTrigger className="w-[160px]">
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="today">Today</SelectItem>
-                                    <SelectItem value="yesterday">Yesterday</SelectItem>
-                                    <SelectItem value="last_7_days">Last 7 Days</SelectItem>
-                                    <SelectItem value="last_30_days">Last 30 Days</SelectItem>
-                                    <SelectItem value="this_month">This Month</SelectItem>
-                                    <SelectItem value="last_month">Last Month</SelectItem>
-                                    <SelectItem value="this_year">This Year</SelectItem>
-                                    <SelectItem value="custom">Custom range</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        {globalFilters.date_preset === 'custom' && (
-                            <>
-                                <div className="flex flex-col gap-1">
-                                    <label className="text-xs text-muted-foreground">From</label>
-                                    <input
-                                        type="date"
-                                        className="rounded-md border border-input bg-background px-2 py-1.5 text-sm h-9"
-                                        value={globalFilters.date_from}
-                                        onChange={(e) => setGlobalFilters((f) => ({ ...f, date_from: e.target.value }))}
-                                    />
-                                </div>
-                                <div className="flex flex-col gap-1">
-                                    <label className="text-xs text-muted-foreground">To</label>
-                                    <input
-                                        type="date"
-                                        className="rounded-md border border-input bg-background px-2 py-1.5 text-sm h-9"
-                                        value={globalFilters.date_to}
-                                        onChange={(e) => setGlobalFilters((f) => ({ ...f, date_to: e.target.value }))}
-                                    />
-                                </div>
-                            </>
-                        )}
-                        <div className="flex flex-col gap-1">
-                            <label className="text-xs text-muted-foreground">Time grouping</label>
-                            <Select value={globalFilters.time_grouping} onValueChange={(v) => setGlobalFilters((f) => ({ ...f, time_grouping: v }))}>
-                                <SelectTrigger className="w-[120px]">
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="daily">Daily</SelectItem>
-                                    <SelectItem value="weekly">Weekly</SelectItem>
-                                    <SelectItem value="monthly">Monthly</SelectItem>
-                                    <SelectItem value="quarterly">Quarterly</SelectItem>
-                                    <SelectItem value="yearly">Yearly</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="flex flex-col gap-1">
-                            <label className="text-xs text-muted-foreground">Visit type</label>
-                            <Select value={globalFilters.visit_type} onValueChange={(v) => setGlobalFilters((f) => ({ ...f, visit_type: v }))}>
-                                <SelectTrigger className="w-[110px]">
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">All</SelectItem>
-                                    <SelectItem value="virtual">Virtual</SelectItem>
-                                    <SelectItem value="physical">Physical</SelectItem>
-                                    <SelectItem value="eburol">Eburol</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="flex flex-col gap-1">
-                            <label className="text-xs text-muted-foreground">Status</label>
-                            <Select value={globalFilters.status} onValueChange={(v) => setGlobalFilters((f) => ({ ...f, status: v }))}>
-                                <SelectTrigger className="w-[120px]">
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">All</SelectItem>
-                                    <SelectItem value="pending">Pending</SelectItem>
-                                    <SelectItem value="approved">Approved</SelectItem>
-                                    <SelectItem value="rejected">Rejected</SelectItem>
-                                    <SelectItem value="completed">Completed</SelectItem>
-                                    <SelectItem value="missed">Missed</SelectItem>
-                                    <SelectItem value="cancelled">Cancelled</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="flex flex-col gap-1">
-                            <label className="text-xs text-muted-foreground">Monitoring officer</label>
-                            <Select value={globalFilters.monitoring_officer_id} onValueChange={(v) => setGlobalFilters((f) => ({ ...f, monitoring_officer_id: v }))}>
-                                <SelectTrigger className="w-[160px]">
-                                    <SelectValue placeholder="All" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">All</SelectItem>
-                                    {monitoringOfficersList.map((o) => (
-                                        <SelectItem key={o.id} value={String(o.id)}>{o.name}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <Button onClick={applyGlobalFilters}>Apply filters</Button>
-                    </CardContent>
-                </Card>
+                {/* Filters: from–to and buttons only (no card) */}
+                <div className="flex flex-wrap items-end gap-3">
+                    <div className="flex flex-col gap-1">
+                        <label className="text-xs text-muted-foreground">From</label>
+                        <input
+                            type="date"
+                            className="rounded-md border border-input bg-background px-2 py-1.5 text-sm h-9 w-40"
+                            value={globalFilters.date_from}
+                            onChange={(e) => setGlobalFilters((f) => ({ ...f, date_from: e.target.value }))}
+                        />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                        <label className="text-xs text-muted-foreground">To</label>
+                        <input
+                            type="date"
+                            className="rounded-md border border-input bg-background px-2 py-1.5 text-sm h-9 w-40"
+                            value={globalFilters.date_to}
+                            onChange={(e) => setGlobalFilters((f) => ({ ...f, date_to: e.target.value }))}
+                        />
+                    </div>
+                    <Button onClick={applyGlobalFilters}>Apply</Button>
+                    <Button variant="ghost" onClick={clearFilters}>Clear</Button>
+                </div>
 
                 {/* KPI Cards */}
                 <div className="grid auto-rows-min gap-4 md:grid-cols-4">
@@ -817,28 +775,63 @@ export default function SuperAdminDashboard({
                         </CardContent>
                     </Card>
 
-                    {/* Peak Usage Hours */}
+                    {/* Distribution of monitoring officers */}
                     <Card>
                         <CardHeader>
                             <ChartTitleWithTooltip
-                                title="Peak Usage Hours"
-                                description="When are system and staff resources most strained? This heatmap shows the number of sessions per hour of the day."
+                                title="Distribution of Monitoring Officers"
+                                description="Sessions supervised per monitoring officer in the selected date range."
                             />
-                            <CardDescription>Sessions per hour</CardDescription>
+                            <CardDescription>Sessions supervised by officer</CardDescription>
                         </CardHeader>
                         <CardContent>
-                            <ResponsiveContainer width="100%" height={300}>
-                                <BarChart data={peak_usage_hours}>
-                                    <CartesianGrid strokeDasharray="3 3" />
-                                    <XAxis dataKey="hour" />
-                                    <YAxis />
-                                    <RechartsTooltip />
-                                    <Bar dataKey="sessions" fill="#eab308" name="Sessions" />
-                                </BarChart>
-                            </ResponsiveContainer>
+                            {Object.keys(monitoring_officer_distribution).length === 0 ? (
+                                <div className="flex h-[300px] items-center justify-center text-muted-foreground">
+                                    No session data in range
+                                </div>
+                            ) : (
+                                <ResponsiveContainer width="100%" height={300}>
+                                    <PieChart>
+                                        <Pie
+                                            data={Object.entries(monitoring_officer_distribution).map(([name, value]) => ({ name, value }))}
+                                            cx="50%"
+                                            cy="50%"
+                                            labelLine={false}
+                                            label={({ name, percent }) => `${name}: ${((percent ?? 0) * 100).toFixed(0)}%`}
+                                            outerRadius={80}
+                                            innerRadius={40}
+                                            dataKey="value"
+                                        >
+                                            {Object.keys(monitoring_officer_distribution).map((_, i) => (
+                                                <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                                            ))}
+                                        </Pie>
+                                        <RechartsTooltip />
+                                        <Legend />
+                                    </PieChart>
+                                </ResponsiveContainer>
+                            )}
                         </CardContent>
                     </Card>
+                </div>
 
+                {/* Peak usage heatmap: hour x day of week */}
+                {peak_usage_heatmap.length > 0 && (
+                    <Card>
+                        <CardHeader>
+                            <ChartTitleWithTooltip
+                                title="Peak Usage Heatmap"
+                                description="Sessions per hour (rows) and day of week (columns). Intensity shows session count."
+                            />
+                            <CardDescription>Hour (0–23) vs day of week (Sun–Sat)</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <PeakUsageHeatmap data={peak_usage_heatmap} />
+                        </CardContent>
+                    </Card>
+                )}
+
+                <div className="grid gap-4 md:grid-cols-2">
                     {/* Incident Reports Summary */}
                     <Card>
                         <CardHeader>
@@ -979,6 +972,44 @@ export default function SuperAdminDashboard({
                         </CardContent>
                     </Card>
                 </div>
+
+                {/* Top Inmates by Visits */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Top Inmates by Visit Count</CardTitle>
+                        <CardDescription>Inmates with the most visits in the selected date range</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="rounded-lg border">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead className="w-16">#</TableHead>
+                                        <TableHead>Inmate</TableHead>
+                                        <TableHead className="text-right">Visits</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {top_inmates_by_visits.length === 0 ? (
+                                        <TableRow>
+                                            <TableCell colSpan={3} className="h-24 text-center text-muted-foreground">
+                                                No visit data in range.
+                                            </TableCell>
+                                        </TableRow>
+                                    ) : (
+                                        top_inmates_by_visits.map((row) => (
+                                            <TableRow key={row.rank}>
+                                                <TableCell className="font-medium">{row.rank}</TableCell>
+                                                <TableCell>{row.inmate_name}</TableCell>
+                                                <TableCell className="text-right">{row.visit_count}</TableCell>
+                                            </TableRow>
+                                        ))
+                                    )}
+                                </TableBody>
+                            </Table>
+                        </div>
+                    </CardContent>
+                </Card>
 
                 {/* Recent Users Table */}
                 <Card>

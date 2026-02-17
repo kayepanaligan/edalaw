@@ -108,6 +108,9 @@ class VisitorDashboardController extends Controller
         $missedCalls = CallLog::where('user_id', $userId)
             ->where('status', 'missed')
             ->count();
+        $failedCalls = CallLog::where('user_id', $userId)
+            ->whereIn('status', ['failed', 'rejected'])
+            ->count();
 
         $recentCallLogs = CallLog::where('user_id', $userId)
             ->orderBy('call_date', 'desc')
@@ -218,6 +221,7 @@ class VisitorDashboardController extends Controller
                 'outgoing_calls' => $outgoingCalls,
                 'completed_calls' => $completedCalls,
                 'missed_calls' => $missedCalls,
+                'failed_calls' => $failedCalls,
             ],
             'recent_call_logs' => $recentCallLogs,
             'eburol_stats' => [

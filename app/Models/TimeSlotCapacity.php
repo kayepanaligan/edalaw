@@ -43,11 +43,12 @@ class TimeSlotCapacity extends Model
 
     /**
      * Get the current booking count for a time slot on a specific date.
+     * Matches scheduled_time in H:i format (DB may store as HH:MM:SS).
      */
     public static function getCurrentBookings(string $date, string $timeSlot, string $visitType): int
     {
         return \App\Models\Visit::where('scheduled_date', $date)
-            ->where('scheduled_time', $timeSlot)
+            ->whereRaw('(scheduled_time = ? OR TIME_FORMAT(scheduled_time, \'%H:%i\') = ?)', [$timeSlot, $timeSlot])
             ->where('visit_type', $visitType)
             ->whereIn('status', [\App\VisitStatus::Pending, \App\VisitStatus::Approved])
             ->count();

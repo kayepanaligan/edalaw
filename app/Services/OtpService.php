@@ -145,9 +145,9 @@ class OtpService
                 return ['success' => false, 'error' => 'User does not have required contact information'];
             }
         } else {
-            // For login OTP, send via Semaphore SMS
+            // For login or password_reset OTP, send via Semaphore SMS
             if (! $user->contact_number) {
-                return ['success' => false, 'error' => 'User does not have a contact number'];
+                return ['success' => false, 'error' => 'No contact number on file. Please contact support to add your mobile number.'];
             }
 
             $result = self::sendOtpSms($user->contact_number, $otp);

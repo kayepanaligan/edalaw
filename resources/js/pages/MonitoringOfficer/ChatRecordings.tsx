@@ -104,7 +104,13 @@ export default function ChatRecordings({ sessions, filters }: Props) {
                         <CardDescription>{sessions.length} session(s)</CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <DataTable columns={columns} data={sessions} />
+                        <DataTable
+                            columns={columns}
+                            data={sessions}
+                            searchKey="chat_search"
+                            searchPlaceholder="Search by session, visitor, inmate..."
+                            initialSorting={[{ id: 'scheduled_start', desc: true }]}
+                        />
                     </CardContent>
                 </Card>
             </div>

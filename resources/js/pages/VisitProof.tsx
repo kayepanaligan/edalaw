@@ -26,7 +26,15 @@ export default function VisitProof({ visit }: Props) {
     return (
         <>
             <Head title="Proof of Appointment" />
-            <div className="min-h-screen bg-white p-6 print:p-8">
+            <style>{`
+                @media print {
+                    @page { size: 8.5in 14in; margin: 0.5in; }
+                    body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+                    .visit-proof-print-wrapper a,
+                    a[href] { visibility: hidden !important; }
+                }
+            `}</style>
+            <div className="visit-proof-print-wrapper min-h-screen bg-white p-6 print:p-8 print:max-w-[8.5in] print:mx-auto">
                 {/* Print button - hidden when printing */}
                 <div className="mb-6 flex justify-end print:hidden">
                     <Button onClick={handlePrint} className="gap-2">
@@ -52,8 +60,8 @@ export default function VisitProof({ visit }: Props) {
 
                     <div className="space-y-4 text-gray-800">
                         <div className="flex justify-between border-b border-gray-200 pb-2">
-                            <span className="font-medium">Reference ID</span>
-                            <span>#{visit.id}</span>
+                            <span className="font-medium">Access Key</span>
+                            <span className="font-mono font-semibold">{visit.access_key ?? '—'}</span>
                         </div>
                         <div className="flex justify-between border-b border-gray-200 pb-2">
                             <span className="font-medium">Visitor</span>
@@ -75,22 +83,11 @@ export default function VisitProof({ visit }: Props) {
                             <span className="font-medium">Scheduled Time</span>
                             <span>{visit.scheduled_time ?? '—'}</span>
                         </div>
-                        {visit.access_key && (
-                            <>
-                                <div className="mt-6 border-t-2 border-gray-300 pt-4">
-                                    <p className="mb-2 text-sm font-medium text-gray-700">
-                                        Access Key (show to officer at the facility)
-                                    </p>
-                                    <p className="rounded bg-gray-100 p-4 text-center font-mono text-2xl font-bold tracking-widest print:bg-gray-200">
-                                        {visit.access_key}
-                                    </p>
-                                </div>
-                                {visit.access_key_expires_at && (
-                                    <p className="mt-2 text-xs text-gray-600">
-                                        Valid until: {visit.access_key_expires_at}
-                                    </p>
-                                )}
-                            </>
+                        {visit.access_key && visit.access_key_expires_at && (
+                            <div className="flex justify-between border-b border-gray-200 pb-2">
+                                <span className="font-medium">Valid until</span>
+                                <span>{visit.access_key_expires_at}</span>
+                            </div>
                         )}
                     </div>
 

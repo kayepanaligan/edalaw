@@ -10,13 +10,13 @@ import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import AuthLayout from '@/layouts/auth-layout';
 import { register } from '@/routes';
-import { request } from '@/routes/password';
 
 type Props = {
     status?: string;
     canResetPassword?: boolean;
     canRegister?: boolean;
     loginUrl?: string;
+    forgotPasswordUrl?: string;
     csrfToken?: string;
     oldEmail?: string;
 };
@@ -26,6 +26,7 @@ export default function Login({
     canResetPassword = false,
     canRegister = false,
     loginUrl = '/login',
+    forgotPasswordUrl = '/password/forgot',
     csrfToken = '',
     oldEmail = '',
 }: Props) {
@@ -46,7 +47,7 @@ export default function Login({
     return (
         <AuthLayout
             title="Log in to your account"
-            description="Enter your email and password below to log in"
+            description="Enter your email or contact number and password below to log in"
         >
             <Head title="Log in" />
 
@@ -60,16 +61,17 @@ export default function Login({
                     <input type="hidden" name="_token" value={csrfToken} />
                     <div className="grid gap-6 rounded-lg border p-6">
                         <div className="grid gap-2">
-                            <Label htmlFor="email">Email address</Label>
+                            <Label htmlFor="email">Email or contact number</Label>
                             <Input
                                 id="email"
                                 name="email"
-                                type="email"
+                                type="text"
                                 required
                                 autoFocus
-                                autoComplete="email"
+                                autoComplete="username"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
+                                placeholder="Email or contact number"
                             />
                             <InputError
                                 message={
@@ -85,7 +87,7 @@ export default function Login({
                                 <Label htmlFor="password">Password</Label>
                                 {canResetPassword && (
                                     <TextLink
-                                        href={request()}
+                                        href={forgotPasswordUrl}
                                         className="ml-auto text-sm"
                                     >
                                         Forgot password?
@@ -99,6 +101,7 @@ export default function Login({
                                     type={showPassword ? 'text' : 'password'}
                                     required
                                     autoComplete="current-password"
+                                    placeholder="Password"
                                     value={password}
                                     onChange={(e) =>
                                         setPassword(e.target.value)
@@ -173,7 +176,6 @@ export default function Login({
                     )}
                     </div>
 
-                
                     <div className="text-center text-sm text-muted-foreground">
                         <TextLink href="/inmate-tunnel">Join as inmate</TextLink>
                     </div>

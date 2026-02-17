@@ -86,13 +86,14 @@ export default function CallLogs({ callLogs }: Props) {
             case 'missed':
                 return <Badge variant="destructive">Missed</Badge>;
             case 'failed':
+            case 'rejected':
                 return (
                     <Badge variant="outline" className="bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20">
-                        Failed
+                        {status === 'rejected' ? 'Rejected' : 'Failed'}
                     </Badge>
                 );
             default:
-                return <Badge variant="secondary">{status}</Badge>;
+                return <Badge variant="secondary" className="capitalize">{status}</Badge>;
         }
     };
 

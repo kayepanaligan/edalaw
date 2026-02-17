@@ -163,6 +163,7 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
     const [bookedSlots, setBookedSlots] = useState<string[]>(bookedTimeSlots);
     const [rescheduleBookedSlots, setRescheduleBookedSlots] = useState<string[]>([]);
     const [slotCapacities, setSlotCapacities] = useState<Record<string, { current: number; max: number; isFull: boolean }>>({});
+    const [userBookedSlots, setUserBookedSlots] = useState<string[]>([]);
     const [rescheduleSlotCapacities, setRescheduleSlotCapacities] = useState<Record<string, { current: number; max: number; isFull: boolean }>>({});
     const [isDayUnavailable, setIsDayUnavailable] = useState(false);
     const [rescheduleDayUnavailable, setRescheduleDayUnavailable] = useState(false);
@@ -216,6 +217,7 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
     useEffect(() => {
         if (!selectedDate || !visitType) {
             setSlotCapacities({});
+            setUserBookedSlots([]);
             setLoadingSlots(false);
             return;
         }
@@ -228,6 +230,11 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
                 const data = await response.json();
                 if (data.slotCapacities) {
                     setSlotCapacities(data.slotCapacities);
+                }
+                if (Array.isArray(data.userBookedSlots)) {
+                    setUserBookedSlots(data.userBookedSlots);
+                } else {
+                    setUserBookedSlots([]);
                 }
                 if (data.isDayUnavailable === true) {
                     setIsDayUnavailable(true);
@@ -738,6 +745,7 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
                                 data={filteredVisits}
                                 searchKey="inmate_first_name"
                                 searchPlaceholder="Search by inmate name, date..."
+                                initialSorting={[{ id: 'scheduled_date', desc: true }]}
                                 headerActions={
                                     <div className="flex flex-wrap items-center gap-2">
                                         <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -824,9 +832,9 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
                     </DialogContent>
                 </Dialog>
 
-                {/* Apply Schedule Modal */}
+                {/* Apply Schedule Modal - vertical layout, moderate width */}
                 <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-                    <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                    <DialogContent className="max-w-lg w-full max-h-[90vh] overflow-y-auto">
                         <DialogHeader>
                             <DialogTitle>Apply for Visit Schedule</DialogTitle>
                             <DialogDescription>
@@ -834,8 +842,34 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
                             </DialogDescription>
                         </DialogHeader>
                         <form onSubmit={handleSubmit}>
-                            <div className="space-y-4">
-                                <div className="grid gap-2">
+                            <div className="flex flex-col gap-4">
+                                <div className="flex flex-col gap-2">
+                                    <Label htmlFor="visit_type">
+                                        Visit Type <span className="text-destructive">*</span>
+                                    </Label>
+                                    <Select
+                                        value={currentVisitType}
+                                        onValueChange={(value) => {
+                                            setVisitType(value);
+                                            form.setData('visit_type', value);
+                                            if (form.data.scheduled_time) {
+                                                form.setData('scheduled_time', '');
+                                            }
+                                        }}
+                                    >
+                                        <SelectTrigger id="visit_type">
+                                            <SelectValue placeholder="Select visit type" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="virtual">Virtual (10-min)</SelectItem>
+                                            <SelectItem value="physical">Physical (1-hour)</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                    <input type="hidden" name="visit_type" value={currentVisitType} />
+                                    <InputError message={form.errors.visit_type} />
+                                </div>
+
+                                <div className="flex flex-col gap-2">
                                     <Label htmlFor="scheduled_date">
                                         Scheduled Date <span className="text-destructive">*</span>
                                     </Label>
@@ -865,7 +899,7 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
                                     </p>
                                 </div>
 
-                                <div className="grid gap-2">
+                                <div className="flex flex-col gap-2">
                                     <Label>
                                         Scheduled Time <span className="text-destructive">*</span>
                                     </Label>
@@ -873,6 +907,11 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
                                         <div className="border rounded-lg p-4 bg-muted/30 text-center text-sm text-muted-foreground">
                                             <Clock className="size-5 mx-auto mb-2 opacity-50" />
                                             Please select a date first to view available time slots
+                                        </div>
+                                    ) : !form.data.visit_type ? (
+                                        <div className="border rounded-lg p-4 bg-muted/30 text-center text-sm text-muted-foreground">
+                                            <Clock className="size-5 mx-auto mb-2 opacity-50" />
+                                            Please select a visit type first
                                         </div>
                                     ) : (
                                         <>
@@ -891,6 +930,7 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
                                                     selectedTime={form.data.scheduled_time || ''}
                                                     bookedSlots={bookedSlots}
                                                     slotCapacities={slotCapacities}
+                                                    userBookedSlots={userBookedSlots}
                                                     visitType={form.data.visit_type as 'physical' | 'virtual'}
                                                     onTimeSelect={(time) => {
                                                         form.setData('scheduled_time', time);
@@ -907,36 +947,13 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
                                     <InputError message={form.errors.scheduled_time} />
                                 </div>
 
-                                <div className="grid gap-2">
-                                    <Label htmlFor="visit_type">
-                                        Visit Type <span className="text-destructive">*</span>
-                                    </Label>
-                                    <Select
-                                        value={currentVisitType}
-                                        onValueChange={(value) => {
-                                            setVisitType(value);
-                                            form.setData('visit_type', value);
-                                        }}
-                                    >
-                                        <SelectTrigger id="visit_type">
-                                            <SelectValue placeholder="Select visit type" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="virtual">Virtual</SelectItem>
-                                            <SelectItem value="physical">Physical</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                    <input type="hidden" name="visit_type" value={currentVisitType} />
-                                    <InputError message={form.errors.visit_type} />
-                                </div>
-
                                 <div className="space-y-4">
                                     <h3 className="text-sm font-semibold flex items-center gap-2">
                                         <User className="size-4" />
                                         Inmate Information
                                     </h3>
 
-                                    <div className="grid gap-2">
+                                    <div className="flex flex-col gap-2">
                                         <Label htmlFor="inmate_first_name">
                                             Inmate First Name <span className="text-destructive">*</span>
                                         </Label>
@@ -945,25 +962,27 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
                                             type="text"
                                             required
                                             name="inmate_first_name"
+                                            placeholder="First name"
                                             value={form.data.inmate_first_name || ''}
                                             onChange={(e) => form.setData('inmate_first_name', e.target.value)}
                                         />
                                         <InputError message={form.errors.inmate_first_name} />
                                     </div>
 
-                                    <div className="grid gap-2">
+                                    <div className="flex flex-col gap-2">
                                         <Label htmlFor="inmate_middle_name">Inmate Middle Name</Label>
                                         <Input
                                             id="inmate_middle_name"
                                             type="text"
                                             name="inmate_middle_name"
+                                            placeholder="Middle name (optional)"
                                             value={form.data.inmate_middle_name || ''}
                                             onChange={(e) => form.setData('inmate_middle_name', e.target.value)}
                                         />
                                         <InputError message={form.errors.inmate_middle_name} />
                                     </div>
 
-                                    <div className="grid gap-2">
+                                    <div className="flex flex-col gap-2">
                                         <Label htmlFor="inmate_last_name">
                                             Inmate Last Name <span className="text-destructive">*</span>
                                         </Label>
@@ -972,6 +991,7 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
                                             type="text"
                                             required
                                             name="inmate_last_name"
+                                            placeholder="Last name"
                                             value={form.data.inmate_last_name || ''}
                                             onChange={(e) => form.setData('inmate_last_name', e.target.value)}
                                         />
@@ -979,14 +999,14 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
                                     </div>
                                 </div>
 
-                                <div className="space-y-4">
+                                <div className="flex flex-col gap-4">
                                     <h3 className="text-sm font-semibold flex items-center gap-2">
                                         <FileText className="size-4" />
                                         Required Documents
                                     </h3>
 
-                                    <div className="space-y-4">
-                                        <div className="space-y-2">
+                                    <div className="flex flex-col gap-4">
+                                        <div className="flex flex-col gap-2">
                                             <Label htmlFor="relationship_proof">
                                                 Proof of Relationship <span className="text-destructive">*</span>
                                             </Label>
@@ -1006,7 +1026,7 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
                                             </p>
                                             <InputError message={form.errors.relationship_proof} />
                                         </div>
-                                        <div className="space-y-2">
+                                        <div className="flex flex-col gap-2">
                                             <Label htmlFor="additional_proof">
                                                 Additional/Supporting Proof of Relationship <span className="text-destructive">*</span>
                                             </Label>
@@ -1029,7 +1049,7 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
                                     </div>
                                 </div>
 
-                                <div className="grid gap-2">
+                                <div className="flex flex-col gap-2">
                                     <Label htmlFor="notes">Additional Notes</Label>
                                     <Textarea
                                         id="notes"
