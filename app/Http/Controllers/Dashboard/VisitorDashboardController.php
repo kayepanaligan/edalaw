@@ -69,10 +69,13 @@ class VisitorDashboardController extends Controller
                     $sessionEnded = in_array($latestSession->status, ['completed', 'terminated', 'no_show', 'unsuccessful'], true)
                         || now()->isAfter($latestSession->scheduled_end);
                     $canJoinVideo = $visit->status === VisitStatus::Approved
-                        && $visit->meeting_link
                         && ! $sessionEnded
                         && now()->between($latestSession->scheduled_start, $latestSession->scheduled_end);
                 }
+
+                $joinUrl = $latestSession && $visit->visit_type === VisitType::Virtual
+                    ? route('visit-session.show', $latestSession)
+                    : null;
 
                 return [
                     'id' => $visit->id,
@@ -84,6 +87,7 @@ class VisitorDashboardController extends Controller
                     ),
                     'status' => $visit->status->value,
                     'meeting_link' => $visit->meeting_link ?? $visit->daily_co_room_url,
+                    'join_url' => $joinUrl,
                     'created_at' => $visit->created_at->format('Y-m-d H:i:s'),
                     'can_join_video' => $canJoinVideo,
                     'session_ended' => $sessionEnded,

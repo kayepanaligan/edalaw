@@ -37,15 +37,15 @@ class InmateTunnelController extends Controller
         $request->validate([
             'token_or_url' => ['required', 'string', 'max:2048'],
         ], [
-            'token_or_url.required' => 'Please enter the inmate tunnel link or token.',
+            'token_or_url.required' => 'Please enter the inmate tunnel code.',
         ]);
 
         $input = trim($request->input('token_or_url'));
-        $token = $this->extractTunnelToken($input);
+        $token = $this->resolveTunnelToken($input);
 
         if (! $token) {
             return redirect()->route('inmate.enter-token')
-                ->withErrors(['token_or_url' => 'The link or token you entered is invalid. Please paste the full link or the token you received.']);
+                ->withErrors(['token_or_url' => 'The code you entered is invalid. Enter the 8-character code you received.']);
         }
 
         $tunnel = InmateTunnel::where('tunnel_token', $token)->first();
@@ -55,20 +55,26 @@ class InmateTunnelController extends Controller
         }
         if ($tunnel->expires_at->isPast()) {
             return redirect()->route('inmate.enter-token')
-                ->withErrors(['token_or_url' => 'This link has expired.']);
+                ->withErrors(['token_or_url' => 'This code has expired.']);
         }
 
-        return redirect()->route('inmate.join', ['token' => $token]);
+        return redirect()->route('inmate.join', ['token' => $tunnel->tunnel_token]);
     }
 
     /**
-     * Extract tunnel token from user input (full URL or raw token).
+     * Resolve tunnel token from user input: 8-char short code, full URL, or raw tunnel token.
      */
-    private function extractTunnelToken(string $input): ?string
+    private function resolveTunnelToken(string $input): ?string
     {
         $input = trim($input);
         if ($input === '') {
             return null;
+        }
+        $upper = strtoupper($input);
+        if (strlen($upper) === 8 && ctype_alnum($upper)) {
+            $tunnel = InmateTunnel::where('short_code', $upper)->first();
+
+            return $tunnel ? $tunnel->tunnel_token : null;
         }
         if (str_contains($input, 'inmate/join/')) {
             $parts = explode('inmate/join/', $input);
@@ -97,10 +103,39 @@ class InmateTunnelController extends Controller
 
         $session = $tunnel->visitSession;
         if (! $session->isWithinSchedule()) {
-            abort(403, 'This link is only valid during the scheduled visit window.');
+            $tz = config('app.timezone');
+            $now = now($tz);
+            $start = $session->scheduled_start->copy()->setTimezone($tz);
+            $end = $session->scheduled_end->copy()->setTimezone($tz);
+            $scheduleWindow = $start->format('M j, Y').', '.$start->format('g:i A').' – '.$end->format('g:i A');
+            $timeUntilActive = null;
+            if ($now->isBefore($start)) {
+                $diff = $now->diff($start);
+                $parts = [];
+                if ($diff->d > 0) {
+                    $parts[] = $diff->d.' '.str('day')->plural($diff->d);
+                }
+                if ($diff->h > 0) {
+                    $parts[] = $diff->h.' '.str('hour')->plural($diff->h);
+                }
+                if ($diff->i > 0 && count($parts) < 2) {
+                    $parts[] = $diff->i.' '.str('minute')->plural($diff->i);
+                }
+                $timeUntilActive = count($parts) > 0 ? implode(' ', $parts) : 'less than a minute';
+            }
+
+            return Inertia::render('Inmate/SessionUnavailable', [
+                'message' => 'This link is only valid during the scheduled visit window.',
+                'title' => 'Link not available',
+                'schedule_window' => $scheduleWindow,
+                'time_until_active' => $timeUntilActive,
+            ]);
         }
         if ($session->isCompleted()) {
-            abort(403, 'This session has ended.');
+            return Inertia::render('Inmate/SessionUnavailable', [
+                'message' => 'This session has ended.',
+                'title' => 'Session ended',
+            ]);
         }
 
         return Inertia::render('Inmate/JoinSession', [
@@ -128,8 +163,6 @@ class InmateTunnelController extends Controller
             return response()->json(['error' => 'Session not available.'], 403);
         }
 
-        $tunnel->update(['is_used' => true]);
-
         $session->update(['inmate_joined_at' => $session->inmate_joined_at ?? now()]);
 
         if ($session->visitor_joined_at && $session->visitor_participant_id) {
@@ -138,19 +171,22 @@ class InmateTunnelController extends Controller
 
         $videoSdk = new VideoSdkService;
         $participantId = 'inmate-'.$session->id.'-'.uniqid();
-        $result = $videoSdk->generateParticipantToken($session->room_id, $participantId, ['allow_join'], 120);
+        $result = $videoSdk->generateJoinTokenForPrebuiltApp($session->room_id, $participantId, ['allow_join'], 120);
 
         if (! ($result['success'] ?? false) || empty($result['token'])) {
-            $tunnel->update(['is_used' => false]);
-
             return response()->json(['error' => 'Unable to generate join token.'], 500);
         }
 
-        return response()->json([
+        $payload = [
             'token' => $result['token'],
             'room_id' => $session->room_id,
             'participant_id' => $participantId,
-        ]);
+        ];
+        if ($videoSdk->isV2Rooms()) {
+            $payload['join_url'] = url('/video-room').'?room_id='.rawurlencode($session->room_id).'&token='.rawurlencode($result['token']);
+        }
+
+        return response()->json($payload);
     }
 
     /**

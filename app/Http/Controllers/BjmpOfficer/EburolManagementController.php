@@ -50,8 +50,8 @@ class EburolManagementController extends Controller
                     'admin_notes' => $eburol->admin_notes,
                     'rejection_reason' => $eburol->rejection_reason,
                     'monitoring_officer_id' => $eburol->monitoring_officer_id,
-                    'death_certificate_path' => $eburol->death_certificate_path ? Storage::disk('public')->url($eburol->death_certificate_path) : null,
-                    'relationship_proof_path' => $eburol->relationship_proof_path ? Storage::disk('public')->url($eburol->relationship_proof_path) : null,
+                    'death_certificate_path' => $eburol->death_certificate_path ? route('bjmp-officer.eburols.document.death-certificate', $eburol) : null,
+                    'relationship_proof_path' => $eburol->relationship_proof_path ? route('bjmp-officer.eburols.document.relationship-proof', $eburol) : null,
                     'created_at' => $eburol->created_at->format('Y-m-d H:i:s'),
                 ];
             });
@@ -94,45 +94,50 @@ class EburolManagementController extends Controller
             'monitoring_officer_id' => ['required', 'exists:users,id'],
         ]);
 
-        $roomId = null;
-        // Create VideoSDK room for e-burol session
+        // Create VideoSDK room and visit session (with inmate tunnel) before approving
         $videoSdkService = new VideoSdkService;
         $roomName = "eburol-{$eburol->id}-".uniqid();
         $roomResult = $videoSdkService->createRoom($roomName);
 
+        if (! ($roomResult['success'] ?? false)) {
+            $errorMessage = $roomResult['error'] ?? 'Video room could not be created.';
+            \Illuminate\Support\Facades\Log::error('VideoSDK room creation failed during e-burol approval', [
+                'eburol_id' => $eburol->id,
+                'error' => $errorMessage,
+            ]);
+
+            return redirect()->back()
+                ->withErrors(['approve' => 'E-Burol cannot be approved: '.$errorMessage.' Please check VideoSDK configuration and try again.']);
+        }
+
+        $roomId = $roomResult['room_id'] ?? null;
         $updateData = [
             'status' => EburolStatus::Approved,
             'monitoring_officer_id' => $request->monitoring_officer_id,
+            'daily_co_room_id' => $roomId,
+            'daily_co_room_name' => $roomResult['room_name'] ?? $roomName,
+            'daily_co_room_url' => $roomResult['room_url'] ?? null,
+            'room_created_at' => now(),
         ];
 
-        if ($roomResult['success']) {
-            $roomId = $roomResult['room_id'] ?? null;
-            $updateData['daily_co_room_id'] = $roomId;
-            $updateData['daily_co_room_name'] = $roomResult['room_name'] ?? $roomName;
-            $updateData['daily_co_room_url'] = $roomResult['room_url'] ?? null;
-            $updateData['room_created_at'] = now();
-
-            // Create monitoring session
-            MonitoringSession::create([
-                'eburol_id' => $eburol->id,
-                'visitor_id' => $eburol->user_id,
-                'session_type' => 'eburol',
-                'session_token' => $roomId ?? $roomName,
-                'status' => 'pending',
-                'started_at' => now(),
-            ]);
-        } else {
-            // Log error but don't block approval
-            \Illuminate\Support\Facades\Log::error('VideoSDK room creation failed during e-burol approval', [
-                'eburol_id' => $eburol->id,
-                'error' => $roomResult['error'] ?? 'Unknown error',
-            ]);
-        }
+        MonitoringSession::create([
+            'eburol_id' => $eburol->id,
+            'visitor_id' => $eburol->user_id,
+            'session_type' => 'eburol',
+            'session_token' => $roomId ?? $roomName,
+            'status' => 'pending',
+            'started_at' => now(),
+        ]);
 
         $eburol->update($updateData);
 
-        if ($roomId) {
-            app(\App\Services\VisitSessionService::class)->createForEburol($eburol, $roomId);
+        $visitSession = app(\App\Services\VisitSessionService::class)->createForEburol($eburol, $roomId);
+        if (! $visitSession) {
+            \Illuminate\Support\Facades\Log::error('Visit session (inmate tunnel) creation failed during e-burol approval', ['eburol_id' => $eburol->id]);
+            $eburol->update(['status' => EburolStatus::Pending]);
+
+            return redirect()->back()
+                ->withErrors(['approve' => 'E-Burol could not be approved: visit session and inmate tunnel could not be created. Please ensure a monitoring officer is assigned and try again.']);
         }
 
         $eburol->refresh();
@@ -237,5 +242,33 @@ class EburolManagementController extends Controller
 
         return redirect()->route('bjmp-officer.eburols.index')
             ->with('success', 'E-Burol status updated successfully.');
+    }
+
+    /**
+     * Serve death certificate file for viewing (BJMP officer).
+     */
+    public function deathCertificate(Eburol $eburol): \Symfony\Component\HttpFoundation\BinaryFileResponse
+    {
+        if (! $eburol->death_certificate_path || ! Storage::disk('public')->exists($eburol->death_certificate_path)) {
+            abort(404, 'Document not found.');
+        }
+
+        return response()->file(Storage::disk('public')->path($eburol->death_certificate_path), [
+            'Content-Disposition' => 'inline; filename="'.basename($eburol->death_certificate_path).'"',
+        ]);
+    }
+
+    /**
+     * Serve relationship proof file for viewing (BJMP officer).
+     */
+    public function relationshipProof(Eburol $eburol): \Symfony\Component\HttpFoundation\BinaryFileResponse
+    {
+        if (! $eburol->relationship_proof_path || ! Storage::disk('public')->exists($eburol->relationship_proof_path)) {
+            abort(404, 'Document not found.');
+        }
+
+        return response()->file(Storage::disk('public')->path($eburol->relationship_proof_path), [
+            'Content-Disposition' => 'inline; filename="'.basename($eburol->relationship_proof_path).'"',
+        ]);
     }
 }

@@ -1,5 +1,5 @@
 import { Head, router } from '@inertiajs/react';
-import { Computer, Globe, MapPin, Monitor, Smartphone, Tablet, Trash2, Users, Activity, Circle } from 'lucide-react';
+import { AlertTriangle, Computer, Globe, LogOut, MapPin, Monitor, Smartphone, Tablet, Trash2, Users, Activity, Circle } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { ColumnDef } from '@tanstack/react-table';
 import { toast } from 'sonner';
@@ -68,6 +68,7 @@ type Props = {
             desktop: number;
         };
     };
+    my_other_sessions_count?: number;
 };
 
 function getDeviceIcon(deviceType: string | null) {
@@ -114,8 +115,9 @@ function getRoleBadge(role: string) {
     );
 }
 
-export default function SessionManagement({ sessions, stats }: Props) {
+export default function SessionManagement({ sessions, stats, my_other_sessions_count = 0 }: Props) {
     const [revokingSession, setRevokingSession] = useState<number | null>(null);
+    const [revokingMyOther, setRevokingMyOther] = useState(false);
     const [deviceFilter, setDeviceFilter] = useState<string>('all');
     const [statusFilter, setStatusFilter] = useState<string>('all');
 
@@ -142,6 +144,20 @@ export default function SessionManagement({ sessions, stats }: Props) {
             onError: () => {
                 toast.error('Failed to revoke user sessions');
             },
+        });
+    };
+
+    const handleRevokeMyOtherSessions = () => {
+        setRevokingMyOther(true);
+        router.post('/admin/sessions/revoke-my-other', {}, {
+            preserveScroll: true,
+            onSuccess: () => {
+                toast.success('All other sessions have been ended');
+            },
+            onError: () => {
+                toast.error('Failed to end other sessions');
+            },
+            onFinish: () => setRevokingMyOther(false),
         });
     };
 
@@ -350,6 +366,31 @@ export default function SessionManagement({ sessions, stats }: Props) {
                         Monitor and manage all user sessions across the system
                     </p>
                 </div>
+
+                {my_other_sessions_count > 0 && (
+                    <Card className="border-amber-500/50 bg-amber-500/5 dark:bg-amber-500/10">
+                        <CardContent className="flex flex-col gap-4 pt-6 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="flex items-center gap-3">
+                                <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0" />
+                                <div>
+                                    <p className="font-medium">You are logged in on {my_other_sessions_count} other device{my_other_sessions_count !== 1 ? 's' : ''}</p>
+                                    <p className="text-sm text-muted-foreground">
+                                        End all other sessions to stay logged in only on this device.
+                                    </p>
+                                </div>
+                            </div>
+                            <Button
+                                variant="outline"
+                                className="border-amber-500/50 text-amber-700 hover:bg-amber-500/10 dark:text-amber-400 dark:hover:bg-amber-500/20 shrink-0"
+                                onClick={handleRevokeMyOtherSessions}
+                                disabled={revokingMyOther}
+                            >
+                                <LogOut className="mr-2 h-4 w-4" />
+                                {revokingMyOther ? 'Ending...' : 'End all other sessions'}
+                            </Button>
+                        </CardContent>
+                    </Card>
+                )}
 
                 {/* Stats Cards */}
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">

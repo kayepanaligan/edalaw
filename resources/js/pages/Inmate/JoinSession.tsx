@@ -30,7 +30,9 @@ export default function JoinSession({ tunnel_token, session }: Props) {
             }
             setToken({ token: data.token, room_id: data.room_id, participant_id: data.participant_id });
             setJoined(true);
-            const url = `https://app.videosdk.live/meetings/${data.room_id}?token=${encodeURIComponent(data.token)}`;
+            const url =
+                data.join_url ??
+                `https://app.videosdk.live/meetings/${data.room_id}?token=${encodeURIComponent(data.token)}`;
             window.location.href = url;
         } catch {
             setError('Failed to connect');

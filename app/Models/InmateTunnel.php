@@ -16,6 +16,7 @@ class InmateTunnel extends Model
     protected $fillable = [
         'visit_session_id',
         'tunnel_token',
+        'short_code',
         'expires_at',
         'is_used',
     ];
@@ -46,5 +47,21 @@ class InmateTunnel extends Model
     public static function generateToken(): string
     {
         return Str::uuid()->toString();
+    }
+
+    /**
+     * Generate a short 8-character alphanumeric code for inmate tunnel (easy to type).
+     */
+    public static function generateShortCode(): string
+    {
+        $chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Exclude ambiguous 0/O, 1/I
+        do {
+            $code = '';
+            for ($i = 0; $i < 8; $i++) {
+                $code .= $chars[random_int(0, strlen($chars) - 1)];
+            }
+        } while (self::where('short_code', $code)->exists());
+
+        return $code;
     }
 }

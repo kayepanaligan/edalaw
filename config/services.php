@@ -49,6 +49,7 @@ return [
     'videosdk' => [
         'api_key' => env('VIDEOSDK_API_KEY'),
         'secret_key' => env('VIDEOSDK_SECRET_KEY'),
+        // Use v1/meetings so app.videosdk.live/meetings/{id} join links work. v2 rooms can 404 on the hosted app.
         'api_endpoint' => env('VIDEOSDK_API_ENDPOINT', 'https://api.videosdk.live/v1/meetings'),
         'token' => env('VIDEOSDK_TOKEN'),
     ],

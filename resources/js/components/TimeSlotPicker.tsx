@@ -40,83 +40,26 @@ export function TimeSlotPicker({
         return `${displayHour}${displayMinute} ${period}`;
     };
 
-    // Generate time slots: 10-minute intervals for virtual, hourly for physical
+    // Generate time slots: 1-hour slots for both virtual and physical (e.g. 7:00 AM – 8:00 AM)
     const generateTimeSlots = (): TimeSlot[] => {
         const slots: TimeSlot[] = [];
-        const isHourly = visitType === 'physical';
-
-        if (isHourly) {
-            // Physical: hourly slots 7:00–8:00, 8:00–9:00, … 17:00–18:00
-            for (let hour = 7; hour < 18; hour++) {
-                const time24 = `${hour.toString().padStart(2, '0')}:00`;
-                const period: 'AM' | 'PM' = hour < 12 ? 'AM' : 'PM';
-                const endHour = hour + 1;
-                const endPeriod: 'AM' | 'PM' = endHour < 12 ? 'AM' : 'PM';
-                const startLabel = formatTime(hour, 0, period);
-                const endLabel = formatTime(endHour, 0, endPeriod);
-                const rangeLabel = `${startLabel} - ${endLabel}`;
-                const capacity = slotCapacities[time24] || { current: 0, max: 4, isFull: false };
-                slots.push({
-                    value: time24,
-                    label: rangeLabel,
-                    rangeLabel: rangeLabel,
-                    period: hour < 12 ? 'AM' : 'PM',
-                    currentBookings: capacity.current,
-                    maxCapacity: capacity.max,
-                    isFull: capacity.isFull,
-                });
-            }
-            return slots;
-        }
-
-        // Virtual: 10-minute intervals
-        const getEndTime = (hour: number, minute: number): { hour: number; minute: number } => {
-            let endMinute = minute + 10;
-            let endHour = hour;
-            if (endMinute >= 60) {
-                endMinute = 0;
-                endHour += 1;
-            }
-            return { hour: endHour, minute: endMinute };
-        };
-
-        for (let hour = 7; hour < 12; hour++) {
-            for (let minute = 0; minute < 60; minute += 10) {
-                const time24 = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
-                const startLabel = formatTime(hour, minute, 'AM');
-                const endTime = getEndTime(hour, minute);
-                const endLabel = formatTime(endTime.hour, endTime.minute, endTime.hour < 12 ? 'AM' : 'PM');
-                const rangeLabel = `${startLabel} - ${endLabel}`;
-                const capacity = slotCapacities[time24] || { current: 0, max: 4, isFull: false };
-                slots.push({
-                    value: time24,
-                    label: rangeLabel,
-                    rangeLabel: rangeLabel,
-                    period: 'AM',
-                    currentBookings: capacity.current,
-                    maxCapacity: capacity.max,
-                    isFull: capacity.isFull,
-                });
-            }
-        }
-        for (let hour = 12; hour < 18; hour++) {
-            for (let minute = 0; minute < 60; minute += 10) {
-                const time24 = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
-                const startLabel = formatTime(hour, minute, 'PM');
-                const endTime = getEndTime(hour, minute);
-                const endLabel = formatTime(endTime.hour, endTime.minute, endTime.hour < 12 ? 'AM' : 'PM');
-                const rangeLabel = `${startLabel} - ${endLabel}`;
-                const capacity = slotCapacities[time24] || { current: 0, max: 4, isFull: false };
-                slots.push({
-                    value: time24,
-                    label: rangeLabel,
-                    rangeLabel: rangeLabel,
-                    period: 'PM',
-                    currentBookings: capacity.current,
-                    maxCapacity: capacity.max,
-                    isFull: capacity.isFull,
-                });
-            }
+        for (let hour = 7; hour < 18; hour++) {
+            const time24 = `${hour.toString().padStart(2, '0')}:00`;
+            const period: 'AM' | 'PM' = hour < 12 ? 'AM' : 'PM';
+            const endHour = hour + 1;
+            const startLabel = formatTime(hour, 0, period);
+            const endLabel = formatTime(endHour, 0, endHour < 12 ? 'AM' : 'PM');
+            const rangeLabel = `${startLabel} - ${endLabel}`;
+            const capacity = slotCapacities[time24] || { current: 0, max: 4, isFull: false };
+            slots.push({
+                value: time24,
+                label: rangeLabel,
+                rangeLabel: rangeLabel,
+                period: hour < 12 ? 'AM' : 'PM',
+                currentBookings: capacity.current,
+                maxCapacity: capacity.max,
+                isFull: capacity.isFull,
+            });
         }
         return slots;
     };
@@ -146,18 +89,18 @@ export function TimeSlotPicker({
                 <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 rounded-md p-3">
                     <p className="text-xs text-blue-900 dark:text-blue-100 font-medium mb-1">
                         <AlertCircle className="size-3 inline mr-1" />
-                        Important: You can only select one 10-minute time range per schedule.
+                        Select one 1-hour time range per schedule.
                     </p>
                     <p className="text-xs text-blue-700 dark:text-blue-300">
-                        Each time slot represents exactly 10 minutes. Once a time slot reaches its maximum capacity, it will be unavailable for selection.
+                        Each time slot is 1 hour. Once a slot reaches its maximum capacity, it will be unavailable.
                     </p>
                 </div>
             </div>
             
             <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'AM' | 'PM')} className="w-full">
                 <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="AM">AM (7:00 AM - 11:50 AM)</TabsTrigger>
-                    <TabsTrigger value="PM">PM (12:00 PM - 5:50 PM)</TabsTrigger>
+                    <TabsTrigger value="AM">AM (7:00 AM - 12:00 PM)</TabsTrigger>
+                    <TabsTrigger value="PM">PM (12:00 PM - 6:00 PM)</TabsTrigger>
                 </TabsList>
                 
                 <TabsContent value="AM" className="mt-4">

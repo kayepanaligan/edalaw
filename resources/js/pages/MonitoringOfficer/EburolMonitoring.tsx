@@ -25,6 +25,8 @@ type Eburol = {
     wake_location: string;
     status: string;
     created_at: string;
+    inmate_tunnel_code?: string | null;
+    inmate_tunnel_status?: 'active' | 'expired' | 'used' | null;
 };
 
 type Props = {
@@ -74,6 +76,27 @@ export default function EburolMonitoring({ eburols }: Props) {
             accessorKey: 'status',
             header: 'Status',
             cell: ({ row }) => getStatusBadge(row.original.status),
+        },
+        {
+            id: 'inmate_tunnel',
+            header: 'Inmate tunnel',
+            cell: ({ row }) => {
+                const code = row.original.inmate_tunnel_code;
+                const status = row.original.inmate_tunnel_status;
+                if (!code) return <span className="text-muted-foreground">—</span>;
+                const statusLabel = status === 'active' ? 'Active' : status === 'expired' ? 'Expired' : status === 'used' ? 'Used' : '—';
+                const statusVariant = status === 'active' ? 'default' : status === 'expired' ? 'destructive' : 'secondary';
+                return (
+                    <div className="flex flex-col gap-1">
+                        <code className="font-mono text-sm tracking-wider">{code}</code>
+                        {status && (
+                            <Badge variant={statusVariant} className="text-xs w-fit">
+                                {statusLabel}
+                            </Badge>
+                        )}
+                    </div>
+                );
+            },
         },
     ], []);
 

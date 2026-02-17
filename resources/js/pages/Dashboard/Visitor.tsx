@@ -49,6 +49,7 @@ type RecentSchedule = {
     inmate_name: string;
     status: 'pending' | 'approved' | 'rejected' | 'missed' | 'completed';
     meeting_link: string | null;
+    join_url: string | null;
     created_at: string;
     can_join_video?: boolean;
     session_ended?: boolean;
@@ -461,13 +462,11 @@ export default function VisitorDashboard({
                                                         </div>
                                                         {schedule.visit_type === 'virtual'
                                                             && schedule.status === 'approved'
-                                                            && schedule.meeting_link && (
+                                                            && (schedule.join_url || schedule.meeting_link) && (
                                                             <div className="text-sm">
-                                                                {canJoinVideoCall ? (
+                                                                {canJoinVideoCall && schedule.join_url ? (
                                                                     <a
-                                                                        href={schedule.meeting_link}
-                                                                        target="_blank"
-                                                                        rel="noopener noreferrer"
+                                                                        href={schedule.join_url}
                                                                         className="inline-flex items-center gap-2 text-primary hover:underline"
                                                                     >
                                                                         <Video className="h-4 w-4" />
@@ -479,7 +478,7 @@ export default function VisitorDashboard({
                                                                         <span>
                                                                             {schedule.session_ended
                                                                                 ? 'Session ended'
-                                                                                : 'Meeting link will be available at scheduled time'}
+                                                                                : 'Join will be available at scheduled time'}
                                                                         </span>
                                                                     </div>
                                                                 )}
@@ -489,19 +488,14 @@ export default function VisitorDashboard({
                                                     <div className="flex flex-col items-end gap-2">
                                                         {getStatusBadge(schedule.status)}
                                                         {getVisitTypeBadge(schedule.visit_type)}
-                                                        {canJoinVideoCall && (
+                                                        {canJoinVideoCall && schedule.join_url && (
                                                             <Button
                                                                 size="sm"
                                                                 variant="default"
                                                                 asChild
                                                                 className="bg-green-500 hover:bg-green-600"
                                                             >
-                                                                <a
-                                                                    href={schedule.meeting_link!}
-                                                                    target="_blank"
-                                                                    rel="noopener noreferrer"
-                                                                    className="inline-flex items-center gap-2"
-                                                                >
+                                                                <a href={schedule.join_url} className="inline-flex items-center gap-2">
                                                                     <Video className="h-4 w-4" />
                                                                     Join Call
                                                                 </a>

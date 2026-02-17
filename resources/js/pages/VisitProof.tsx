@@ -98,6 +98,9 @@ export default function VisitProof({ visit }: Props) {
                         This is an official proof of your approved physical visit. Please print and bring this document
                         with you.
                     </p>
+                    <p className="mt-2 text-center text-xs font-medium text-gray-700">
+                        Visitors must also bring valid IDs (e.g. government-issued ID or birth certificate) to present at the facility.
+                    </p>
 
                     <div className="mt-12 grid grid-cols-2 gap-8 border-t border-gray-200 pt-8 print:mt-16">
                         <div className="flex flex-col">

@@ -66,6 +66,7 @@ type Visit = {
     status: 'pending' | 'approved' | 'rejected' | 'missed' | 'completed' | 'cancelled';
     notes: string | null;
     meeting_link: string | null;
+    join_url: string | null;
     access_key: string | null;
     access_key_expires_at: string | null;
     monitoring_officer_id: number | null;
@@ -597,7 +598,26 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
                     if (session && ['completed', 'terminated'].includes(session.status)) {
                         return <span className="text-sm text-muted-foreground">Completed</span>;
                     }
+                    const sessionNotExpired = session && new Date(session.scheduled_end) > new Date() && !['completed', 'terminated'].includes(session.status);
                     if (session && !session.can_join_video) {
+                        if (sessionNotExpired) {
+                            return (
+                                <Button
+                                    size="sm"
+                                    variant="default"
+                                    className="bg-green-600 hover:bg-green-700 inline-flex gap-2"
+                                    title="Join video call (a reminder will show if it's not yet time)"
+                                    onClick={() => {
+                                        setSelectedSessionForVideo({ sessionId: session.id, visit });
+                                        setVideoTermsAccepted(false);
+                                        setVideoTermsModalOpen(true);
+                                    }}
+                                >
+                                    <VideoIcon className="h-4 w-4" />
+                                    Video Call
+                                </Button>
+                            );
+                        }
                         const tooltip = session.join_disabled_reason === 'not_started'
                             ? 'Video call is available from the scheduled start time.'
                             : session.join_disabled_reason === 'ended'
@@ -610,10 +630,10 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
                             </Button>
                         );
                     }
-                    if (visit.meeting_link) {
+                    if (visit.join_url) {
                         return (
                             <Button size="sm" variant="outline" asChild className="inline-flex gap-2">
-                                <a href={visit.meeting_link} target="_blank" rel="noopener noreferrer" title="Join video (legacy link)">
+                                <a href={visit.join_url} title="Join video call">
                                     <VideoIcon className="h-4 w-4" />
                                     Join
                                 </a>

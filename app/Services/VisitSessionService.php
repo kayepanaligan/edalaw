@@ -7,6 +7,7 @@ use App\Models\InmateTunnel;
 use App\Models\Visit;
 use App\Models\VisitSession;
 use App\VisitType;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 
 class VisitSessionService
@@ -26,11 +27,7 @@ class VisitSessionService
             return null;
         }
 
-        $scheduledStart = $visit->scheduled_date->copy();
-        if ($visit->scheduled_time) {
-            [$h, $m] = explode(':', $visit->scheduled_time);
-            $scheduledStart->setTime((int) $h, (int) $m);
-        }
+        $scheduledStart = $this->parseSlotStart($visit->scheduled_date, $visit->scheduled_time);
         $scheduledEnd = $scheduledStart->copy()->addHour();
 
         $session = VisitSession::create([
@@ -60,11 +57,10 @@ class VisitSessionService
             return null;
         }
 
-        $scheduledStart = $eburol->wake_start_date->copy()->setTime(8, 0);
-        if ($eburol->preferred_time) {
-            [$h, $m] = explode(':', $eburol->preferred_time);
-            $scheduledStart->setTime((int) $h, (int) $m);
-        }
+        $tz = config('app.timezone');
+        $dateStr = $eburol->wake_start_date->format('Y-m-d');
+        $timeStr = $eburol->preferred_time ?: '08:00';
+        $scheduledStart = Carbon::parse($dateStr.' '.$timeStr, $tz);
         $scheduledEnd = $scheduledStart->copy()->addHour();
 
         $session = VisitSession::create([
@@ -84,6 +80,23 @@ class VisitSessionService
     }
 
     /**
+     * Parse slot start in application timezone (matches Visit::getSlotStart logic).
+     */
+    private function parseSlotStart($scheduledDate, ?string $scheduledTime): Carbon
+    {
+        $dateStr = $scheduledDate->format('Y-m-d');
+        if (! $scheduledTime) {
+            return Carbon::parse($dateStr, config('app.timezone'))->startOfDay();
+        }
+        $parts = explode(':', trim($scheduledTime), 2);
+        $h = (int) ($parts[0] ?? 0);
+        $m = (int) (isset($parts[1]) ? explode(' ', $parts[1])[0] : 0);
+        $timeNormalized = sprintf('%02d:%02d', $h, $m);
+
+        return Carbon::parse($dateStr.' '.$timeNormalized, config('app.timezone'));
+    }
+
+    /**
      * Create a single inmate tunnel for the session (activated during visit, expires at scheduled end).
      */
     private function createInmateTunnelForSession(VisitSession $session, \Carbon\CarbonInterface $expiresAt): void
@@ -91,6 +104,7 @@ class VisitSessionService
         InmateTunnel::create([
             'visit_session_id' => $session->id,
             'tunnel_token' => InmateTunnel::generateToken(),
+            'short_code' => InmateTunnel::generateShortCode(),
             'expires_at' => $expiresAt,
             'is_used' => false,
         ]);

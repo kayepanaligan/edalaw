@@ -17,11 +17,16 @@ class EburolMonitoringController extends Controller
     {
         $user = $request->user();
 
-        $eburols = Eburol::with(['user'])
+        $eburols = Eburol::with(['user', 'visitSessions.inmateTunnels'])
             ->where('monitoring_officer_id', $user->id)
             ->orderBy('wake_start_date', 'desc')
             ->get()
             ->map(function ($eburol) {
+                $latestSession = $eburol->visitSessions->sortByDesc('scheduled_start')->first();
+                $tunnel = $latestSession?->inmateTunnels->first();
+                $inmateTunnelCode = $tunnel?->short_code;
+                $inmateTunnelStatus = $tunnel ? ($tunnel->is_used ? 'used' : ($tunnel->expires_at->isPast() ? 'expired' : 'active')) : null;
+
                 return [
                     'id' => $eburol->id,
                     'visitor_name' => trim("{$eburol->user->first_name} {$eburol->user->middle_name} {$eburol->user->last_name}"),
@@ -33,6 +38,8 @@ class EburolMonitoringController extends Controller
                     'wake_location' => $eburol->wake_location,
                     'status' => $eburol->status->value,
                     'created_at' => $eburol->created_at->format('Y-m-d H:i:s'),
+                    'inmate_tunnel_code' => $inmateTunnelCode,
+                    'inmate_tunnel_status' => $inmateTunnelStatus,
                 ];
             });
 

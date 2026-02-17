@@ -23,7 +23,8 @@ class EburolController extends Controller
      */
     public function index(): Response
     {
-        $eburols = Eburol::where('user_id', auth()->id())
+        $eburols = Eburol::with(['visitSessions' => fn ($q) => $q->orderBy('scheduled_start', 'desc')->limit(1)])
+            ->where('user_id', auth()->id())
             ->orderBy('wake_start_date', 'desc')
             ->orderBy('created_at', 'desc')
             ->get()
@@ -45,6 +46,35 @@ class EburolController extends Controller
                     if ($hasActiveAppeal) {
                         $canAppeal = false;
                     }
+                }
+
+                $latestSession = $eburol->visitSessions->first();
+                $visitSessionPayload = null;
+                $joinUrl = null;
+                if ($latestSession) {
+                    $tz = config('app.timezone');
+                    $now = now($tz);
+                    $start = $latestSession->scheduled_start->setTimezone($tz);
+                    $end = $latestSession->scheduled_end->setTimezone($tz);
+                    $withinWindow = $now->between($start, $end);
+                    $notCompleted = ! in_array($latestSession->status, ['completed', 'terminated'], true);
+                    $canJoinVideo = $eburol->status === EburolStatus::Approved && $withinWindow && $notCompleted;
+                    $joinDisabledReason = null;
+                    if (! $canJoinVideo && $eburol->status === EburolStatus::Approved && $notCompleted) {
+                        $joinDisabledReason = $now->lt($start) ? 'not_started' : 'ended';
+                    } elseif (! $canJoinVideo && $notCompleted === false) {
+                        $joinDisabledReason = 'ended';
+                    }
+                    $visitSessionPayload = [
+                        'id' => $latestSession->id,
+                        'scheduled_start' => $latestSession->scheduled_start->toIso8601String(),
+                        'scheduled_end' => $latestSession->scheduled_end->toIso8601String(),
+                        'status' => $latestSession->status,
+                        'terms_accepted_at' => $latestSession->terms_accepted_at?->toIso8601String(),
+                        'can_join_video' => $canJoinVideo,
+                        'join_disabled_reason' => $joinDisabledReason,
+                    ];
+                    $joinUrl = route('visit-session.show', $latestSession);
                 }
 
                 return [
@@ -70,12 +100,35 @@ class EburolController extends Controller
                     'created_at' => $eburol->created_at->format('Y-m-d H:i:s'),
                     'can_appeal' => $canAppeal,
                     'appeal_deadline' => $appealDeadline,
+                    'visit_session' => $visitSessionPayload,
+                    'join_url' => $joinUrl,
                 ];
             });
 
         return Inertia::render('Visitor/EburolManagement', [
             'eburols' => $eburols,
         ]);
+    }
+
+    /**
+     * Get 1-hour slot availability for a given date (for e-burol preferred time picker). Max 4 per slot.
+     */
+    public function slotAvailability(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $request->validate(['date' => ['required', 'date', 'after_or_equal:today']]);
+        $date = $request->input('date');
+        $slots = [];
+        $maxPerSlot = 4;
+        for ($hour = 8; $hour < 18; $hour++) {
+            $slot = sprintf('%02d:00', $hour);
+            $current = Eburol::where('wake_start_date', $date)
+                ->where('preferred_time', $slot)
+                ->whereIn('status', [EburolStatus::Pending, EburolStatus::Approved])
+                ->count();
+            $slots[$slot] = ['current' => $current, 'max' => $maxPerSlot, 'isFull' => $current >= $maxPerSlot];
+        }
+
+        return response()->json($slots);
     }
 
     /**

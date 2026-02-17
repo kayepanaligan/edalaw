@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\EburolStatus;
 use App\Models\CallLog;
+use App\Models\InmateTunnel;
 use App\Models\VisitSession;
 use App\VisitStatus;
 
@@ -45,6 +46,11 @@ class VisitSessionCompletionService
         $this->syncVisitOrEburolStatus($session, $status);
         if ($status === 'completed') {
             $this->createVideoCallLogForVisitor($session);
+        }
+
+        $actuallyUsed = $bothJoined || $session->chatLogs()->exists();
+        if ($actuallyUsed) {
+            InmateTunnel::where('visit_session_id', $session->id)->update(['is_used' => true]);
         }
     }
 

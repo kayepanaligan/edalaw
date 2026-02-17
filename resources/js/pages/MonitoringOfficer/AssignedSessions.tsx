@@ -1,8 +1,10 @@
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import type { ColumnDef } from '@tanstack/react-table';
 import { Eye, Link2, Lock, Play, Square, Unlock } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
+
+import { useToast } from '@/hooks/use-toast';
 
 import { formatVisitSchedule, formatSessionSchedule } from '@/lib/formatVisitSchedule';
 import { Badge } from '@/components/ui/badge';
@@ -66,6 +68,7 @@ function getStatusBadge(status: string) {
 }
 
 export default function AssignedSessions({ sessions, filters: initialFilters }: Props) {
+    useToast();
     const [typeFilter, setTypeFilter] = useState(initialFilters?.type ?? 'all');
     const [generatingTunnelFor, setGeneratingTunnelFor] = useState<number | null>(null);
     const [endingFor, setEndingFor] = useState<number | null>(null);
@@ -223,12 +226,12 @@ export default function AssignedSessions({ sessions, filters: initialFilters }: 
                                         Start
                                     </Button>
                                 )}
-{isActive && (
+                                {!isCompleted && !s.schedule_ended && (
                                     <Button size="sm" variant="outline" asChild>
-                                        <Link href={`/monitoring-officer/assigned-sessions/${s.id}/join`}>
+                                        <a href={`/monitoring-officer/assigned-sessions/${s.id}/join`}>
                                             <Eye className="mr-1 h-4 w-4" />
                                             Join as observer
-                                        </Link>
+                                        </a>
                                     </Button>
                                 )}
                                 {isActive && (

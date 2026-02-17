@@ -9,6 +9,7 @@ use App\Models\Role;
 use App\Models\Suggestion;
 use App\Models\User;
 use App\Models\Visit;
+use App\Models\VisitSession;
 use Illuminate\Support\Facades\Log;
 
 class NotificationService
@@ -58,9 +59,13 @@ class NotificationService
         $message = ($statusMessages[$status] ?? 'Your visit schedule status has been updated.')
             ." Inmate: {$inmateName}. Scheduled for: {$visit->scheduled_date->format('M d, Y')}";
 
-        // Add meeting link to message if approved and virtual
-        if ($status === 'approved' && $visit->visit_type === \App\VisitType::Virtual && $visit->meeting_link) {
-            $message .= " Meeting Link: {$visit->meeting_link}";
+        // Add in-app join URL so visitor gets a link that generates token (raw VideoSDK URL would prompt login)
+        if ($status === 'approved' && $visit->visit_type === \App\VisitType::Virtual) {
+            $session = $visit->visitSessions()->orderBy('scheduled_start', 'desc')->first();
+            if ($session) {
+                $joinUrl = url()->route('visit-session.show', $session);
+                $message .= " Join your virtual visit: {$joinUrl}";
+            }
         }
 
         $notification = Notification::create([
@@ -114,6 +119,36 @@ class NotificationService
         if ($user) {
             self::sendSmsToVisitor($user, $titles[$status] ?? 'E-Burol Status Updated', $message);
         }
+    }
+
+    /**
+     * Notify visitor that their session starts in 5 minutes — they should click Join to prepare.
+     */
+    public static function createJoinReminderNotification(VisitSession $session): void
+    {
+        $visitor = $session->visitor;
+        if (! $visitor) {
+            return;
+        }
+
+        $start = $session->scheduled_start->format('g:i A');
+        $end = $session->scheduled_end->format('g:i A');
+        $date = $session->scheduled_start->format('M j, Y');
+        $type = $session->session_type === 'eburol' ? 'E-Burol' : 'Visit';
+        $joinUrl = url()->route('visit-session.show', $session);
+
+        $message = "Your {$type} is scheduled to start in 5 minutes ({$date}, {$start} – {$end}). Please click Join now to prepare. {$joinUrl}";
+
+        Notification::create([
+            'user_id' => $visitor->id,
+            'type' => 'join_reminder',
+            'title' => 'Time to join — session starts in 5 minutes',
+            'message' => $message,
+            'notifiable_id' => $session->id,
+            'notifiable_type' => VisitSession::class,
+        ]);
+
+        self::sendSmsToVisitor($visitor, 'Time to join — session in 5 minutes', $message);
     }
 
     /**

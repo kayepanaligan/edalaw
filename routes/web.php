@@ -69,6 +69,10 @@ Route::get('inmate/chat', [\App\Http\Controllers\InmateTunnelController::class, 
 Route::post('inmate/chat', [\App\Http\Controllers\InmateTunnelController::class, 'sendChat'])
     ->name('inmate.chat.send');
 
+// Embedded VideoSDK prebuilt (v2 rooms; no auth so inmate can join via token in URL)
+Route::get('video-room', [\App\Http\Controllers\VideoRoomController::class, 'show'])
+    ->name('video-room.show');
+
 // Concurrent login warning (no auth - shown when login blocked due to existing session)
 Route::get('concurrent-login-warning', function () {
     return Inertia::render('auth/concurrent-login-warning', [
@@ -266,6 +270,8 @@ Route::middleware(['auth', 'verified', 'approved'])->group(function () {
             ->name('call-logs.index');
         Route::get('eburol', [\App\Http\Controllers\Visitor\EburolController::class, 'index'])
             ->name('eburol.index');
+        Route::get('eburol/slot-availability', [\App\Http\Controllers\Visitor\EburolController::class, 'slotAvailability'])
+            ->name('eburol.slot-availability');
         Route::post('eburol', [\App\Http\Controllers\Visitor\EburolController::class, 'store'])
             ->name('eburol.store');
         Route::get('eburol/{eburol}', [\App\Http\Controllers\Visitor\EburolController::class, 'show'])
@@ -303,6 +309,8 @@ Route::middleware(['auth', 'verified', 'approved'])->group(function () {
     Route::middleware(['role:visitor'])->group(function () {
         Route::get('visit/session/{session}', [\App\Http\Controllers\Visitor\VisitSessionController::class, 'show'])
             ->name('visit-session.show');
+        Route::get('visit/session/{session}/video-room', [\App\Http\Controllers\Visitor\VisitSessionController::class, 'videoRoom'])
+            ->name('visit-session.video-room');
         Route::post('visit/session/{session}/accept-terms', [\App\Http\Controllers\Visitor\VisitSessionController::class, 'acceptTerms'])
             ->name('visit-session.accept-terms');
         Route::post('visit/session/{session}/participant-joined', [\App\Http\Controllers\Visitor\VisitSessionController::class, 'participantJoined'])
@@ -310,9 +318,19 @@ Route::middleware(['auth', 'verified', 'approved'])->group(function () {
     });
 
     Route::middleware(['role:bjmp_officer'])->prefix('bjmp-officer')->name('bjmp-officer.')->group(function () {
+        Route::get('notifications', [\App\Http\Controllers\BjmpOfficer\NotificationController::class, 'index'])
+            ->name('notifications.index');
+        Route::post('notifications/{notification}/read', [\App\Http\Controllers\BjmpOfficer\NotificationController::class, 'markAsRead'])
+            ->name('notifications.read');
+        Route::post('notifications/read-all', [\App\Http\Controllers\BjmpOfficer\NotificationController::class, 'markAllAsRead'])
+            ->name('notifications.read-all');
 
         Route::get('eburols', [\App\Http\Controllers\BjmpOfficer\EburolManagementController::class, 'index'])
             ->name('eburols.index');
+        Route::get('eburols/{eburol}/document/death-certificate', [\App\Http\Controllers\BjmpOfficer\EburolManagementController::class, 'deathCertificate'])
+            ->name('eburols.document.death-certificate');
+        Route::get('eburols/{eburol}/document/relationship-proof', [\App\Http\Controllers\BjmpOfficer\EburolManagementController::class, 'relationshipProof'])
+            ->name('eburols.document.relationship-proof');
         Route::post('eburols/{eburol}/approve', [\App\Http\Controllers\BjmpOfficer\EburolManagementController::class, 'approve'])
             ->name('eburols.approve');
         Route::post('eburols/{eburol}/reject', [\App\Http\Controllers\BjmpOfficer\EburolManagementController::class, 'reject'])
@@ -376,6 +394,8 @@ Route::middleware(['auth', 'verified', 'approved'])->group(function () {
             ->name('sessions.revoke');
         Route::post('sessions/user/{user}/revoke-all', [\App\Http\Controllers\Admin\SessionManagementController::class, 'revokeUserSessions'])
             ->name('sessions.revoke-user-all');
+        Route::post('sessions/revoke-my-other', [\App\Http\Controllers\Admin\SessionManagementController::class, 'revokeMyOtherSessions'])
+            ->name('sessions.revoke-my-other');
         Route::get('audit-logs', [\App\Http\Controllers\Admin\AuditLogController::class, 'index'])
             ->name('audit-logs.index');
         Route::get('audit-logs/export', [\App\Http\Controllers\Admin\AuditLogController::class, 'export'])

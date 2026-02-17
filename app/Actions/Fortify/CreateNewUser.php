@@ -34,11 +34,14 @@ class CreateNewUser implements CreatesNewUsers
             })->validate();
         }
 
-        // Validate ID documents for visitors
-        if ($role->slug === 'visitor') {
+        // Validate ID documents for visitor, BJMP officer, and monitoring officer (at least 2 proofs of identity)
+        if (in_array($role->slug, ['visitor', 'bjmp_officer', 'monitoring_officer'], true)) {
             Validator::make($request->all(), [
-                'id_document_1' => ['required', 'file', 'mimes:jpeg,jpg,png,pdf', 'max:5120'], // 5MB
+                'id_document_1' => ['required', 'file', 'mimes:jpeg,jpg,png,pdf', 'max:5120'],
                 'id_document_2' => ['required', 'file', 'mimes:jpeg,jpg,png,pdf', 'max:5120'],
+            ], [
+                'id_document_1.required' => 'Please upload at least two proofs of identity (e.g. valid ID, birth certificate).',
+                'id_document_2.required' => 'Please upload a second proof of identity.',
             ])->validate();
         }
 
@@ -48,11 +51,12 @@ class CreateNewUser implements CreatesNewUsers
             'role_id' => ['required', 'exists:roles,id'],
         ])->validate();
 
-        // Store ID documents for visitors
+        // Store ID documents for visitor, BJMP officer, and monitoring officer
         $idDocument1Path = null;
         $idDocument2Path = null;
 
-        if ($role->slug === 'visitor' && $request->hasFile('id_document_1') && $request->hasFile('id_document_2')) {
+        if (in_array($role->slug, ['visitor', 'bjmp_officer', 'monitoring_officer'], true)
+            && $request->hasFile('id_document_1') && $request->hasFile('id_document_2')) {
             $idDocument1Path = $request->file('id_document_1')->store('users/id_documents', 'public');
             $idDocument2Path = $request->file('id_document_2')->store('users/id_documents', 'public');
         }

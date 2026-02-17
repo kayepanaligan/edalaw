@@ -51,13 +51,16 @@ class ScheduleController extends Controller
                 $latestSession = $visit->visitSessions->first();
                 $sessionPayload = null;
                 if ($latestSession) {
-                    $now = now();
-                    $withinWindow = $now->between($latestSession->scheduled_start, $latestSession->scheduled_end);
+                    $tz = config('app.timezone');
+                    $now = now($tz);
+                    $start = $latestSession->scheduled_start->setTimezone($tz);
+                    $end = $latestSession->scheduled_end->setTimezone($tz);
+                    $withinWindow = $now->between($start, $end);
                     $notCompleted = ! in_array($latestSession->status, ['completed', 'terminated'], true);
                     $canJoin = $visit->status === VisitStatus::Approved && $withinWindow && $notCompleted;
                     $joinDisabledReason = null;
                     if (! $canJoin && $visit->status === VisitStatus::Approved && $notCompleted) {
-                        $joinDisabledReason = $now->lt($latestSession->scheduled_start) ? 'not_started' : 'ended';
+                        $joinDisabledReason = $now->lt($start) ? 'not_started' : 'ended';
                     } elseif (! $canJoin && $notCompleted === false) {
                         $joinDisabledReason = 'ended';
                     }
@@ -72,6 +75,10 @@ class ScheduleController extends Controller
                     ];
                 }
 
+                $joinUrl = $latestSession && $visit->visit_type === VisitType::Virtual
+                    ? route('visit-session.show', $latestSession)
+                    : null;
+
                 return [
                     'id' => $visit->id,
                     'scheduled_date' => $visit->scheduled_date->format('Y-m-d'),
@@ -83,6 +90,7 @@ class ScheduleController extends Controller
                     'status' => $visit->status->value,
                     'notes' => $visit->notes,
                     'meeting_link' => $visit->meeting_link ?? $visit->daily_co_room_url,
+                    'join_url' => $joinUrl,
                     'access_key' => $visit->access_key,
                     'access_key_expires_at' => $visit->access_key_expires_at?->format('Y-m-d H:i:s'),
                     'monitoring_officer_id' => $visit->monitoring_officer_id,

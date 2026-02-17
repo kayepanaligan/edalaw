@@ -1,7 +1,9 @@
 import { Head, Link, router } from '@inertiajs/react';
 import type { ColumnDef } from '@tanstack/react-table';
-import { Filter, Search } from 'lucide-react';
+import { Copy, Filter, Search } from 'lucide-react';
 import { useMemo, useState } from 'react';
+
+import { useClipboard } from '@/hooks/use-clipboard';
 
 import { DataTable } from '@/components/data-table';
 import { Badge } from '@/components/ui/badge';
@@ -22,6 +24,8 @@ type TunnelRow = {
     id: number;
     visit_session_id: number;
     tunnel_token: string;
+    short_code: string | null;
+    tunnel_link: string;
     expires_at: string;
     expires_at_human: string;
     is_used: boolean;
@@ -54,6 +58,7 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 export default function AdminInmateTunnels({ tunnels, filters: initialFilters }: Props) {
+    const [, copy] = useClipboard();
     const [searchQuery, setSearchQuery] = useState(initialFilters.search ?? '');
     const [dateFrom, setDateFrom] = useState(initialFilters.date_from ?? '');
     const [dateTo, setDateTo] = useState(initialFilters.date_to ?? '');
@@ -64,13 +69,41 @@ export default function AdminInmateTunnels({ tunnels, filters: initialFilters }:
             { accessorKey: 'created_at', header: 'Created', cell: ({ row }) => row.original.created_at.slice(0, 19).replace('T', ' ') },
             { accessorKey: 'visit_session_id', header: 'Session ID', cell: ({ row }) => <span className="font-mono text-sm">{row.original.visit_session_id}</span> },
             { accessorKey: 'session_type', header: 'Type', cell: ({ row }) => <span className="capitalize">{row.original.session_type}</span> },
+            {
+                accessorKey: 'short_code',
+                header: 'Inmate tunnel code',
+                cell: ({ row }) => {
+                    const code = row.original.short_code;
+                    const link = row.original.tunnel_link ?? '';
+                    if (!code && !link) return <span className="text-muted-foreground">—</span>;
+                    const display = code ?? (link.length > 45 ? `${link.slice(0, 42)}…` : link);
+                    const toCopy = code ?? link;
+                    return (
+                        <div className="flex items-center gap-2">
+                            <code className="font-mono text-sm tracking-wider rounded bg-muted px-1.5 py-0.5" title={link || undefined}>
+                                {display}
+                            </code>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 shrink-0"
+                                onClick={() => copy(toCopy)}
+                                title={code ? 'Copy code' : 'Copy link'}
+                            >
+                                <Copy className="h-4 w-4" />
+                            </Button>
+                        </div>
+                    );
+                },
+            },
             { accessorKey: 'visitor_name', header: 'Visitor', cell: ({ row }) => row.original.visitor_name ?? '—' },
             { accessorKey: 'inmate_name', header: 'Inmate', cell: ({ row }) => row.original.inmate_name ?? '—' },
             { accessorKey: 'monitor_name', header: 'Monitoring Officer', cell: ({ row }) => row.original.monitor_name ?? '—' },
             { accessorKey: 'expires_at', header: 'Expires', cell: ({ row }) => <div><div className="text-sm">{row.original.expires_at.slice(0, 16).replace('T', ' ')}</div><div className="text-xs text-muted-foreground">{row.original.expires_at_human}</div></div> },
             { accessorKey: 'status', header: 'Status', cell: ({ row }) => <StatusBadge status={row.original.status} /> },
         ],
-        []
+        [copy]
     );
 
     const handleFilter = () => {

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\UserSession;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Session;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -52,9 +53,15 @@ class SessionManagementController extends Controller
             ],
         ];
 
+        $currentSessionId = Session::getId();
+        $myOtherSessionsCount = UserSession::where('user_id', auth()->id())
+            ->where('session_id', '!=', $currentSessionId)
+            ->count();
+
         return Inertia::render('Admin/SessionManagement', [
             'sessions' => $sessions,
             'stats' => $stats,
+            'my_other_sessions_count' => $myOtherSessionsCount,
         ]);
     }
 
@@ -94,5 +101,28 @@ class SessionManagementController extends Controller
         }
 
         return redirect()->back()->with('success', 'All sessions for this user have been revoked.');
+    }
+
+    /**
+     * Revoke all other sessions for the current user (end login on other devices).
+     */
+    public function revokeMyOtherSessions(): RedirectResponse
+    {
+        $currentSessionId = Session::getId();
+
+        $otherSessions = UserSession::where('user_id', auth()->id())
+            ->where('session_id', '!=', $currentSessionId)
+            ->get();
+
+        foreach ($otherSessions as $session) {
+            if (config('session.driver') === 'database') {
+                DB::table(config('session.table', 'sessions'))
+                    ->where('id', $session->session_id)
+                    ->delete();
+            }
+            $session->delete();
+        }
+
+        return redirect()->back()->with('success', 'All other sessions have been ended. You are now logged in only on this device.');
     }
 }

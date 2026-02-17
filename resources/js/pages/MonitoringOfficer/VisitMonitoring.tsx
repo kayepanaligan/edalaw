@@ -1,6 +1,6 @@
 import { Head } from '@inertiajs/react';
 import type { ColumnDef } from '@tanstack/react-table';
-import { ExternalLink, Video } from 'lucide-react';
+import { Video } from 'lucide-react';
 import { useMemo } from 'react';
 
 import { DataTable } from '@/components/data-table';
@@ -22,7 +22,7 @@ type Visit = {
     scheduled_time: string | null;
     inmate_name: string;
     status: string;
-    meeting_link: string | null;
+    join_url: string | null;
     created_at: string;
 };
 
@@ -72,17 +72,15 @@ export default function VisitMonitoring({ visits }: Props) {
             cell: ({ row }) => getStatusBadge(row.original.status),
         },
         {
-            id: 'meeting_link',
+            id: 'join_url',
             header: 'Meeting',
             cell: ({ row }) =>
-                row.original.meeting_link ? (
+                row.original.join_url ? (
                     <a
-                        href={row.original.meeting_link}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                        href={row.original.join_url}
                         className="inline-flex items-center gap-1 text-primary hover:underline"
                     >
-                        <ExternalLink className="h-4 w-4" />
+                        <Video className="h-4 w-4" />
                         Join
                     </a>
                 ) : (

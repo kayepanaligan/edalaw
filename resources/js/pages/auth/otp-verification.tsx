@@ -1,9 +1,7 @@
 import { Head, router, useForm } from '@inertiajs/react';
-import { useState } from 'react';
 
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import {
     InputOTP,
     InputOTPGroup,
@@ -20,7 +18,6 @@ type Props = {
 };
 
 export default function OtpVerification({ email, contact_number }: Props) {
-    const [otp, setOtp] = useState('');
     const form = useForm({
         otp: '',
         remember: false,
@@ -28,8 +25,7 @@ export default function OtpVerification({ email, contact_number }: Props) {
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        // Include current OTP from state at submit time (setData is async, so form.data.otp may be stale on first click)
-        form.transform((data) => ({ ...data, otp })).post('/otp-verification/verify', {
+        form.post('/otp-verification/verify', {
             preserveScroll: true,
         });
     };
@@ -38,7 +34,7 @@ export default function OtpVerification({ email, contact_number }: Props) {
         router.post('/otp-verification/resend', {}, {
             preserveScroll: true,
             onSuccess: () => {
-                setOtp('');
+                form.setData('otp', '');
             },
         });
     };
@@ -75,8 +71,8 @@ export default function OtpVerification({ email, contact_number }: Props) {
                         <InputOTP
                             id="otp"
                             maxLength={6}
-                            value={otp}
-                            onChange={setOtp}
+                            value={form.data.otp}
+                            onChange={(value) => form.setData('otp', value)}
                             disabled={form.processing}
                             pattern={REGEXP_ONLY_DIGITS}
                         >
@@ -95,7 +91,7 @@ export default function OtpVerification({ email, contact_number }: Props) {
                     <Button
                         type="submit"
                         className="w-full"
-                        disabled={form.processing || otp.length !== 6}
+                        disabled={form.processing || form.data.otp.length !== 6}
                     >
                         {form.processing && <Spinner />}
                         Verify OTP

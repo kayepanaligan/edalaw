@@ -23,11 +23,16 @@ class EburolManagementController extends Controller
      */
     public function index(Request $request): Response
     {
-        $eburols = Eburol::with(['user', 'monitoringOfficer'])
+        $eburols = Eburol::with(['user', 'monitoringOfficer', 'visitSessions.inmateTunnels'])
             ->orderBy('wake_start_date', 'desc')
             ->orderBy('created_at', 'desc')
             ->get()
             ->map(function ($eburol) {
+                $latestSession = $eburol->visitSessions->sortByDesc('scheduled_start')->first();
+                $tunnel = $latestSession?->inmateTunnels->first();
+                $inmateTunnelCode = $tunnel?->short_code;
+                $inmateTunnelStatus = $tunnel ? ($tunnel->is_used ? 'used' : ($tunnel->expires_at->isPast() ? 'expired' : 'active')) : null;
+
                 return [
                     'id' => $eburol->id,
                     'user_id' => $eburol->user_id,
@@ -56,6 +61,8 @@ class EburolManagementController extends Controller
                     'death_certificate_path' => $eburol->death_certificate_path ? route('admin.eburols.document.death-certificate', $eburol) : null,
                     'relationship_proof_path' => $eburol->relationship_proof_path ? route('admin.eburols.document.relationship-proof', $eburol) : null,
                     'created_at' => $eburol->created_at->format('Y-m-d H:i:s'),
+                    'inmate_tunnel_code' => $inmateTunnelCode,
+                    'inmate_tunnel_status' => $inmateTunnelStatus,
                 ];
             });
 
@@ -347,41 +354,47 @@ class EburolManagementController extends Controller
             'monitoring_officer_id' => $request->monitoring_officer_id,
         ];
 
-        $roomId = null;
-        // Create VideoSDK room for e-burol
+        // Create VideoSDK room and visit session (with inmate tunnel) before approving
         $videoSdkService = new \App\Services\VideoSdkService;
         $roomName = "eburol-{$eburol->id}-".uniqid();
         $roomResult = $videoSdkService->createRoom($roomName);
 
-        if ($roomResult['success']) {
-            $roomId = $roomResult['room_id'] ?? null;
-            $updateData['daily_co_room_id'] = $roomId;
-            $updateData['daily_co_room_name'] = $roomResult['room_name'] ?? $roomName;
-            $updateData['daily_co_room_url'] = $roomResult['room_url'] ?? null;
-            $updateData['room_created_at'] = now();
-
-            // Create monitoring session
-            \App\Models\MonitoringSession::create([
-                'eburol_id' => $eburol->id,
-                'visitor_id' => $eburol->user_id,
-                'session_type' => 'eburol',
-                'session_token' => $roomId ?? $roomName,
-                'status' => 'pending',
-                'started_at' => now(),
-            ]);
-        } else {
-            // Log error but don't block approval
+        if (! ($roomResult['success'] ?? false)) {
+            $errorMessage = $roomResult['error'] ?? 'Video room could not be created.';
             \Illuminate\Support\Facades\Log::error('VideoSDK room creation failed during e-burol approval', [
                 'eburol_id' => $eburol->id,
-                'error' => $roomResult['error'] ?? 'Unknown error',
+                'error' => $errorMessage,
             ]);
+
+            return redirect()->back()
+                ->withErrors(['approve' => 'E-Burol cannot be approved: '.$errorMessage.' Please check VideoSDK configuration and try again.']);
         }
+
+        $roomId = $roomResult['room_id'] ?? null;
+        $updateData['daily_co_room_id'] = $roomId;
+        $updateData['daily_co_room_name'] = $roomResult['room_name'] ?? $roomName;
+        $updateData['daily_co_room_url'] = $roomResult['room_url'] ?? null;
+        $updateData['room_created_at'] = now();
+
+        // Create monitoring session
+        \App\Models\MonitoringSession::create([
+            'eburol_id' => $eburol->id,
+            'visitor_id' => $eburol->user_id,
+            'session_type' => 'eburol',
+            'session_token' => $roomId ?? $roomName,
+            'status' => 'pending',
+            'started_at' => now(),
+        ]);
 
         $eburol->update($updateData);
 
-        // Create visit_sessions record for new flow
-        if ($roomId) {
-            app(\App\Services\VisitSessionService::class)->createForEburol($eburol, $roomId);
+        $visitSession = app(\App\Services\VisitSessionService::class)->createForEburol($eburol, $roomId);
+        if (! $visitSession) {
+            \Illuminate\Support\Facades\Log::error('Visit session (inmate tunnel) creation failed during e-burol approval', ['eburol_id' => $eburol->id]);
+            $eburol->update(['status' => EburolStatus::Pending]);
+
+            return redirect()->back()
+                ->withErrors(['approve' => 'E-Burol could not be approved: visit session and inmate tunnel could not be created. Please ensure a monitoring officer is assigned and try again.']);
         }
 
         // Notify monitoring officer if assigned and it's a new assignment

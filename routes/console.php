@@ -9,3 +9,4 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 Schedule::command('visit-sessions:end-expired')->everyMinute();
+Schedule::command('visit-sessions:send-join-reminder')->everyMinute();

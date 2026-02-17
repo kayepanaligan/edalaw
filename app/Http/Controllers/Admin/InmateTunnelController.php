@@ -21,6 +21,7 @@ class InmateTunnelController extends Controller
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('tunnel_token', 'like', "%{$search}%")
+                    ->orWhere('short_code', 'like', "%{$search}%")
                     ->orWhereHas('visitSession', function ($s) use ($search) {
                         $s->where('id', 'like', "%{$search}%");
                     });
@@ -62,6 +63,8 @@ class InmateTunnelController extends Controller
                     'id' => $t->id,
                     'visit_session_id' => $t->visit_session_id,
                     'tunnel_token' => $t->tunnel_token,
+                    'short_code' => $t->short_code,
+                    'tunnel_link' => route('inmate.join', ['token' => $t->tunnel_token]),
                     'expires_at' => $t->expires_at->toIso8601String(),
                     'expires_at_human' => $t->expires_at->diffForHumans(),
                     'is_used' => $t->is_used,

@@ -41,7 +41,9 @@ class AssignedSessionsController extends Controller
                 $visitor = $session->visit?->user ?? $session->eburol?->user;
                 $inmateName = $session->visit
                     ? trim("{$session->visit->inmate_first_name} {$session->visit->inmate_middle_name} {$session->visit->inmate_last_name}")
-                    : trim("{$session->eburol->inmate_first_name} {$session->eburol->inmate_middle_name} {$session->eburol->inmate_last_name}");
+                    : ($session->eburol
+                        ? trim("{$session->eburol->inmate_first_name} {$session->eburol->inmate_middle_name} {$session->eburol->inmate_last_name}")
+                        : '—');
 
                 $scheduledDate = null;
                 $scheduledTime = null;
@@ -278,17 +280,26 @@ class AssignedSessionsController extends Controller
         }
 
         $videoSdk = new VideoSdkService;
+        $validation = $videoSdk->validateRoom($session->room_id);
+        if (! ($validation['success'] ?? false)) {
+            return redirect()->route('monitoring-officer.assigned-sessions.index')
+                ->with('error', $validation['error'] ?? 'Meeting not found or expired. Please ensure the visit has been approved and the video room is still valid.');
+        }
+
         $participantId = 'monitor-'.$request->user()->id.'-'.$session->id;
-        $result = $videoSdk->generateViewerParticipantToken($session->room_id, $participantId, 120);
+        $result = $videoSdk->generateJoinTokenForPrebuiltApp($session->room_id, $participantId, ['allow_join'], 120);
 
         if (! ($result['success'] ?? false) || empty($result['token'])) {
             return redirect()->route('monitoring-officer.assigned-sessions.index')
                 ->with('error', 'Unable to generate join link. Please try again.');
         }
 
-        $query = 'token='.rawurlencode($result['token']);
-        $url = 'https://app.videosdk.live/meetings/'.$session->room_id.'?'.$query;
+        $url = $videoSdk->isV2Rooms()
+            ? url('/video-room').'?room_id='.rawurlencode($session->room_id).'&token='.rawurlencode($result['token']).'&name='.rawurlencode($request->user()->name ?? 'Monitor').'&observer=1'
+            : 'https://app.videosdk.live/meetings/'.$session->room_id.'?token='.rawurlencode($result['token']);
 
-        return redirect()->away($url);
+        return Inertia::render('MonitoringOfficer/JoinObserverRedirect', [
+            'join_url' => $url,
+        ]);
     }
 }

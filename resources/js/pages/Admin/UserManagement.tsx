@@ -1,6 +1,6 @@
 import { Head, router, useForm } from '@inertiajs/react';
 import type { ColumnDef } from '@tanstack/react-table';
-import { Plus, MoreVertical, Eye, Edit, Trash2, RefreshCw, Circle, X } from 'lucide-react';
+import { Plus, MoreVertical, Eye, Edit, Trash2, RefreshCw, Circle, X, LogOut } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -141,6 +141,7 @@ export default function UserManagement({ users = [], roles: rolesProp = [] }: Pr
     const [isUpdateStatusDialogOpen, setIsUpdateStatusDialogOpen] = useState(false);
     const [isRejectDialogOpen, setIsRejectDialogOpen] = useState(false);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [isLogoutUserModalOpen, setIsLogoutUserModalOpen] = useState(false);
     const [isAddUserDialogOpen, setIsAddUserDialogOpen] = useState(false);
     const [duplicateErrorModal, setDuplicateErrorModal] = useState<{ open: boolean; message: string }>({
         open: false,
@@ -247,6 +248,11 @@ export default function UserManagement({ users = [], roles: rolesProp = [] }: Pr
         setIsDeleteModalOpen(true);
     }, []);
 
+    const handleLogoutUser = useCallback((user: User) => {
+        setSelectedUser(user);
+        setIsLogoutUserModalOpen(true);
+    }, []);
+
     const submitUpdateStatus = () => {
         if (!selectedUser) {
             return;
@@ -347,6 +353,24 @@ export default function UserManagement({ users = [], roles: rolesProp = [] }: Pr
             },
             onError: () => {
                 toast.error('Failed to delete user');
+            },
+        });
+    };
+
+    const submitLogoutUser = () => {
+        if (!selectedUser) {
+            return;
+        }
+
+        router.post(`/admin/sessions/user/${selectedUser.id}/revoke-all`, {}, {
+            preserveScroll: true,
+            onSuccess: () => {
+                toast.success('User logged out from all devices');
+                setIsLogoutUserModalOpen(false);
+                setSelectedUser(null);
+            },
+            onError: () => {
+                toast.error('Failed to log out user');
             },
         });
     };
@@ -499,6 +523,10 @@ export default function UserManagement({ users = [], roles: rolesProp = [] }: Pr
                                     <RefreshCw className="mr-2 h-4 w-4" />
                                     Edit Status
                                 </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleLogoutUser(user)}>
+                                    <LogOut className="mr-2 h-4 w-4" />
+                                    Log out user (all devices)
+                                </DropdownMenuItem>
                                 {user.approval_status === 'pending' && (
                                     <DropdownMenuItem
                                         onClick={() => handleReject(user)}
@@ -522,7 +550,7 @@ export default function UserManagement({ users = [], roles: rolesProp = [] }: Pr
                 },
             },
         ],
-        [handleView, handleEdit, handleUpdateStatus, handleDelete],
+        [handleView, handleEdit, handleUpdateStatus, handleDelete, handleLogoutUser],
     );
 
     const headerActions = useMemo(
@@ -1009,6 +1037,27 @@ export default function UserManagement({ users = [], roles: rolesProp = [] }: Pr
                                 </Button>
                             </DialogFooter>
                         </form>
+                    </DialogContent>
+                </Dialog>
+
+                {/* Log out user (all devices) Modal */}
+                <Dialog open={isLogoutUserModalOpen} onOpenChange={setIsLogoutUserModalOpen}>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Log out user from all devices</DialogTitle>
+                            <DialogDescription>
+                                This will end all login sessions for {selectedUser?.first_name} {selectedUser?.last_name} ({selectedUser?.email}). They will need to sign in again on any device.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <DialogFooter>
+                            <Button variant="outline" onClick={() => setIsLogoutUserModalOpen(false)}>
+                                Cancel
+                            </Button>
+                            <Button variant="secondary" onClick={submitLogoutUser}>
+                                <LogOut className="mr-2 h-4 w-4" />
+                                Log out user
+                            </Button>
+                        </DialogFooter>
                     </DialogContent>
                 </Dialog>
 

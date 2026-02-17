@@ -27,10 +27,10 @@ export default function EnterTunnelToken({ verifyUrl, csrfToken }: Props) {
 
     return (
         <AuthLayout
-            title="Inmate tunnel"
-            description="Enter the inmate tunnel link or token you received to join your scheduled visit"
+            title="Join as inmate"
+            description="Enter the 8-character code you received to join your scheduled visit"
         >
-            <Head title="Inmate tunnel" />
+            <Head title="Join as inmate" />
 
             <div className="mx-auto w-full max-w-md">
                 <form
@@ -42,16 +42,19 @@ export default function EnterTunnelToken({ verifyUrl, csrfToken }: Props) {
                     <input type="hidden" name="_token" value={csrfToken} />
                     <div className="grid gap-6 rounded-lg border p-6">
                         <div className="grid gap-2">
-                            <Label htmlFor="token_or_url">Link or token</Label>
+                            <Label htmlFor="token_or_url">Inmate tunnel code</Label>
                             <Input
                                 id="token_or_url"
                                 name="token_or_url"
                                 type="text"
                                 required
                                 autoFocus
-                                placeholder="Paste the full link or token"
+                                minLength={8}
+                                maxLength={32}
+                                placeholder="e.g. AB12CD34 (8-character code)"
+                                className="font-mono tracking-widest"
                                 value={value}
-                                onChange={(e) => setValue(e.target.value)}
+                                onChange={(e) => setValue(e.target.value.replace(/\s/g, '').slice(0, 32))}
                             />
                             <InputError
                                 message={

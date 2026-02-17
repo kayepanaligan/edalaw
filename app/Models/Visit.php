@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Services\NotificationService;
 use App\VisitStatus;
 use App\VisitType;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -80,42 +81,47 @@ class Visit extends Model
     }
 
     /**
+     * Build slot start datetime in application timezone (avoids timezone/parsing issues).
+     */
+    private function getSlotStart(): Carbon
+    {
+        $dateStr = $this->scheduled_date->format('Y-m-d');
+        $timeStr = $this->scheduled_time;
+        if (! $timeStr) {
+            return Carbon::parse($dateStr, config('app.timezone'))->startOfDay();
+        }
+        $parts = explode(':', trim($timeStr), 2);
+        $h = (int) ($parts[0] ?? 0);
+        $m = (int) (isset($parts[1]) ? explode(' ', $parts[1])[0] : 0);
+        $timeNormalized = sprintf('%02d:%02d', $h, $m);
+
+        return Carbon::parse($dateStr.' '.$timeNormalized, config('app.timezone'));
+    }
+
+    /**
      * Whether the scheduled slot has started (current time is at or after scheduled start).
      */
     public function isScheduleStarted(): bool
     {
-        $start = $this->scheduled_date->copy();
-        if ($this->scheduled_time) {
-            [$h, $m] = explode(':', $this->scheduled_time);
-            $start->setTime((int) $h, (int) $m);
-        } else {
-            $start->startOfDay();
-        }
+        $start = $this->getSlotStart();
 
         return now()->gte($start);
     }
 
     /**
      * Whether the scheduled date and time have passed (no longer valid for approval or joining).
+     * Virtual visits: 10-minute slot. Physical visits: 1-hour slot.
      */
     public function isScheduleInPast(): bool
     {
-        $end = $this->scheduled_date->copy();
-        if ($this->scheduled_time) {
-            [$h, $m] = explode(':', $this->scheduled_time);
-            $end->setTime((int) $h, (int) $m);
-        } else {
-            $end->endOfDay();
-
-            return now()->isAfter($end);
-        }
-        if ($this->visit_type === VisitType::Virtual) {
-            $end->addMinutes(10);
-        } else {
-            $end->addHour();
+        if (! $this->scheduled_time) {
+            return now()->isAfter($this->scheduled_date->copy()->endOfDay());
         }
 
-        return now()->isAfter($end);
+        $slotStart = $this->getSlotStart();
+        $slotEnd = $slotStart->copy()->addHour();
+
+        return now()->isAfter($slotEnd);
     }
 
     /**

@@ -223,33 +223,34 @@ export function AppSidebar() {
         ];
     }
 
-    // BJMP Officer navigation
+    // BJMP Officer navigation with categories
+    let bjmpOfficerNavGroups: Array<{ label: string; items: NavItem[] }> | undefined;
     if (userRole === 'bjmp_officer') {
-        mainNavItems.push({
-            title: 'E-Burol Management',
-            href: '/bjmp-officer/eburols',
-            icon: Heart,
-        });
-        mainNavItems.push({
-            title: 'Visit Schedules',
-            href: '/bjmp-officer/schedules',
-            icon: Calendar,
-        });
-        mainNavItems.push({
-            title: 'Appeal Processing',
-            href: '/bjmp-officer/appeals',
-            icon: Scale,
-        });
-        mainNavItems.push({
-            title: 'History Logs',
-            href: '/bjmp-officer/audit-logs',
-            icon: FileText,
-        });
-        mainNavItems.push({
-            title: 'Settings',
-            href: '/settings',
-            icon: Settings,
-        });
+        const unreadBjmpCount = page.props.unreadNotificationCount ?? 0;
+        bjmpOfficerNavGroups = [
+            {
+                label: 'Main',
+                items: [
+                    { title: 'Dashboard', href: '/dashboard', icon: LayoutGrid },
+                    { title: 'Notifications', href: '/bjmp-officer/notifications', icon: Bell, badge: unreadBjmpCount > 0 ? unreadBjmpCount : undefined },
+                ],
+            },
+            {
+                label: 'Services',
+                items: [
+                    { title: 'E-Burol', href: '/bjmp-officer/eburols', icon: Heart },
+                    { title: 'Visit Schedules', href: '/bjmp-officer/schedules', icon: Calendar },
+                    { title: 'Appeals', href: '/bjmp-officer/appeals', icon: Scale },
+                ],
+            },
+            {
+                label: 'System',
+                items: [
+                    { title: 'History Logs', href: '/bjmp-officer/audit-logs', icon: FileText },
+                    { title: 'Settings', href: '/settings', icon: Settings },
+                ],
+            },
+        ];
     }
 
     // Monitoring Officer navigation with categories
@@ -339,6 +340,8 @@ export function AppSidebar() {
                     <NavMain groups={visitorNavGroups} />
                 ) : userRole === 'super_admin' && superAdminNavGroups ? (
                     <NavMain groups={superAdminNavGroups} />
+                ) : userRole === 'bjmp_officer' && bjmpOfficerNavGroups ? (
+                    <NavMain groups={bjmpOfficerNavGroups} />
                 ) : userRole === 'monitoring_officer' && monitoringOfficerNavGroups ? (
                     <NavMain groups={monitoringOfficerNavGroups} />
                 ) : (

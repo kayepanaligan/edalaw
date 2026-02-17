@@ -28,6 +28,7 @@ class VisitSession extends Model
         'started_at',
         'ended_at',
         'terms_accepted_at',
+        'join_reminder_sent_at',
         'chat_locked',
         'visitor_joined_at',
         'inmate_joined_at',
@@ -47,6 +48,7 @@ class VisitSession extends Model
             'started_at' => 'datetime',
             'ended_at' => 'datetime',
             'terms_accepted_at' => 'datetime',
+            'join_reminder_sent_at' => 'datetime',
             'chat_locked' => 'boolean',
             'visitor_joined_at' => 'datetime',
             'inmate_joined_at' => 'datetime',
@@ -86,9 +88,12 @@ class VisitSession extends Model
 
     public function isWithinSchedule(): bool
     {
-        $now = now();
+        $tz = config('app.timezone');
+        $now = now($tz);
+        $start = $this->scheduled_start->copy()->setTimezone($tz);
+        $end = $this->scheduled_end->copy()->setTimezone($tz);
 
-        return $now->between($this->scheduled_start, $this->scheduled_end);
+        return $now->between($start, $end);
     }
 
     /**
@@ -97,10 +102,13 @@ class VisitSession extends Model
      */
     public function isWithinScheduleForTunnel(): bool
     {
-        $now = now();
-        $windowStart = $this->scheduled_start->copy()->startOfDay();
+        $tz = config('app.timezone');
+        $now = now($tz);
+        $start = $this->scheduled_start->copy()->setTimezone($tz);
+        $end = $this->scheduled_end->copy()->setTimezone($tz);
+        $windowStart = $start->copy()->startOfDay();
 
-        return $now->between($windowStart, $this->scheduled_end);
+        return $now->between($windowStart, $end);
     }
 
     public function isCompleted(): bool

@@ -1,7 +1,7 @@
 import { Head, router, useForm } from '@inertiajs/react';
 import type { ColumnDef } from '@tanstack/react-table';
-import { Calendar, Clock, FileText, MapPin, Scale, User, Users, MoreVertical, Eye, Edit, CalendarClock, Trash2, Filter } from 'lucide-react';
-import { useCallback, useMemo, useState } from 'react';
+import { Calendar, Clock, FileText, MapPin, Scale, User, Users, MoreVertical, Eye, Edit, CalendarClock, Trash2, Filter, Video } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { DataTable } from '@/components/data-table';
@@ -27,6 +27,14 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Spinner } from '@/components/ui/spinner';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
@@ -56,6 +64,16 @@ type Eburol = {
     created_at: string;
     can_appeal?: boolean;
     appeal_deadline?: string | null;
+    visit_session?: {
+        id: number;
+        scheduled_start: string;
+        scheduled_end: string;
+        status: string;
+        terms_accepted_at: string | null;
+        can_join_video: boolean;
+        join_disabled_reason?: 'not_started' | 'ended' | null;
+    } | null;
+    join_url?: string | null;
 };
 
 type Props = {
@@ -72,6 +90,21 @@ const breadcrumbs: BreadcrumbItem[] = [
         href: '/visitor/eburol',
     },
 ];
+
+/** Format 24h slot start (e.g. "08:00") as 12hr range "8:00 AM – 9:00 AM". */
+function formatEburolTimeSlot(slot: string | null): string {
+    if (!slot) return '—';
+    const [hStr, mStr] = slot.split(':');
+    const h = parseInt(hStr ?? '0', 10);
+    const m = parseInt(mStr ?? '0', 10);
+    const period = h < 12 ? 'AM' : 'PM';
+    const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+    const endH = h + 1;
+    const endPeriod = endH < 12 ? 'AM' : 'PM';
+    const endH12 = endH === 0 ? 12 : endH > 12 ? endH - 12 : endH;
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    return `${h12}:${pad(m)} ${period} – ${endH12}:00 ${endPeriod}`;
+}
 
 function getStatusBadge(status: string) {
     switch (status) {
@@ -109,6 +142,11 @@ export default function EburolManagement({ eburols }: Props) {
     const [isAppealModalOpen, setIsAppealModalOpen] = useState(false);
     const [selectedEburol, setSelectedEburol] = useState<Eburol | null>(null);
     const [statusFilter, setStatusFilter] = useState<string>('all');
+    const [videoTermsModalOpen, setVideoTermsModalOpen] = useState(false);
+    const [selectedSessionIdForVideo, setSelectedSessionIdForVideo] = useState<number | null>(null);
+    const [videoTermsAccepted, setVideoTermsAccepted] = useState(false);
+    const [acceptingTerms, setAcceptingTerms] = useState(false);
+    const [eburolSlotAvailability, setEburolSlotAvailability] = useState<Record<string, { current: number; max: number; isFull: boolean }>>({});
     useToast();
     const today = new Date().toISOString().split('T')[0];
 
@@ -176,6 +214,18 @@ export default function EburolManagement({ eburols }: Props) {
         death_certificate: null as File | null,
         relationship_proof: null as File | null,
     });
+
+    useEffect(() => {
+        const date = form.data.wake_start_date;
+        if (!date) {
+            setEburolSlotAvailability({});
+            return;
+        }
+        fetch(`/visitor/eburol/slot-availability?date=${encodeURIComponent(date)}`)
+            .then((res) => res.ok ? res.json() : {})
+            .then((data) => setEburolSlotAvailability(data))
+            .catch(() => setEburolSlotAvailability({}));
+    }, [form.data.wake_start_date]);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -294,7 +344,7 @@ export default function EburolManagement({ eburols }: Props) {
 - Date of Death: ${appealForm.data.deceased_date_of_death}
 - Relationship: ${appealForm.data.relationship_to_inmate}
 - Wake Period: ${appealForm.data.wake_start_date} to ${appealForm.data.wake_end_date}
-- Preferred Time: ${appealForm.data.preferred_time || 'Not specified'}
+- Preferred Time: ${appealForm.data.preferred_time ? formatEburolTimeSlot(appealForm.data.preferred_time) : 'Not specified'}
 - Wake Location: ${appealForm.data.wake_location}
 ${appealForm.data.additional_details ? `- Additional Details: ${appealForm.data.additional_details}` : ''}
 
@@ -524,7 +574,7 @@ ${appealForm.data.reason}`;
                         </div>
                         {eburol.preferred_time && (
                             <div className="text-xs text-muted-foreground">
-                                Preferred: {eburol.preferred_time}
+                                Preferred: {formatEburolTimeSlot(eburol.preferred_time)}
                             </div>
                         )}
                     </div>
@@ -602,6 +652,81 @@ ${appealForm.data.reason}`;
                         )}
                     </div>
                 );
+            },
+        },
+        {
+            id: 'meeting',
+            header: '',
+            cell: ({ row }) => {
+                const eburol = row.original;
+                if (eburol.status !== 'approved') {
+                    return <span className="text-sm text-muted-foreground">—</span>;
+                }
+                const session = eburol.visit_session;
+                if (session?.can_join_video) {
+                    return (
+                        <Button
+                            size="sm"
+                            variant="default"
+                            className="bg-green-600 hover:bg-green-700 inline-flex gap-2"
+                            title="Join meeting"
+                            onClick={() => {
+                                setSelectedSessionIdForVideo(session.id);
+                                setVideoTermsAccepted(false);
+                                setVideoTermsModalOpen(true);
+                            }}
+                        >
+                            <Video className="h-4 w-4" />
+                            Join
+                        </Button>
+                    );
+                }
+                if (session && ['completed', 'terminated'].includes(session.status)) {
+                    return <span className="text-sm text-muted-foreground">Completed</span>;
+                }
+                const sessionNotExpired = session && new Date(session.scheduled_end) > new Date() && !['completed', 'terminated'].includes(session.status);
+                if (session && !session.can_join_video) {
+                    if (sessionNotExpired) {
+                        return (
+                            <Button
+                                size="sm"
+                                variant="default"
+                                className="bg-green-600 hover:bg-green-700 inline-flex gap-2"
+                                title="Join meeting (a reminder will show if it's not yet time)"
+                                onClick={() => {
+                                    setSelectedSessionIdForVideo(session.id);
+                                    setVideoTermsAccepted(false);
+                                    setVideoTermsModalOpen(true);
+                                }}
+                            >
+                                <Video className="h-4 w-4" />
+                                Join
+                            </Button>
+                        );
+                    }
+                    const tooltip = session.join_disabled_reason === 'not_started'
+                        ? 'Meeting is available from the scheduled start time.'
+                        : session.join_disabled_reason === 'ended'
+                            ? 'Schedule has ended.'
+                            : 'Available during scheduled time only.';
+                    return (
+                        <Button size="sm" variant="outline" disabled className="inline-flex gap-2" title={tooltip}>
+                            <Video className="h-4 w-4" />
+                            Join
+                        </Button>
+                    );
+                }
+                if (eburol.join_url) {
+                    return (
+                        <Button size="sm" variant="outline" asChild className="inline-flex gap-2">
+                            <a href={eburol.join_url} title="Join meeting">
+                                <Video className="h-4 w-4" />
+                                Join
+                            </a>
+                        </Button>
+                    );
+                }
+                return <span className="text-sm text-muted-foreground">—</span>;
             },
         },
         {
@@ -873,15 +998,37 @@ ${appealForm.data.reason}`;
                                             />
                                             <InputError message={form.errors.wake_end_date} />
                                         </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="preferred_time">Preferred Time</Label>
-                                            <Input
-                                                id="preferred_time"
-                                                type="time"
-                                                name="preferred_time"
-                                                value={form.data.preferred_time}
-                                                onChange={(e) => form.setData('preferred_time', e.target.value)}
-                                            />
+                                        <div className="space-y-2 md:col-span-3">
+                                            <Label>Preferred time (1-hour slot)</Label>
+                                            {form.data.wake_start_date ? (
+                                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
+                                                    {Array.from({ length: 10 }, (_, i) => {
+                                                        const hour = 8 + i;
+                                                        const slot = `${hour.toString().padStart(2, '0')}:00`;
+                                                        const cap = eburolSlotAvailability[slot] ?? { current: 0, max: 4, isFull: false };
+                                                        const label = formatEburolTimeSlot(slot);
+                                                        const isSelected = form.data.preferred_time === slot;
+                                                        return (
+                                                            <Button
+                                                                key={slot}
+                                                                type="button"
+                                                                variant={isSelected ? 'default' : 'outline'}
+                                                                size="sm"
+                                                                disabled={cap.isFull}
+                                                                className="text-xs flex flex-col h-auto py-2"
+                                                                onClick={() => form.setData('preferred_time', slot)}
+                                                            >
+                                                                <span>{label.split(' – ')[0]}</span>
+                                                                <span className="text-muted-foreground text-[10px]">
+                                                                    {cap.current}/{cap.max}
+                                                                </span>
+                                                            </Button>
+                                                        );
+                                                    })}
+                                                </div>
+                                            ) : (
+                                                <p className="text-sm text-muted-foreground">Select start date first to see available time slots.</p>
+                                            )}
                                             <InputError message={form.errors.preferred_time} />
                                         </div>
                                     </div>
@@ -1031,6 +1178,59 @@ ${appealForm.data.reason}`;
                     </CardContent>
                 </Card>
 
+                {/* Video Call Terms & Conditions Modal */}
+                <Dialog open={videoTermsModalOpen} onOpenChange={setVideoTermsModalOpen}>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Terms & Conditions</DialogTitle>
+                            <DialogDescription>
+                                Please read and accept before joining the meeting.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4 py-4">
+                            <ul className="list-disc list-inside space-y-2 text-sm text-muted-foreground">
+                                <li>The call is monitored by an officer.</li>
+                                <li>The call is recorded.</li>
+                                <li>Violations may result in termination of the call and/or future visit privileges.</li>
+                            </ul>
+                            <div className="flex items-center gap-2">
+                                <Checkbox
+                                    id="eburol-video-terms"
+                                    checked={videoTermsAccepted}
+                                    onCheckedChange={(c) => setVideoTermsAccepted(c === true)}
+                                />
+                                <Label htmlFor="eburol-video-terms" className="text-sm font-normal cursor-pointer">
+                                    I understand and accept these terms.
+                                </Label>
+                            </div>
+                        </div>
+                        <DialogFooter>
+                            <Button variant="outline" onClick={() => setVideoTermsModalOpen(false)}>
+                                Cancel
+                            </Button>
+                            <Button
+                                disabled={!videoTermsAccepted || acceptingTerms}
+                                onClick={() => {
+                                    if (selectedSessionIdForVideo === null) return;
+                                    const sessionId = selectedSessionIdForVideo;
+                                    setAcceptingTerms(true);
+                                    router.post(`/visit/session/${sessionId}/accept-terms`, {}, {
+                                        onSuccess: () => {
+                                            setVideoTermsModalOpen(false);
+                                            setSelectedSessionIdForVideo(null);
+                                            setAcceptingTerms(false);
+                                            router.visit(`/visit/session/${sessionId}`);
+                                        },
+                                        onError: () => setAcceptingTerms(false),
+                                    });
+                                }}
+                            >
+                                {acceptingTerms ? 'Accepting...' : 'Accept and Join'}
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+
                 {/* View Details Modal */}
                 <Dialog open={isViewModalOpen} onOpenChange={setIsViewModalOpen}>
                     <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
@@ -1090,7 +1290,7 @@ ${appealForm.data.reason}`;
                                     {selectedEburol.preferred_time && (
                                         <div>
                                             <Label className="text-muted-foreground">Preferred Time</Label>
-                                            <p className="font-medium">{selectedEburol.preferred_time}</p>
+                                            <p className="font-medium">{formatEburolTimeSlot(selectedEburol.preferred_time)}</p>
                                         </div>
                                     )}
                                     <div className="col-span-2">

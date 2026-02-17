@@ -308,6 +308,39 @@ export default function Register({ roles = [] }: Props) {
                         </div>
                     </div>
 
+                    {(selectedRole && ['visitor', 'bjmp_officer', 'monitoring_officer'].includes(roles.find((r) => String(r.id) === selectedRole)?.slug ?? '')) && (
+                        <div className="space-y-4">
+                            <h3 className="text-lg font-semibold">Proof of identity (at least 2)</h3>
+                            <p className="text-sm text-muted-foreground">
+                                Upload at least two proofs of identity (e.g. valid ID, birth certificate). Accepted: PDF, JPG, PNG (max 5MB each).
+                            </p>
+                            <div className="grid grid-cols-1 gap-4">
+                                <div className="grid gap-2">
+                                    <Label htmlFor="id_document_1">Proof 1 (e.g. Valid ID or Birth Certificate) *</Label>
+                                    <Input
+                                        id="id_document_1"
+                                        type="file"
+                                        accept=".pdf,.jpg,.jpeg,.png"
+                                        required
+                                        onChange={(e) => form.setData('id_document_1', e.target.files?.[0] ?? null)}
+                                    />
+                                    <InputError message={form.errors.id_document_1} />
+                                </div>
+                                <div className="grid gap-2">
+                                    <Label htmlFor="id_document_2">Proof 2 (e.g. Valid ID or Birth Certificate) *</Label>
+                                    <Input
+                                        id="id_document_2"
+                                        type="file"
+                                        accept=".pdf,.jpg,.jpeg,.png"
+                                        required
+                                        onChange={(e) => form.setData('id_document_2', e.target.files?.[0] ?? null)}
+                                    />
+                                    <InputError message={form.errors.id_document_2} />
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     <div className="space-y-4">
                         <h3 className="text-lg font-semibold">Account Security</h3>
                         
