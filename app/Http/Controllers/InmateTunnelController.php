@@ -183,7 +183,7 @@ class InmateTunnelController extends Controller
             'participant_id' => $participantId,
         ];
         if ($videoSdk->isV2Rooms()) {
-            $payload['join_url'] = url('/video-room').'?room_id='.rawurlencode($session->room_id).'&token='.rawurlencode($result['token']);
+            $payload['join_url'] = url('/video-room').'?room_id='.rawurlencode($session->room_id).'&token='.rawurlencode($result['token']).'&participant_id='.rawurlencode($participantId);
         }
 
         return response()->json($payload);

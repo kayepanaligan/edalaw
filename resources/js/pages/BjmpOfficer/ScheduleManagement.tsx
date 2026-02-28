@@ -1,6 +1,6 @@
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 import type { ColumnDef } from '@tanstack/react-table';
-import { Calendar, Video, MoreVertical, Eye, Check, X, RefreshCw, CalendarClock, FileOutput, VideoIcon } from 'lucide-react';
+import { Calendar, Video, MoreVertical, Eye, Check, X, RefreshCw, CalendarClock, FileOutput } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -434,35 +434,6 @@ export default function ScheduleManagement({ visits, stats, monitoringOfficers }
                         </Button>
                     );
                 }
-                if (visit.visit_type === 'virtual' && visit.status === 'approved') {
-                    const canJoin = visit.visit_session_id && visit.schedule_started && !visit.schedule_ended;
-                    if (canJoin) {
-                        return (
-                            <a
-                                href={`/bjmp-officer/visit-session/${visit.visit_session_id}/join`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-green-600 text-white hover:bg-green-700"
-                                title="Join video call"
-                            >
-                                <VideoIcon className="h-4 w-4" />
-                            </a>
-                        );
-                    }
-                    const tooltip = !visit.schedule_started
-                        ? 'Video call is available from the scheduled start time.'
-                        : visit.schedule_ended
-                            ? 'Schedule has ended.'
-                            : 'Not available';
-                    return (
-                        <span
-                            className="inline-flex h-9 w-9 cursor-not-allowed items-center justify-center rounded-md bg-muted text-muted-foreground"
-                            title={tooltip}
-                        >
-                            <VideoIcon className="h-4 w-4" />
-                        </span>
-                    );
-                }
                 return <span className="text-sm text-muted-foreground">—</span>;
             },
         },
@@ -710,39 +681,6 @@ export default function ScheduleManagement({ visits, stats, monitoringOfficers }
                                     <Label className="text-muted-foreground">Scheduled time</Label>
                                     <Input readOnly value={selectedVisit.scheduled_time ?? '—'} className="bg-muted" />
                                 </div>
-                                {selectedVisit.visit_type === 'virtual' && selectedVisit.status === 'approved' && (
-                                    <div className="space-y-1">
-                                        <Label className="text-muted-foreground">Join video call</Label>
-                                        <div className="pt-2">
-                                            {selectedVisit.visit_session_id && selectedVisit.schedule_started && !selectedVisit.schedule_ended
-                                                ? (
-                                                    <a
-                                                        href={`/bjmp-officer/visit-session/${selectedVisit.visit_session_id}/join`}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="inline-flex h-10 w-10 items-center justify-center rounded-md bg-green-600 text-white hover:bg-green-700"
-                                                        title="Join video call"
-                                                    >
-                                                        <VideoIcon className="h-5 w-5" />
-                                                    </a>
-                                                )
-                                                : (
-                                                    <span
-                                                        className="inline-flex h-10 w-10 cursor-not-allowed items-center justify-center rounded-md bg-muted text-muted-foreground"
-                                                        title={
-                                                            !selectedVisit.schedule_started
-                                                                ? 'Video call is available from the scheduled start time.'
-                                                                : selectedVisit.schedule_ended
-                                                                    ? 'Schedule has ended.'
-                                                                    : 'Not available'
-                                                        }
-                                                    >
-                                                        <VideoIcon className="h-5 w-5" />
-                                                    </span>
-                                                )}
-                                        </div>
-                                    </div>
-                                )}
                                 <div className="space-y-1">
                                     <Label className="text-muted-foreground">Notes</Label>
                                     <Input readOnly value={selectedVisit.notes ?? '—'} className="bg-muted" />

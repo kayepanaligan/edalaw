@@ -27,9 +27,7 @@ export function AppSidebar() {
     const userRole = auth?.user?.role;
 
     const mainNavItems: NavItem[] = [];
-    
-    // Only add Dashboard to mainNavItems for non-visitor and non-super_admin roles
-    // (super_admin uses groups, visitor uses groups)
+   
     if (userRole !== 'visitor' && userRole !== 'super_admin') {
         mainNavItems.push({
             title: 'Dashboard',
@@ -38,7 +36,6 @@ export function AppSidebar() {
         });
     }
 
-    // Super Admin navigation with categories
     let superAdminNavGroups: Array<{ label: string; items: NavItem[] }> | undefined;
     if (userRole === 'super_admin') {
         const unreadAdminCount = typeof page.props.unreadAdminNotificationCount === 'number' ? page.props.unreadAdminNotificationCount : 0;

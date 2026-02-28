@@ -163,6 +163,7 @@ class VisitSessionController extends Controller
 
         $videoSdk = new VideoSdkService;
         $participantId = 'visitor-'.$user->id.'-'.$session->id;
+        // Token is generated for session->room_id; same room_id is passed to frontend so meetingId matches JWT roomId.
         $result = $videoSdk->generateJoinTokenForPrebuiltApp($session->room_id, $participantId, ['allow_join'], 120);
         if (! ($result['success'] ?? false) || empty($result['token'])) {
             return redirect()->route('visit-session.show', $session)
@@ -174,6 +175,7 @@ class VisitSessionController extends Controller
             'token' => $result['token'],
             'api_key' => config('services.videosdk.api_key'),
             'participant_name' => $user->name ?? 'Visitor',
+            'participant_id' => $participantId,
             'is_observer' => false,
             'branding_logo_url' => asset('logo.svg'),
             'branding_name' => config('app.name'),

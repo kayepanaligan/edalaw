@@ -9,21 +9,17 @@ use Illuminate\Support\Facades\Log;
 class VideoSdkService
 {
     private string $apiKey;
-
     private string $secretKey;
-
     private string $apiEndpoint;
-
     private string $token;
 
     public function __construct()
     {
-        $this->apiKey = config('services.videosdk.api_key');
-        $this->secretKey = config('services.videosdk.secret_key');
-        $this->apiEndpoint = config('services.videosdk.api_endpoint');
-        $this->token = config('services.videosdk.token');
+        $this->apiKey = (string) (config('services.videosdk.api_key') ?? '');
+        $this->secretKey = (string) (config('services.videosdk.secret_key') ?? '');
+        $this->apiEndpoint = (string) (config('services.videosdk.api_endpoint') ?? '');
     }
-
+ 
     /**
      * Create a new video room. Retries once after 2 seconds on failure (transient errors).
      *
@@ -131,9 +127,10 @@ class VideoSdkService
                 if ($isV1) {
                     $roomId = $data['meetingId'] ?? $data['roomId'] ?? $data['id'] ?? $name;
                 } else {
-                    // For v2 rooms, prefer customRoomId for joining via prebuilt embed.
-                    // The opaque `roomId` can cause the prebuilt to create a new room unexpectedly.
-                    $roomId = $data['customRoomId'] ?? $data['roomId'] ?? $data['id'] ?? $name;
+                    // v2: Use opaque roomId for joining. POST /infra/v1/meetings/init-config resolves by roomId.
+                    // Sessions created before this change may have customRoomId stored; those require a new room
+                    // (e.g. re-approve visit) to get the opaque roomId and avoid init-config 404.
+                    $roomId = $data['roomId'] ?? $data['id'] ?? $data['customRoomId'] ?? $name;
                 }
 
                 $roomUrl = $data['links']['room'] ?? $data['roomUrl'] ?? $data['url'] ?? null;
@@ -244,6 +241,7 @@ class VideoSdkService
      *
      * @return array{success: bool, room?: array, error?: string}
      */
+
     public function getRoom(string $roomId): array
     {
         if (! $this->apiKey || ! $this->apiEndpoint) {
@@ -307,14 +305,6 @@ class VideoSdkService
     }
 
     /**
-     * Generate a token for joining a room (legacy - returns static token).
-     */
-    public function generateToken(string $roomId, array $permissions = ['allow_join']): string
-    {
-        return $this->token;
-    }
-
-    /**
      * Whether the app is configured for VideoSDK v2 rooms (vs v1 meetings).
      * v2 room IDs do not work with app.videosdk.live/meetings/ (404); use embedded prebuilt instead.
      */
@@ -334,58 +324,49 @@ class VideoSdkService
         array $permissions = ['allow_join'],
         int $expiryMinutes = 120
     ): array {
-        $isV1 = str_contains($this->apiEndpoint, '/v1/meetings');
-        if ($isV1) {
-            if ($this->token) {
-                $token = trim($this->token);
-                if (str_starts_with($token, 'Bearer ')) {
-                    $token = substr($token, 7);
-                }
-                if ($token !== '') {
-                    return ['success' => true, 'token' => $token];
-                }
-            }
-
-            return $this->generateSimpleMeetingToken($permissions, $expiryMinutes);
+        if ($this->isV2Rooms()) {
+            return $this->generateParticipantToken($roomId, $participantId, $permissions, $expiryMinutes);
         }
 
-        return $this->generateParticipantToken($roomId, $participantId, $permissions, $expiryMinutes);
+        // For v1 meetings, fallback to simple token
+        return $this->generateSimpleMeetingToken($permissions, $expiryMinutes);
     }
 
     /**
      * Simple token for v1 meetings / prebuilt app (apikey + permissions only).
+     * When used with v2 infrastructure, include version 2 in payload.
      */
-    public function generateSimpleMeetingToken(array $permissions = ['allow_join'], int $expiryMinutes = 120): array
+   public function generateSimpleMeetingToken(array $permissions = ['allow_join'], int $expiryMinutes = 120): array
     {
         if (! $this->apiKey || ! $this->secretKey) {
             Log::error('VideoSDK API key or secret not configured');
-
             return ['success' => false, 'error' => 'VideoSDK not configured', 'token' => null];
         }
 
+        $iat = now()->timestamp;
+        $exp = now()->addMinutes($expiryMinutes)->timestamp;
+        $payload = [
+            'apikey' => $this->apiKey,
+            'permissions' => count($permissions) > 0 ? array_values($permissions) : ['allow_join'],
+            'version' => 2,
+            'iat' => $iat,
+            'exp' => $exp,
+        ];
+
         try {
-            $payload = [
-                'apikey' => $this->apiKey,
-                'permissions' => $permissions,
-                'exp' => now()->addMinutes($expiryMinutes)->timestamp,
-                'iat' => now()->timestamp,
-            ];
-
             $token = JWT::encode($payload, $this->secretKey, 'HS256');
-
             return ['success' => true, 'token' => $token];
         } catch (\Exception $e) {
             Log::error('VideoSDK simple token generation failed', ['error' => $e->getMessage()]);
-
             return ['success' => false, 'error' => $e->getMessage(), 'token' => null];
         }
     }
-
     /**
      * Generate a participant JWT for VideoSDK room join (v2 API).
-     * Permissions: allow_join (publish), allow_mod (admin - mute/remove others).
+     * Payload must match dashboard project: apikey, permissions, version 2, roomId, participantId.
+     * Signed with SECRET_KEY only (never API key).
      *
-     * @param  array{allow_join?: bool, ask_join?: bool, allow_mod?: bool}  $permissions
+     * @param  array<int, string>  $permissions  At minimum ['allow_join']
      */
     public function generateParticipantToken(
         string $roomId,
@@ -394,33 +375,40 @@ class VideoSdkService
         int $expiryMinutes = 120
     ): array {
         if (! $this->apiKey || ! $this->secretKey) {
-            Log::error('VideoSDK API key or secret not configured');
-
+            Log::error('VideoSDK participant token: API key or secret not configured');
             return ['success' => false, 'error' => 'VideoSDK not configured', 'token' => null];
         }
 
-        try {
-            $payload = [
-                'apikey' => $this->apiKey,
-                'permissions' => $permissions,
-                'version' => 2,
-                'roomId' => $roomId,
-                'participantId' => $participantId,
-                'roles' => 'rtc',
-                'exp' => now()->addMinutes($expiryMinutes)->timestamp,
-                'iat' => now()->timestamp,
-            ];
+        $iat = now()->timestamp;
+        $exp = now()->addMinutes($expiryMinutes)->timestamp;
 
+        $payload = [
+            'apikey' => $this->apiKey,
+            'permissions' => count($permissions) > 0 ? array_values($permissions) : ['allow_join'],
+            'version' => 2,
+            'roomId' => $roomId,
+            'participantId' => $participantId,
+            'roles' => ['rtc'], // required for v2 join
+            'iat' => $iat,
+            'exp' => $exp,
+        ];
+
+        try {
             $token = JWT::encode($payload, $this->secretKey, 'HS256');
+
+            Log::info('VideoSDK participant token generated', [
+                'room_id' => $roomId,
+                'participant_id' => $participantId,
+                'iat' => $iat,
+                'exp' => $exp,
+            ]);
 
             return ['success' => true, 'token' => $token];
         } catch (\Exception $e) {
             Log::error('VideoSDK participant token generation failed', ['error' => $e->getMessage()]);
-
             return ['success' => false, 'error' => $e->getMessage(), 'token' => null];
         }
     }
-
     /**
      * Generate a participant JWT for viewer/observer join (e.g. monitoring officer).
      * Uses only allow_join; no allow_mod. Client should join with webcam and mic disabled

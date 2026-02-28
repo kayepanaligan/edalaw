@@ -85,15 +85,21 @@ class AuthenticateUser
 
     /**
      * Block login if user already has an active session (another device).
+     * Only sessions with recent last_activity (within session lifetime) count; expired/inactive
+     * sessions do not block, so "forgot to log out" does not prevent login from another device.
      * Record the attempt, notify super admin and user, then throw.
      */
     private function guardAgainstConcurrentLogin(Request $request, User $user): void
     {
-        $hasOtherSession = DB::table(config('session.table', 'sessions'))
+        $sessionLifetimeMinutes = (int) config('session.lifetime', 120);
+        $cutoffTimestamp = now()->subMinutes($sessionLifetimeMinutes)->timestamp;
+
+        $hasOtherActiveSession = DB::table(config('session.table', 'sessions'))
             ->where('user_id', $user->id)
+            ->where('last_activity', '>=', $cutoffTimestamp)
             ->exists();
 
-        if (! $hasOtherSession) {
+        if (! $hasOtherActiveSession) {
             return;
         }
 

@@ -1,6 +1,5 @@
 import { createInertiaApp } from '@inertiajs/react';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
-import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Toaster } from 'sonner';
 import '../css/app.css';
@@ -19,10 +18,10 @@ createInertiaApp({
         const root = createRoot(el);
 
         root.render(
-            <StrictMode>
+            <>
                 <App {...props} />
                 <Toaster position="top-right" richColors />
-            </StrictMode>,
+            </>,
         );
     },
     progress: {

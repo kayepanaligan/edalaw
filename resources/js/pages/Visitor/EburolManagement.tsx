@@ -37,6 +37,11 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 import { Spinner } from '@/components/ui/spinner';
 import { Textarea } from '@/components/ui/textarea';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { RelationshipPicker } from '@/components/RelationshipPicker';
 import { useToast } from '@/hooks/use-toast';
 import AppLayout from '@/layouts/app-layout';
@@ -763,283 +768,263 @@ export default function EburolManagement({ eburols }: Props) {
                             Apply for e-burol schedule to allow inmates to attend wakes of deceased family members
                         </p>
                     </div>
-                    <Button onClick={() => setShowForm(!showForm)}>
-                        {showForm ? 'Cancel' : 'Apply for E-Burol'}
+                    <Button onClick={() => setShowForm(true)}>
+                        Apply for E-Burol
                     </Button>
                 </div>
 
-                {showForm && (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Apply for E-Burol Schedule</CardTitle>
-                            <CardDescription>
-                                Fill in the details below to apply for an e-burol schedule. Please ensure all required documents are provided.
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <form onSubmit={handleSubmit} className="space-y-6">
-                                {/* Inmate Information */}
-                                <div className="space-y-4">
-                                    <h3 className="text-lg font-semibold flex items-center gap-2">
-                                        <User className="h-5 w-5" />
-                                        Inmate Information
-                                    </h3>
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                        <div className="space-y-2">
-                                            <Label htmlFor="inmate_first_name">First Name *</Label>
-                                            <Input
-                                                id="inmate_first_name"
-                                                name="inmate_first_name"
-                                                value={form.data.inmate_first_name}
-                                                onChange={(e) => form.setData('inmate_first_name', e.target.value)}
-                                                required
-                                            />
-                                            <InputError message={form.errors.inmate_first_name} />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="inmate_middle_name">Middle Name</Label>
-                                            <Input
-                                                id="inmate_middle_name"
-                                                name="inmate_middle_name"
-                                                value={form.data.inmate_middle_name}
-                                                onChange={(e) => form.setData('inmate_middle_name', e.target.value)}
-                                            />
-                                            <InputError message={form.errors.inmate_middle_name} />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="inmate_last_name">Last Name *</Label>
-                                            <Input
-                                                id="inmate_last_name"
-                                                name="inmate_last_name"
-                                                value={form.data.inmate_last_name}
-                                                onChange={(e) => form.setData('inmate_last_name', e.target.value)}
-                                                required
-                                            />
-                                            <InputError message={form.errors.inmate_last_name} />
-                                        </div>
-                                    </div>
-                                </div>
+                {/* Apply for E-Burol Modal */}
+                <Dialog open={showForm} onOpenChange={(open) => { setShowForm(open); if (!open) form.reset(); }}>
+                    <DialogContent className="max-h-[90vh] overflow-y-auto max-w-lg">
+                        <DialogHeader>
+                            <DialogTitle>Apply for E-Burol Schedule</DialogTitle>
+                            <DialogDescription>
+                                Fill in the details below. All fields are arranged in order. Please ensure all required documents are provided.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <form onSubmit={handleSubmit} className="space-y-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="modal_inmate_first_name">Inmate First Name *</Label>
+                                <Input
+                                    id="modal_inmate_first_name"
+                                    name="inmate_first_name"
+                                    value={form.data.inmate_first_name}
+                                    onChange={(e) => form.setData('inmate_first_name', e.target.value)}
+                                    required
+                                />
+                                <InputError message={form.errors.inmate_first_name} />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="modal_inmate_middle_name">Inmate Middle Name</Label>
+                                <Input
+                                    id="modal_inmate_middle_name"
+                                    name="inmate_middle_name"
+                                    value={form.data.inmate_middle_name}
+                                    onChange={(e) => form.setData('inmate_middle_name', e.target.value)}
+                                />
+                                <InputError message={form.errors.inmate_middle_name} />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="modal_inmate_last_name">Inmate Last Name *</Label>
+                                <Input
+                                    id="modal_inmate_last_name"
+                                    name="inmate_last_name"
+                                    value={form.data.inmate_last_name}
+                                    onChange={(e) => form.setData('inmate_last_name', e.target.value)}
+                                    required
+                                />
+                                <InputError message={form.errors.inmate_last_name} />
+                            </div>
 
-                                {/* Deceased Information */}
-                                <div className="space-y-4">
-                                    <h3 className="text-lg font-semibold flex items-center gap-2">
-                                        <Users className="h-5 w-5" />
-                                        Deceased Information
-                                    </h3>
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                        <div className="space-y-2">
-                                            <Label htmlFor="deceased_first_name">First Name *</Label>
-                                            <Input
-                                                id="deceased_first_name"
-                                                name="deceased_first_name"
-                                                value={form.data.deceased_first_name}
-                                                onChange={(e) => form.setData('deceased_first_name', e.target.value)}
-                                                required
-                                            />
-                                            <InputError message={form.errors.deceased_first_name} />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="deceased_middle_name">Middle Name</Label>
-                                            <Input
-                                                id="deceased_middle_name"
-                                                name="deceased_middle_name"
-                                                value={form.data.deceased_middle_name}
-                                                onChange={(e) => form.setData('deceased_middle_name', e.target.value)}
-                                            />
-                                            <InputError message={form.errors.deceased_middle_name} />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="deceased_last_name">Last Name *</Label>
-                                            <Input
-                                                id="deceased_last_name"
-                                                name="deceased_last_name"
-                                                value={form.data.deceased_last_name}
-                                                onChange={(e) => form.setData('deceased_last_name', e.target.value)}
-                                                required
-                                            />
-                                            <InputError message={form.errors.deceased_last_name} />
-                                        </div>
-                                    </div>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <Label htmlFor="deceased_date_of_death">Date of Death *</Label>
-                                            <Input
-                                                id="deceased_date_of_death"
-                                                type="date"
-                                                name="deceased_date_of_death"
-                                                value={form.data.deceased_date_of_death}
-                                                onChange={(e) => form.setData('deceased_date_of_death', e.target.value)}
-                                                max={today}
-                                                required
-                                            />
-                                            <InputError message={form.errors.deceased_date_of_death} />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <RelationshipPicker
-                                                id="relationship_to_inmate"
-                                                value={form.data.relationship_to_inmate}
-                                                onChange={(v) => form.setData('relationship_to_inmate', v)}
-                                                error={form.errors.relationship_to_inmate}
-                                                label="Relationship to Inmate"
-                                                required
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="modal_deceased_first_name">Deceased First Name *</Label>
+                                <Input
+                                    id="modal_deceased_first_name"
+                                    name="deceased_first_name"
+                                    value={form.data.deceased_first_name}
+                                    onChange={(e) => form.setData('deceased_first_name', e.target.value)}
+                                    required
+                                />
+                                <InputError message={form.errors.deceased_first_name} />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="modal_deceased_middle_name">Deceased Middle Name</Label>
+                                <Input
+                                    id="modal_deceased_middle_name"
+                                    name="deceased_middle_name"
+                                    value={form.data.deceased_middle_name}
+                                    onChange={(e) => form.setData('deceased_middle_name', e.target.value)}
+                                />
+                                <InputError message={form.errors.deceased_middle_name} />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="modal_deceased_last_name">Deceased Last Name *</Label>
+                                <Input
+                                    id="modal_deceased_last_name"
+                                    name="deceased_last_name"
+                                    value={form.data.deceased_last_name}
+                                    onChange={(e) => form.setData('deceased_last_name', e.target.value)}
+                                    required
+                                />
+                                <InputError message={form.errors.deceased_last_name} />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="modal_deceased_date_of_death">Date of Death *</Label>
+                                <Input
+                                    id="modal_deceased_date_of_death"
+                                    type="date"
+                                    name="deceased_date_of_death"
+                                    value={form.data.deceased_date_of_death}
+                                    onChange={(e) => form.setData('deceased_date_of_death', e.target.value)}
+                                    max={today}
+                                    required
+                                />
+                                <InputError message={form.errors.deceased_date_of_death} />
+                            </div>
+                            <div className="space-y-2">
+                                <RelationshipPicker
+                                    id="modal_relationship_to_inmate"
+                                    value={form.data.relationship_to_inmate}
+                                    onChange={(v) => form.setData('relationship_to_inmate', v)}
+                                    error={form.errors.relationship_to_inmate}
+                                    label="Relationship to Inmate *"
+                                    required
+                                />
+                            </div>
 
-                                {/* Wake Schedule: single date + clickable 1-hour slots */}
-                                <div className="space-y-4">
-                                    <h3 className="text-lg font-semibold flex items-center gap-2">
-                                        <Calendar className="h-5 w-5" />
-                                        Wake Schedule
-                                    </h3>
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                        <div className="space-y-2">
-                                            <Label htmlFor="wake_start_date">Wake schedule date *</Label>
-                                            <Input
-                                                id="wake_start_date"
-                                                type="date"
-                                                name="wake_start_date"
-                                                value={form.data.wake_start_date}
-                                                onChange={(e) => form.setData('wake_start_date', e.target.value)}
-                                                min={today}
-                                                required
-                                            />
-                                            <InputError message={form.errors.wake_start_date} />
-                                        </div>
-                                        <div className="space-y-2 md:col-span-2">
-                                            <Label>Preferred time (1-hour slot, e.g. 7:00 – 8:00 AM)</Label>
-                                            {form.data.wake_start_date ? (
-                                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                                                    {Array.from({ length: 11 }, (_, i) => {
-                                                        const hour = 7 + i;
-                                                        const slot = `${hour.toString().padStart(2, '0')}:00`;
-                                                        const cap = eburolSlotAvailability[slot] ?? { current: 0, max: 4, isFull: false, isPast: false };
-                                                        const label = formatEburolTimeSlot(slot);
-                                                        const isSelected = form.data.preferred_time === slot;
-                                                        const disabled = cap.isFull || cap.isPast;
-                                                        return (
-                                                            <Button
-                                                                key={slot}
-                                                                type="button"
-                                                                variant={isSelected ? 'default' : 'outline'}
-                                                                size="sm"
-                                                                disabled={disabled}
-                                                                className="text-xs flex flex-col h-auto py-2"
-                                                                onClick={() => !disabled && form.setData('preferred_time', slot)}
-                                                            >
-                                                                <span>{label}</span>
-                                                                {!cap.isPast && (
-                                                                    <span className="text-muted-foreground text-[10px]">
-                                                                        {cap.current}/{cap.max}
-                                                                    </span>
-                                                                )}
-                                                                {cap.isPast && <span className="text-muted-foreground text-[10px]">Past</span>}
-                                                            </Button>
-                                                        );
-                                                    })}
-                                                </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="modal_wake_start_date">Wake schedule date *</Label>
+                                <Input
+                                    id="modal_wake_start_date"
+                                    type="date"
+                                    name="wake_start_date"
+                                    value={form.data.wake_start_date}
+                                    onChange={(e) => form.setData('wake_start_date', e.target.value)}
+                                    min={today}
+                                    required
+                                />
+                                <InputError message={form.errors.wake_start_date} />
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Preferred time (1-hour slot)</Label>
+                                {form.data.wake_start_date ? (
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                        {Array.from({ length: 11 }, (_, i) => {
+                                            const hour = 7 + i;
+                                            const slot = `${hour.toString().padStart(2, '0')}:00`;
+                                            const cap = eburolSlotAvailability[slot] ?? { current: 0, max: 4, isFull: false, isPast: false };
+                                            const userHasThisSlot = eburols.some(
+                                                (e) =>
+                                                    e.wake_start_date === form.data.wake_start_date &&
+                                                    e.preferred_time === slot &&
+                                                    (e.status === 'pending' || e.status === 'approved')
+                                            );
+                                            const disabled = cap.isFull || cap.isPast || userHasThisSlot;
+                                            const label = formatEburolTimeSlot(slot);
+                                            const isSelected = form.data.preferred_time === slot;
+                                            const tooltipReason = disabled
+                                                ? userHasThisSlot
+                                                    ? 'You already have an e-burol schedule for this time slot.'
+                                                    : cap.isPast
+                                                        ? 'This time slot has passed.'
+                                                        : `Slot full (${cap.current}/${cap.max}).`
+                                                : null;
+                                            const slotButton = (
+                                                <Button
+                                                    type="button"
+                                                    variant={isSelected ? 'default' : 'outline'}
+                                                    size="sm"
+                                                    disabled={disabled}
+                                                    className="text-xs flex flex-col h-auto py-2"
+                                                    onClick={() => !disabled && form.setData('preferred_time', slot)}
+                                                >
+                                                    <span>{label}</span>
+                                                    {!cap.isPast && (
+                                                        <span className="text-muted-foreground text-[10px]">
+                                                            {cap.current}/{cap.max}
+                                                        </span>
+                                                    )}
+                                                    {cap.isPast && <span className="text-muted-foreground text-[10px]">Past</span>}
+                                                </Button>
+                                            );
+                                            return tooltipReason ? (
+                                                <Tooltip key={slot}>
+                                                    <TooltipTrigger asChild>
+                                                        <span className="inline-block cursor-not-allowed">{slotButton}</span>
+                                                    </TooltipTrigger>
+                                                    <TooltipContent side="top" className="max-w-xs">
+                                                        {tooltipReason}
+                                                    </TooltipContent>
+                                                </Tooltip>
                                             ) : (
-                                                <p className="text-sm text-muted-foreground">Select wake schedule date first to see available time slots.</p>
-                                            )}
-                                            <InputError message={form.errors.preferred_time} />
-                                        </div>
+                                                <span key={slot}>{slotButton}</span>
+                                            );
+                                        })}
                                     </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="wake_location">Wake Location *</Label>
-                                        <Textarea
-                                            id="wake_location"
-                                            name="wake_location"
-                                            placeholder="Enter the complete address of the wake location"
-                                            value={form.data.wake_location}
-                                            onChange={(e) => form.setData('wake_location', e.target.value)}
-                                            required
-                                            rows={3}
-                                        />
-                                        <InputError message={form.errors.wake_location} />
-                                    </div>
-                                </div>
+                                ) : (
+                                    <p className="text-sm text-muted-foreground">Select wake schedule date first to see available time slots.</p>
+                                )}
+                                <InputError message={form.errors.preferred_time} />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="modal_wake_location">Wake Location *</Label>
+                                <Textarea
+                                    id="modal_wake_location"
+                                    name="wake_location"
+                                    placeholder="Enter the complete address of the wake location"
+                                    value={form.data.wake_location}
+                                    onChange={(e) => form.setData('wake_location', e.target.value)}
+                                    required
+                                    rows={3}
+                                />
+                                <InputError message={form.errors.wake_location} />
+                            </div>
 
-                                {/* Documents */}
-                                <div className="space-y-4">
-                                    <h3 className="text-lg font-semibold flex items-center gap-2">
-                                        <FileText className="h-5 w-5" />
-                                        Required Documents
-                                    </h3>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <Label htmlFor="death_certificate">Death Certificate *</Label>
-                                            <Input
-                                                id="death_certificate"
-                                                type="file"
-                                                name="death_certificate"
-                                                accept=".pdf,.jpg,.jpeg,.png"
-                                                onChange={(e) => {
-                                                    const file = e.target.files?.[0] || null;
-                                                    form.setData('death_certificate', file);
-                                                }}
-                                                required
-                                            />
-                                            <p className="text-xs text-muted-foreground">
-                                                Accepted formats: PDF, JPG, PNG (Max 10MB)
-                                            </p>
-                                            <InputError message={form.errors.death_certificate} />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="relationship_proof">Proof of Relationship *</Label>
-                                            <Input
-                                                id="relationship_proof"
-                                                type="file"
-                                                name="relationship_proof"
-                                                accept=".pdf,.jpg,.jpeg,.png"
-                                                onChange={(e) => {
-                                                    const file = e.target.files?.[0] || null;
-                                                    form.setData('relationship_proof', file);
-                                                }}
-                                                required
-                                            />
-                                            <p className="text-xs text-muted-foreground">
-                                                Accepted formats: PDF, JPG, PNG (Max 10MB)
-                                            </p>
-                                            <InputError message={form.errors.relationship_proof} />
-                                        </div>
-                                    </div>
-                                </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="modal_death_certificate">Death Certificate *</Label>
+                                <Input
+                                    id="modal_death_certificate"
+                                    type="file"
+                                    name="death_certificate"
+                                    accept=".pdf,.jpg,.jpeg,.png"
+                                    onChange={(e) => {
+                                        const file = e.target.files?.[0] || null;
+                                        form.setData('death_certificate', file);
+                                    }}
+                                    required
+                                />
+                                <p className="text-xs text-muted-foreground">Accepted formats: PDF, JPG, PNG (Max 10MB)</p>
+                                <InputError message={form.errors.death_certificate} />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="modal_relationship_proof">Proof of Relationship *</Label>
+                                <Input
+                                    id="modal_relationship_proof"
+                                    type="file"
+                                    name="relationship_proof"
+                                    accept=".pdf,.jpg,.jpeg,.png"
+                                    onChange={(e) => {
+                                        const file = e.target.files?.[0] || null;
+                                        form.setData('relationship_proof', file);
+                                    }}
+                                    required
+                                />
+                                <p className="text-xs text-muted-foreground">Accepted formats: PDF, JPG, PNG (Max 10MB)</p>
+                                <InputError message={form.errors.relationship_proof} />
+                            </div>
 
-                                {/* Additional Details */}
-                                <div className="space-y-2">
-                                    <Label htmlFor="additional_details">Additional Details</Label>
-                                    <Textarea
-                                        id="additional_details"
-                                        name="additional_details"
-                                        placeholder="Any additional information that may help with the approval process"
-                                        value={form.data.additional_details}
-                                        onChange={(e) => form.setData('additional_details', e.target.value)}
-                                        rows={4}
-                                    />
-                                    <InputError message={form.errors.additional_details} />
-                                </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="modal_additional_details">Additional Details</Label>
+                                <Textarea
+                                    id="modal_additional_details"
+                                    name="additional_details"
+                                    placeholder="Any additional information that may help with the approval process"
+                                    value={form.data.additional_details}
+                                    onChange={(e) => form.setData('additional_details', e.target.value)}
+                                    rows={4}
+                                />
+                                <InputError message={form.errors.additional_details} />
+                            </div>
 
-                                <div className="flex justify-end gap-2">
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        onClick={() => {
-                                            setShowForm(false);
-                                            form.reset();
-                                        }}
-                                    >
-                                        Cancel
-                                    </Button>
-                                    <Button type="submit" disabled={form.processing}>
-                                        {form.processing && <Spinner />}
-                                        Submit Application
-                                    </Button>
-                                </div>
-                            </form>
-                        </CardContent>
-                    </Card>
-                )}
+                            <DialogFooter className="gap-2 sm:gap-0">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => {
+                                        setShowForm(false);
+                                        form.reset();
+                                    }}
+                                >
+                                    Cancel
+                                </Button>
+                                <Button type="submit" disabled={form.processing}>
+                                    {form.processing && <Spinner />}
+                                    Submit Application
+                                </Button>
+                            </DialogFooter>
+                        </form>
+                    </DialogContent>
+                </Dialog>
 
                 {/* Existing E-Burol Requests */}
                 <Card>

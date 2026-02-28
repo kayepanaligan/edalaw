@@ -308,7 +308,7 @@ class AssignedSessionsController extends Controller
         }
 
         $url = $videoSdk->isV2Rooms()
-            ? url('/video-room').'?room_id='.rawurlencode($session->room_id).'&token='.rawurlencode($result['token']).'&name='.rawurlencode($request->user()->name ?? 'Monitor').'&observer=1'
+            ? url('/video-room').'?room_id='.rawurlencode($session->room_id).'&token='.rawurlencode($result['token']).'&name='.rawurlencode($request->user()->name ?? 'Monitor').'&participant_id='.rawurlencode($participantId).'&observer=1'
             : 'https://app.videosdk.live/meetings/'.$session->room_id.'?token='.rawurlencode($result['token']);
 
         $session->refresh();

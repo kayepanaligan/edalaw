@@ -49,9 +49,10 @@ return [
     'videosdk' => [
         'api_key' => env('VIDEOSDK_API_KEY'),
         'secret_key' => env('VIDEOSDK_SECRET_KEY'),
-        // Use v1/meetings so app.videosdk.live/meetings/{id} join links work. v2 rooms can 404 on the hosted app.
+        // v2 rooms: https://api.videosdk.live/v2/rooms — token and init-config use opaque roomId.
         'api_endpoint' => env('VIDEOSDK_API_ENDPOINT', 'https://api.videosdk.live/v1/meetings'),
         'token' => env('VIDEOSDK_TOKEN'),
+        // After changing .env run: php artisan config:clear
     ],
 
 ];
