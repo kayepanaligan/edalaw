@@ -1,7 +1,7 @@
 import { queryParams, type RouteQueryOptions, type RouteDefinition, applyUrlDefaults } from './../../../wayfinder'
 /**
 * @see \App\Http\Controllers\Admin\SessionManagementController::index
- * @see app/Http/Controllers/Admin/SessionManagementController.php:17
+ * @see app/Http/Controllers/Admin/SessionManagementController.php:18
  * @route '/admin/sessions'
  */
 export const index = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -16,7 +16,7 @@ index.definition = {
 
 /**
 * @see \App\Http\Controllers\Admin\SessionManagementController::index
- * @see app/Http/Controllers/Admin/SessionManagementController.php:17
+ * @see app/Http/Controllers/Admin/SessionManagementController.php:18
  * @route '/admin/sessions'
  */
 index.url = (options?: RouteQueryOptions) => {
@@ -25,7 +25,7 @@ index.url = (options?: RouteQueryOptions) => {
 
 /**
 * @see \App\Http\Controllers\Admin\SessionManagementController::index
- * @see app/Http/Controllers/Admin/SessionManagementController.php:17
+ * @see app/Http/Controllers/Admin/SessionManagementController.php:18
  * @route '/admin/sessions'
  */
 index.get = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -34,7 +34,7 @@ index.get = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
 })
 /**
 * @see \App\Http\Controllers\Admin\SessionManagementController::index
- * @see app/Http/Controllers/Admin/SessionManagementController.php:17
+ * @see app/Http/Controllers/Admin/SessionManagementController.php:18
  * @route '/admin/sessions'
  */
 index.head = (options?: RouteQueryOptions): RouteDefinition<'head'> => ({
@@ -44,7 +44,7 @@ index.head = (options?: RouteQueryOptions): RouteDefinition<'head'> => ({
 
 /**
 * @see \App\Http\Controllers\Admin\SessionManagementController::revoke
- * @see app/Http/Controllers/Admin/SessionManagementController.php:64
+ * @see app/Http/Controllers/Admin/SessionManagementController.php:71
  * @route '/admin/sessions/{session}'
  */
 export const revoke = (args: { session: number | { id: number } } | [session: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'delete'> => ({
@@ -59,7 +59,7 @@ revoke.definition = {
 
 /**
 * @see \App\Http\Controllers\Admin\SessionManagementController::revoke
- * @see app/Http/Controllers/Admin/SessionManagementController.php:64
+ * @see app/Http/Controllers/Admin/SessionManagementController.php:71
  * @route '/admin/sessions/{session}'
  */
 revoke.url = (args: { session: number | { id: number } } | [session: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions) => {
@@ -92,7 +92,7 @@ revoke.url = (args: { session: number | { id: number } } | [session: number | { 
 
 /**
 * @see \App\Http\Controllers\Admin\SessionManagementController::revoke
- * @see app/Http/Controllers/Admin/SessionManagementController.php:64
+ * @see app/Http/Controllers/Admin/SessionManagementController.php:71
  * @route '/admin/sessions/{session}'
  */
 revoke.delete = (args: { session: number | { id: number } } | [session: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'delete'> => ({
@@ -102,7 +102,7 @@ revoke.delete = (args: { session: number | { id: number } } | [session: number |
 
 /**
 * @see \App\Http\Controllers\Admin\SessionManagementController::revokeUserAll
- * @see app/Http/Controllers/Admin/SessionManagementController.php:82
+ * @see app/Http/Controllers/Admin/SessionManagementController.php:89
  * @route '/admin/sessions/user/{user}/revoke-all'
  */
 export const revokeUserAll = (args: { user: string | number } | [user: string | number ] | string | number, options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -117,7 +117,7 @@ revokeUserAll.definition = {
 
 /**
 * @see \App\Http\Controllers\Admin\SessionManagementController::revokeUserAll
- * @see app/Http/Controllers/Admin/SessionManagementController.php:82
+ * @see app/Http/Controllers/Admin/SessionManagementController.php:89
  * @route '/admin/sessions/user/{user}/revoke-all'
  */
 revokeUserAll.url = (args: { user: string | number } | [user: string | number ] | string | number, options?: RouteQueryOptions) => {
@@ -145,17 +145,52 @@ revokeUserAll.url = (args: { user: string | number } | [user: string | number ] 
 
 /**
 * @see \App\Http\Controllers\Admin\SessionManagementController::revokeUserAll
- * @see app/Http/Controllers/Admin/SessionManagementController.php:82
+ * @see app/Http/Controllers/Admin/SessionManagementController.php:89
  * @route '/admin/sessions/user/{user}/revoke-all'
  */
 revokeUserAll.post = (args: { user: string | number } | [user: string | number ] | string | number, options?: RouteQueryOptions): RouteDefinition<'post'> => ({
     url: revokeUserAll.url(args, options),
     method: 'post',
 })
+
+/**
+* @see \App\Http\Controllers\Admin\SessionManagementController::revokeMyOther
+ * @see app/Http/Controllers/Admin/SessionManagementController.php:109
+ * @route '/admin/sessions/revoke-my-other'
+ */
+export const revokeMyOther = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
+    url: revokeMyOther.url(options),
+    method: 'post',
+})
+
+revokeMyOther.definition = {
+    methods: ["post"],
+    url: '/admin/sessions/revoke-my-other',
+} satisfies RouteDefinition<["post"]>
+
+/**
+* @see \App\Http\Controllers\Admin\SessionManagementController::revokeMyOther
+ * @see app/Http/Controllers/Admin/SessionManagementController.php:109
+ * @route '/admin/sessions/revoke-my-other'
+ */
+revokeMyOther.url = (options?: RouteQueryOptions) => {
+    return revokeMyOther.definition.url + queryParams(options)
+}
+
+/**
+* @see \App\Http\Controllers\Admin\SessionManagementController::revokeMyOther
+ * @see app/Http/Controllers/Admin/SessionManagementController.php:109
+ * @route '/admin/sessions/revoke-my-other'
+ */
+revokeMyOther.post = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
+    url: revokeMyOther.url(options),
+    method: 'post',
+})
 const sessions = {
     index: Object.assign(index, index),
 revoke: Object.assign(revoke, revoke),
 revokeUserAll: Object.assign(revokeUserAll, revokeUserAll),
+revokeMyOther: Object.assign(revokeMyOther, revokeMyOther),
 }
 
 export default sessions

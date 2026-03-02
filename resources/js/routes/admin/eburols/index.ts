@@ -1,7 +1,8 @@
 import { queryParams, type RouteQueryOptions, type RouteDefinition, applyUrlDefaults } from './../../../wayfinder'
+import document from './document'
 /**
 * @see \App\Http\Controllers\Admin\EburolManagementController::index
- * @see app/Http/Controllers/Admin/EburolManagementController.php:23
+ * @see app/Http/Controllers/Admin/EburolManagementController.php:24
  * @route '/admin/eburols'
  */
 export const index = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -16,7 +17,7 @@ index.definition = {
 
 /**
 * @see \App\Http\Controllers\Admin\EburolManagementController::index
- * @see app/Http/Controllers/Admin/EburolManagementController.php:23
+ * @see app/Http/Controllers/Admin/EburolManagementController.php:24
  * @route '/admin/eburols'
  */
 index.url = (options?: RouteQueryOptions) => {
@@ -25,7 +26,7 @@ index.url = (options?: RouteQueryOptions) => {
 
 /**
 * @see \App\Http\Controllers\Admin\EburolManagementController::index
- * @see app/Http/Controllers/Admin/EburolManagementController.php:23
+ * @see app/Http/Controllers/Admin/EburolManagementController.php:24
  * @route '/admin/eburols'
  */
 index.get = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -34,7 +35,7 @@ index.get = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
 })
 /**
 * @see \App\Http\Controllers\Admin\EburolManagementController::index
- * @see app/Http/Controllers/Admin/EburolManagementController.php:23
+ * @see app/Http/Controllers/Admin/EburolManagementController.php:24
  * @route '/admin/eburols'
  */
 index.head = (options?: RouteQueryOptions): RouteDefinition<'head'> => ({
@@ -44,7 +45,7 @@ index.head = (options?: RouteQueryOptions): RouteDefinition<'head'> => ({
 
 /**
 * @see \App\Http\Controllers\Admin\EburolManagementController::store
- * @see app/Http/Controllers/Admin/EburolManagementController.php:110
+ * @see app/Http/Controllers/Admin/EburolManagementController.php:118
  * @route '/admin/eburols'
  */
 export const store = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -59,7 +60,7 @@ store.definition = {
 
 /**
 * @see \App\Http\Controllers\Admin\EburolManagementController::store
- * @see app/Http/Controllers/Admin/EburolManagementController.php:110
+ * @see app/Http/Controllers/Admin/EburolManagementController.php:118
  * @route '/admin/eburols'
  */
 store.url = (options?: RouteQueryOptions) => {
@@ -68,7 +69,7 @@ store.url = (options?: RouteQueryOptions) => {
 
 /**
 * @see \App\Http\Controllers\Admin\EburolManagementController::store
- * @see app/Http/Controllers/Admin/EburolManagementController.php:110
+ * @see app/Http/Controllers/Admin/EburolManagementController.php:118
  * @route '/admin/eburols'
  */
 store.post = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -78,7 +79,7 @@ store.post = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
 
 /**
 * @see \App\Http\Controllers\Admin\EburolManagementController::update
- * @see app/Http/Controllers/Admin/EburolManagementController.php:194
+ * @see app/Http/Controllers/Admin/EburolManagementController.php:202
  * @route '/admin/eburols/{eburol}'
  */
 export const update = (args: { eburol: number | { id: number } } | [eburol: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'put'> => ({
@@ -93,7 +94,7 @@ update.definition = {
 
 /**
 * @see \App\Http\Controllers\Admin\EburolManagementController::update
- * @see app/Http/Controllers/Admin/EburolManagementController.php:194
+ * @see app/Http/Controllers/Admin/EburolManagementController.php:202
  * @route '/admin/eburols/{eburol}'
  */
 update.url = (args: { eburol: number | { id: number } } | [eburol: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions) => {
@@ -126,7 +127,7 @@ update.url = (args: { eburol: number | { id: number } } | [eburol: number | { id
 
 /**
 * @see \App\Http\Controllers\Admin\EburolManagementController::update
- * @see app/Http/Controllers/Admin/EburolManagementController.php:194
+ * @see app/Http/Controllers/Admin/EburolManagementController.php:202
  * @route '/admin/eburols/{eburol}'
  */
 update.put = (args: { eburol: number | { id: number } } | [eburol: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'put'> => ({
@@ -136,7 +137,7 @@ update.put = (args: { eburol: number | { id: number } } | [eburol: number | { id
 
 /**
 * @see \App\Http\Controllers\Admin\EburolManagementController::destroy
- * @see app/Http/Controllers/Admin/EburolManagementController.php:281
+ * @see app/Http/Controllers/Admin/EburolManagementController.php:289
  * @route '/admin/eburols/{eburol}'
  */
 export const destroy = (args: { eburol: number | { id: number } } | [eburol: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'delete'> => ({
@@ -151,7 +152,7 @@ destroy.definition = {
 
 /**
 * @see \App\Http\Controllers\Admin\EburolManagementController::destroy
- * @see app/Http/Controllers/Admin/EburolManagementController.php:281
+ * @see app/Http/Controllers/Admin/EburolManagementController.php:289
  * @route '/admin/eburols/{eburol}'
  */
 destroy.url = (args: { eburol: number | { id: number } } | [eburol: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions) => {
@@ -184,7 +185,7 @@ destroy.url = (args: { eburol: number | { id: number } } | [eburol: number | { i
 
 /**
 * @see \App\Http\Controllers\Admin\EburolManagementController::destroy
- * @see app/Http/Controllers/Admin/EburolManagementController.php:281
+ * @see app/Http/Controllers/Admin/EburolManagementController.php:289
  * @route '/admin/eburols/{eburol}'
  */
 destroy.delete = (args: { eburol: number | { id: number } } | [eburol: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'delete'> => ({
@@ -194,7 +195,7 @@ destroy.delete = (args: { eburol: number | { id: number } } | [eburol: number | 
 
 /**
 * @see \App\Http\Controllers\Admin\EburolManagementController::approve
- * @see app/Http/Controllers/Admin/EburolManagementController.php:308
+ * @see app/Http/Controllers/Admin/EburolManagementController.php:344
  * @route '/admin/eburols/{eburol}/approve'
  */
 export const approve = (args: { eburol: number | { id: number } } | [eburol: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -209,7 +210,7 @@ approve.definition = {
 
 /**
 * @see \App\Http\Controllers\Admin\EburolManagementController::approve
- * @see app/Http/Controllers/Admin/EburolManagementController.php:308
+ * @see app/Http/Controllers/Admin/EburolManagementController.php:344
  * @route '/admin/eburols/{eburol}/approve'
  */
 approve.url = (args: { eburol: number | { id: number } } | [eburol: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions) => {
@@ -242,7 +243,7 @@ approve.url = (args: { eburol: number | { id: number } } | [eburol: number | { i
 
 /**
 * @see \App\Http\Controllers\Admin\EburolManagementController::approve
- * @see app/Http/Controllers/Admin/EburolManagementController.php:308
+ * @see app/Http/Controllers/Admin/EburolManagementController.php:344
  * @route '/admin/eburols/{eburol}/approve'
  */
 approve.post = (args: { eburol: number | { id: number } } | [eburol: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -252,7 +253,7 @@ approve.post = (args: { eburol: number | { id: number } } | [eburol: number | { 
 
 /**
 * @see \App\Http\Controllers\Admin\EburolManagementController::reject
- * @see app/Http/Controllers/Admin/EburolManagementController.php:380
+ * @see app/Http/Controllers/Admin/EburolManagementController.php:422
  * @route '/admin/eburols/{eburol}/reject'
  */
 export const reject = (args: { eburol: number | { id: number } } | [eburol: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -267,7 +268,7 @@ reject.definition = {
 
 /**
 * @see \App\Http\Controllers\Admin\EburolManagementController::reject
- * @see app/Http/Controllers/Admin/EburolManagementController.php:380
+ * @see app/Http/Controllers/Admin/EburolManagementController.php:422
  * @route '/admin/eburols/{eburol}/reject'
  */
 reject.url = (args: { eburol: number | { id: number } } | [eburol: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions) => {
@@ -300,7 +301,7 @@ reject.url = (args: { eburol: number | { id: number } } | [eburol: number | { id
 
 /**
 * @see \App\Http\Controllers\Admin\EburolManagementController::reject
- * @see app/Http/Controllers/Admin/EburolManagementController.php:380
+ * @see app/Http/Controllers/Admin/EburolManagementController.php:422
  * @route '/admin/eburols/{eburol}/reject'
  */
 reject.post = (args: { eburol: number | { id: number } } | [eburol: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -310,7 +311,7 @@ reject.post = (args: { eburol: number | { id: number } } | [eburol: number | { i
 
 /**
 * @see \App\Http\Controllers\Admin\EburolManagementController::updateStatus
- * @see app/Http/Controllers/Admin/EburolManagementController.php:409
+ * @see app/Http/Controllers/Admin/EburolManagementController.php:451
  * @route '/admin/eburols/{eburol}/update-status'
  */
 export const updateStatus = (args: { eburol: number | { id: number } } | [eburol: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -325,7 +326,7 @@ updateStatus.definition = {
 
 /**
 * @see \App\Http\Controllers\Admin\EburolManagementController::updateStatus
- * @see app/Http/Controllers/Admin/EburolManagementController.php:409
+ * @see app/Http/Controllers/Admin/EburolManagementController.php:451
  * @route '/admin/eburols/{eburol}/update-status'
  */
 updateStatus.url = (args: { eburol: number | { id: number } } | [eburol: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions) => {
@@ -358,7 +359,7 @@ updateStatus.url = (args: { eburol: number | { id: number } } | [eburol: number 
 
 /**
 * @see \App\Http\Controllers\Admin\EburolManagementController::updateStatus
- * @see app/Http/Controllers/Admin/EburolManagementController.php:409
+ * @see app/Http/Controllers/Admin/EburolManagementController.php:451
  * @route '/admin/eburols/{eburol}/update-status'
  */
 updateStatus.post = (args: { eburol: number | { id: number } } | [eburol: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -373,6 +374,7 @@ destroy: Object.assign(destroy, destroy),
 approve: Object.assign(approve, approve),
 reject: Object.assign(reject, reject),
 updateStatus: Object.assign(updateStatus, updateStatus),
+document: Object.assign(document, document),
 }
 
 export default eburols

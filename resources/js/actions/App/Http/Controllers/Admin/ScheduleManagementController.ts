@@ -1,7 +1,7 @@
 import { queryParams, type RouteQueryOptions, type RouteDefinition, applyUrlDefaults } from './../../../../../wayfinder'
 /**
 * @see \App\Http\Controllers\Admin\ScheduleManagementController::index
- * @see app/Http/Controllers/Admin/ScheduleManagementController.php:23
+ * @see app/Http/Controllers/Admin/ScheduleManagementController.php:24
  * @route '/admin/schedules'
  */
 export const index = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -16,7 +16,7 @@ index.definition = {
 
 /**
 * @see \App\Http\Controllers\Admin\ScheduleManagementController::index
- * @see app/Http/Controllers/Admin/ScheduleManagementController.php:23
+ * @see app/Http/Controllers/Admin/ScheduleManagementController.php:24
  * @route '/admin/schedules'
  */
 index.url = (options?: RouteQueryOptions) => {
@@ -25,7 +25,7 @@ index.url = (options?: RouteQueryOptions) => {
 
 /**
 * @see \App\Http\Controllers\Admin\ScheduleManagementController::index
- * @see app/Http/Controllers/Admin/ScheduleManagementController.php:23
+ * @see app/Http/Controllers/Admin/ScheduleManagementController.php:24
  * @route '/admin/schedules'
  */
 index.get = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -34,7 +34,7 @@ index.get = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
 })
 /**
 * @see \App\Http\Controllers\Admin\ScheduleManagementController::index
- * @see app/Http/Controllers/Admin/ScheduleManagementController.php:23
+ * @see app/Http/Controllers/Admin/ScheduleManagementController.php:24
  * @route '/admin/schedules'
  */
 index.head = (options?: RouteQueryOptions): RouteDefinition<'head'> => ({
@@ -43,8 +43,51 @@ index.head = (options?: RouteQueryOptions): RouteDefinition<'head'> => ({
 })
 
 /**
+* @see \App\Http\Controllers\Admin\ScheduleManagementController::getBookedTimeSlots
+ * @see app/Http/Controllers/Admin/ScheduleManagementController.php:108
+ * @route '/admin/schedules/booked-slots'
+ */
+export const getBookedTimeSlots = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
+    url: getBookedTimeSlots.url(options),
+    method: 'get',
+})
+
+getBookedTimeSlots.definition = {
+    methods: ["get","head"],
+    url: '/admin/schedules/booked-slots',
+} satisfies RouteDefinition<["get","head"]>
+
+/**
+* @see \App\Http\Controllers\Admin\ScheduleManagementController::getBookedTimeSlots
+ * @see app/Http/Controllers/Admin/ScheduleManagementController.php:108
+ * @route '/admin/schedules/booked-slots'
+ */
+getBookedTimeSlots.url = (options?: RouteQueryOptions) => {
+    return getBookedTimeSlots.definition.url + queryParams(options)
+}
+
+/**
+* @see \App\Http\Controllers\Admin\ScheduleManagementController::getBookedTimeSlots
+ * @see app/Http/Controllers/Admin/ScheduleManagementController.php:108
+ * @route '/admin/schedules/booked-slots'
+ */
+getBookedTimeSlots.get = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
+    url: getBookedTimeSlots.url(options),
+    method: 'get',
+})
+/**
+* @see \App\Http\Controllers\Admin\ScheduleManagementController::getBookedTimeSlots
+ * @see app/Http/Controllers/Admin/ScheduleManagementController.php:108
+ * @route '/admin/schedules/booked-slots'
+ */
+getBookedTimeSlots.head = (options?: RouteQueryOptions): RouteDefinition<'head'> => ({
+    url: getBookedTimeSlots.url(options),
+    method: 'head',
+})
+
+/**
 * @see \App\Http\Controllers\Admin\ScheduleManagementController::store
- * @see app/Http/Controllers/Admin/ScheduleManagementController.php:320
+ * @see app/Http/Controllers/Admin/ScheduleManagementController.php:457
  * @route '/admin/schedules'
  */
 export const store = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -59,7 +102,7 @@ store.definition = {
 
 /**
 * @see \App\Http\Controllers\Admin\ScheduleManagementController::store
- * @see app/Http/Controllers/Admin/ScheduleManagementController.php:320
+ * @see app/Http/Controllers/Admin/ScheduleManagementController.php:457
  * @route '/admin/schedules'
  */
 store.url = (options?: RouteQueryOptions) => {
@@ -68,7 +111,7 @@ store.url = (options?: RouteQueryOptions) => {
 
 /**
 * @see \App\Http\Controllers\Admin\ScheduleManagementController::store
- * @see app/Http/Controllers/Admin/ScheduleManagementController.php:320
+ * @see app/Http/Controllers/Admin/ScheduleManagementController.php:457
  * @route '/admin/schedules'
  */
 store.post = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -78,7 +121,7 @@ store.post = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
 
 /**
 * @see \App\Http\Controllers\Admin\ScheduleManagementController::update
- * @see app/Http/Controllers/Admin/ScheduleManagementController.php:391
+ * @see app/Http/Controllers/Admin/ScheduleManagementController.php:587
  * @route '/admin/schedules/{visit}'
  */
 export const update = (args: { visit: number | { id: number } } | [visit: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'put'> => ({
@@ -93,7 +136,7 @@ update.definition = {
 
 /**
 * @see \App\Http\Controllers\Admin\ScheduleManagementController::update
- * @see app/Http/Controllers/Admin/ScheduleManagementController.php:391
+ * @see app/Http/Controllers/Admin/ScheduleManagementController.php:587
  * @route '/admin/schedules/{visit}'
  */
 update.url = (args: { visit: number | { id: number } } | [visit: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions) => {
@@ -126,7 +169,7 @@ update.url = (args: { visit: number | { id: number } } | [visit: number | { id: 
 
 /**
 * @see \App\Http\Controllers\Admin\ScheduleManagementController::update
- * @see app/Http/Controllers/Admin/ScheduleManagementController.php:391
+ * @see app/Http/Controllers/Admin/ScheduleManagementController.php:587
  * @route '/admin/schedules/{visit}'
  */
 update.put = (args: { visit: number | { id: number } } | [visit: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'put'> => ({
@@ -136,7 +179,7 @@ update.put = (args: { visit: number | { id: number } } | [visit: number | { id: 
 
 /**
 * @see \App\Http\Controllers\Admin\ScheduleManagementController::destroy
- * @see app/Http/Controllers/Admin/ScheduleManagementController.php:449
+ * @see app/Http/Controllers/Admin/ScheduleManagementController.php:658
  * @route '/admin/schedules/{visit}'
  */
 export const destroy = (args: { visit: number | { id: number } } | [visit: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'delete'> => ({
@@ -151,7 +194,7 @@ destroy.definition = {
 
 /**
 * @see \App\Http\Controllers\Admin\ScheduleManagementController::destroy
- * @see app/Http/Controllers/Admin/ScheduleManagementController.php:449
+ * @see app/Http/Controllers/Admin/ScheduleManagementController.php:658
  * @route '/admin/schedules/{visit}'
  */
 destroy.url = (args: { visit: number | { id: number } } | [visit: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions) => {
@@ -184,7 +227,7 @@ destroy.url = (args: { visit: number | { id: number } } | [visit: number | { id:
 
 /**
 * @see \App\Http\Controllers\Admin\ScheduleManagementController::destroy
- * @see app/Http/Controllers/Admin/ScheduleManagementController.php:449
+ * @see app/Http/Controllers/Admin/ScheduleManagementController.php:658
  * @route '/admin/schedules/{visit}'
  */
 destroy.delete = (args: { visit: number | { id: number } } | [visit: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'delete'> => ({
@@ -194,7 +237,7 @@ destroy.delete = (args: { visit: number | { id: number } } | [visit: number | { 
 
 /**
 * @see \App\Http\Controllers\Admin\ScheduleManagementController::approve
- * @see app/Http/Controllers/Admin/ScheduleManagementController.php:93
+ * @see app/Http/Controllers/Admin/ScheduleManagementController.php:170
  * @route '/admin/schedules/{visit}/approve'
  */
 export const approve = (args: { visit: number | { id: number } } | [visit: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -209,7 +252,7 @@ approve.definition = {
 
 /**
 * @see \App\Http\Controllers\Admin\ScheduleManagementController::approve
- * @see app/Http/Controllers/Admin/ScheduleManagementController.php:93
+ * @see app/Http/Controllers/Admin/ScheduleManagementController.php:170
  * @route '/admin/schedules/{visit}/approve'
  */
 approve.url = (args: { visit: number | { id: number } } | [visit: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions) => {
@@ -242,7 +285,7 @@ approve.url = (args: { visit: number | { id: number } } | [visit: number | { id:
 
 /**
 * @see \App\Http\Controllers\Admin\ScheduleManagementController::approve
- * @see app/Http/Controllers/Admin/ScheduleManagementController.php:93
+ * @see app/Http/Controllers/Admin/ScheduleManagementController.php:170
  * @route '/admin/schedules/{visit}/approve'
  */
 approve.post = (args: { visit: number | { id: number } } | [visit: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -252,7 +295,7 @@ approve.post = (args: { visit: number | { id: number } } | [visit: number | { id
 
 /**
 * @see \App\Http\Controllers\Admin\ScheduleManagementController::reject
- * @see app/Http/Controllers/Admin/ScheduleManagementController.php:207
+ * @see app/Http/Controllers/Admin/ScheduleManagementController.php:289
  * @route '/admin/schedules/{visit}/reject'
  */
 export const reject = (args: { visit: number | { id: number } } | [visit: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -267,7 +310,7 @@ reject.definition = {
 
 /**
 * @see \App\Http\Controllers\Admin\ScheduleManagementController::reject
- * @see app/Http/Controllers/Admin/ScheduleManagementController.php:207
+ * @see app/Http/Controllers/Admin/ScheduleManagementController.php:289
  * @route '/admin/schedules/{visit}/reject'
  */
 reject.url = (args: { visit: number | { id: number } } | [visit: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions) => {
@@ -300,7 +343,7 @@ reject.url = (args: { visit: number | { id: number } } | [visit: number | { id: 
 
 /**
 * @see \App\Http\Controllers\Admin\ScheduleManagementController::reject
- * @see app/Http/Controllers/Admin/ScheduleManagementController.php:207
+ * @see app/Http/Controllers/Admin/ScheduleManagementController.php:289
  * @route '/admin/schedules/{visit}/reject'
  */
 reject.post = (args: { visit: number | { id: number } } | [visit: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -310,7 +353,7 @@ reject.post = (args: { visit: number | { id: number } } | [visit: number | { id:
 
 /**
 * @see \App\Http\Controllers\Admin\ScheduleManagementController::updateStatus
- * @see app/Http/Controllers/Admin/ScheduleManagementController.php:234
+ * @see app/Http/Controllers/Admin/ScheduleManagementController.php:316
  * @route '/admin/schedules/{visit}/update-status'
  */
 export const updateStatus = (args: { visit: number | { id: number } } | [visit: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -325,7 +368,7 @@ updateStatus.definition = {
 
 /**
 * @see \App\Http\Controllers\Admin\ScheduleManagementController::updateStatus
- * @see app/Http/Controllers/Admin/ScheduleManagementController.php:234
+ * @see app/Http/Controllers/Admin/ScheduleManagementController.php:316
  * @route '/admin/schedules/{visit}/update-status'
  */
 updateStatus.url = (args: { visit: number | { id: number } } | [visit: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions) => {
@@ -358,7 +401,7 @@ updateStatus.url = (args: { visit: number | { id: number } } | [visit: number | 
 
 /**
 * @see \App\Http\Controllers\Admin\ScheduleManagementController::updateStatus
- * @see app/Http/Controllers/Admin/ScheduleManagementController.php:234
+ * @see app/Http/Controllers/Admin/ScheduleManagementController.php:316
  * @route '/admin/schedules/{visit}/update-status'
  */
 updateStatus.post = (args: { visit: number | { id: number } } | [visit: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -368,7 +411,7 @@ updateStatus.post = (args: { visit: number | { id: number } } | [visit: number |
 
 /**
 * @see \App\Http\Controllers\Admin\ScheduleManagementController::generateAccessKey
- * @see app/Http/Controllers/Admin/ScheduleManagementController.php:293
+ * @see app/Http/Controllers/Admin/ScheduleManagementController.php:430
  * @route '/admin/schedules/{visit}/generate-access-key'
  */
 export const generateAccessKey = (args: { visit: number | { id: number } } | [visit: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -383,7 +426,7 @@ generateAccessKey.definition = {
 
 /**
 * @see \App\Http\Controllers\Admin\ScheduleManagementController::generateAccessKey
- * @see app/Http/Controllers/Admin/ScheduleManagementController.php:293
+ * @see app/Http/Controllers/Admin/ScheduleManagementController.php:430
  * @route '/admin/schedules/{visit}/generate-access-key'
  */
 generateAccessKey.url = (args: { visit: number | { id: number } } | [visit: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions) => {
@@ -416,13 +459,13 @@ generateAccessKey.url = (args: { visit: number | { id: number } } | [visit: numb
 
 /**
 * @see \App\Http\Controllers\Admin\ScheduleManagementController::generateAccessKey
- * @see app/Http/Controllers/Admin/ScheduleManagementController.php:293
+ * @see app/Http/Controllers/Admin/ScheduleManagementController.php:430
  * @route '/admin/schedules/{visit}/generate-access-key'
  */
 generateAccessKey.post = (args: { visit: number | { id: number } } | [visit: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'post'> => ({
     url: generateAccessKey.url(args, options),
     method: 'post',
 })
-const ScheduleManagementController = { index, store, update, destroy, approve, reject, updateStatus, generateAccessKey }
+const ScheduleManagementController = { index, getBookedTimeSlots, store, update, destroy, approve, reject, updateStatus, generateAccessKey }
 
 export default ScheduleManagementController

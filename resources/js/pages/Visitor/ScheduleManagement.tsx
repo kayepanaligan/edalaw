@@ -1,5 +1,6 @@
 import { Head, router, useForm, usePage } from '@inertiajs/react';
-import { Calendar, Clock, Plus, Scale, User, Video, X, CalendarClock, FileText, MoreVertical, FileOutput, VideoIcon } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock, Plus, Scale, User, Video, X, CalendarClock, FileText, MoreVertical, FileOutput, VideoIcon, Search, Building, AlertCircle, CheckCircle2 } from 'lucide-react';
+import axios from 'axios';
 
 import { formatVisitSchedule } from '@/lib/formatVisitSchedule';
 import { useEffect, useMemo, useState } from 'react';
@@ -14,6 +15,11 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { cn } from '@/lib/utils';
+import { format } from 'date-fns';
 import {
     Dialog,
     DialogContent,
@@ -44,6 +50,19 @@ import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import visitor from '@/routes/visitor/index';
 import type { BreadcrumbItem } from '@/types';
+
+type InmateSearchResult = {
+    id: number;
+    first_name: string;
+    middle_name: string | null;
+    last_name: string;
+    inmate_number: string;
+    cell: {
+        id: number;
+        cell_number: string;
+    };
+    available_days: Record<number, { virtual: boolean; physical: boolean }>;
+};
 
 type VisitSessionInfo = {
     id: number;
@@ -180,6 +199,13 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
     tomorrow.setDate(tomorrow.getDate() + 1);
     const minScheduleDate = (usePage().props as Props).today_unavailable ? tomorrow.toISOString().split('T')[0] : today;
 
+    // Inmate search states
+    const [isSearchingInmate, setIsSearchingInmate] = useState(false);
+    const [inmateSearchResult, setInmateSearchResult] = useState<InmateSearchResult | null>(null);
+    const [inmateSearchError, setInmateSearchError] = useState<string | null>(null);
+    const [selectedInmateId, setSelectedInmateId] = useState<number | null>(null);
+    const [cellAvailabilityError, setCellAvailabilityError] = useState<string | null>(null);
+
     const form = useForm({
         scheduled_date: '',
         scheduled_time: '',
@@ -260,6 +286,27 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+        
+        // Validate that selected date matches cell schedule
+        if (inmateSearchResult && form.data.scheduled_date && form.data.visit_type) {
+            const selectedDate = new Date(form.data.scheduled_date);
+            const dayOfWeek = selectedDate.getDay(); // 0 = Sunday, 1 = Monday, etc.
+            const availability = inmateSearchResult.available_days[dayOfWeek];
+            
+            let isAllowed = false;
+            if (form.data.visit_type === 'virtual' && availability?.virtual) {
+                isAllowed = true;
+            } else if (form.data.visit_type === 'physical' && availability?.physical) {
+                isAllowed = true;
+            }
+            
+            if (!isAllowed) {
+                const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                toast.error(`This cell is not available for ${form.data.visit_type} visits on ${dayNames[dayOfWeek]}s. Please select a different date.`);
+                return;
+            }
+        }
+        
         form.post(visitor.schedule.store().url, {
             preserveScroll: true,
             forceFormData: true,
@@ -268,6 +315,9 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
                 setVisitType('');
                 setSelectedDate('');
                 setBookedSlots([]);
+                setInmateSearchResult(null);
+                setSelectedInmateId(null);
+                setCellAvailabilityError(null);
                 setIsModalOpen(false);
             },
             onError: () => {
@@ -282,6 +332,71 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
         setVisitType('');
         setSelectedDate('');
         setBookedSlots([]);
+        setInmateSearchResult(null);
+        setInmateSearchError(null);
+        setSelectedInmateId(null);
+        setCellAvailabilityError(null);
+    };
+
+    // Search for inmate by name
+    const handleSearchInmate = async () => {
+        if (!form.data.inmate_first_name || !form.data.inmate_last_name) {
+            setInmateSearchError('Please enter both first name and last name to search');
+            return;
+        }
+
+        setIsSearchingInmate(true);
+        setInmateSearchError(null);
+        setInmateSearchResult(null);
+        setSelectedInmateId(null);
+        setCellAvailabilityError(null);
+
+        try {
+            const response = await axios.post('/visitor/schedule/search-inmate', {
+                first_name: form.data.inmate_first_name,
+                middle_name: form.data.inmate_middle_name,
+                last_name: form.data.inmate_last_name,
+            });
+
+            if (response.data.found && response.data.inmate) {
+                setInmateSearchResult(response.data.inmate);
+                setSelectedInmateId(response.data.inmate.id);
+            } else {
+                setInmateSearchError(response.data.message || 'Inmate not found');
+            }
+        } catch (error: any) {
+            if (error.response?.status === 404) {
+                setInmateSearchError(error.response.data.message || 'Inmate not found');
+            } else {
+                setInmateSearchError('An error occurred while searching. Please try again.');
+            }
+        } finally {
+            setIsSearchingInmate(false);
+        }
+    };
+
+    // Check cell availability when date or visit type changes
+    const checkCellAvailability = async (date: string, visitType: string) => {
+        if (!selectedInmateId || !date || !visitType) {
+            setCellAvailabilityError(null);
+            return;
+        }
+
+        try {
+            const response = await axios.post('/visitor/schedule/check-cell-availability', {
+                inmate_id: selectedInmateId,
+                date: date,
+                visit_type: visitType,
+            });
+
+            if (!response.data.available) {
+                setCellAvailabilityError(response.data.message || 'This cell is not available for the selected date and visit type.');
+            } else {
+                setCellAvailabilityError(null);
+            }
+        } catch (error) {
+            setCellAvailabilityError(null);
+        }
     };
 
     const handleCancelVisit = (visitId: number) => {
@@ -855,6 +970,10 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
                                             if (form.data.scheduled_time) {
                                                 form.setData('scheduled_time', '');
                                             }
+                                            // Check cell availability when visit type changes
+                                            if (form.data.scheduled_date) {
+                                                checkCellAvailability(form.data.scheduled_date, value);
+                                            }
                                         }}
                                     >
                                         <SelectTrigger id="visit_type">
@@ -869,12 +988,198 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
                                     <InputError message={form.errors.visit_type} />
                                 </div>
 
+                                 <div className="space-y-4">
+                                    <h3 className="text-sm font-semibold flex items-center gap-2">
+                                        <User className="size-4" />
+                                        Inmate Information
+                                    </h3>
+
+                                    <div className="flex flex-col gap-2">
+                                        <Label htmlFor="inmate_first_name">
+                                            Inmate First Name <span className="text-destructive">*</span>
+                                        </Label>
+                                        <Input
+                                            id="inmate_first_name"
+                                            type="text"
+                                            required
+                                            name="inmate_first_name"
+                                            placeholder="First name"
+                                            value={form.data.inmate_first_name || ''}
+                                            onChange={(e) => {
+                                                form.setData('inmate_first_name', e.target.value);
+                                                setInmateSearchResult(null);
+                                                setInmateSearchError(null);
+                                            }}
+                                        />
+                                        <InputError message={form.errors.inmate_first_name} />
+                                    </div>
+
+                                    <div className="flex flex-col gap-2">
+                                        <Label htmlFor="inmate_middle_name">Inmate Middle Name</Label>
+                                        <Input
+                                            id="inmate_middle_name"
+                                            type="text"
+                                            name="inmate_middle_name"
+                                            placeholder="Middle name (optional)"
+                                            value={form.data.inmate_middle_name || ''}
+                                            onChange={(e) => {
+                                                form.setData('inmate_middle_name', e.target.value);
+                                                setInmateSearchResult(null);
+                                                setInmateSearchError(null);
+                                            }}
+                                        />
+                                        <InputError message={form.errors.inmate_middle_name} />
+                                    </div>
+
+                                    <div className="flex flex-col gap-2">
+                                        <Label htmlFor="inmate_last_name">
+                                            Inmate Last Name <span className="text-destructive">*</span>
+                                        </Label>
+                                        <Input
+                                            id="inmate_last_name"
+                                            type="text"
+                                            required
+                                            name="inmate_last_name"
+                                            placeholder="Last name"
+                                            value={form.data.inmate_last_name || ''}
+                                            onChange={(e) => {
+                                                form.setData('inmate_last_name', e.target.value);
+                                                setInmateSearchResult(null);
+                                                setInmateSearchError(null);
+                                            }}
+                                        />
+                                        <InputError message={form.errors.inmate_last_name} />
+                                    </div>
+
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={handleSearchInmate}
+                                        disabled={isSearchingInmate}
+                                        className="w-full"
+                                    >
+                                        {isSearchingInmate ? (
+                                            <>
+                                                <Spinner className="mr-2 h-4 w-4" />
+                                                Searching...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Search className="mr-2 h-4 w-4" />
+                                                Search Inmate
+                                            </>
+                                        )}
+                                    </Button>
+
+                                    {/* Search Error */}
+                                    {inmateSearchError && (
+                                        <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive flex items-start gap-2">
+                                            <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                                            <span>{inmateSearchError}</span>
+                                        </div>
+                                    )}
+
+                                    {/* Search Result - Cell Schedule */}
+                                    {inmateSearchResult && (
+                                        <div className="rounded-md bg-green-500/10 p-3 text-sm">
+                                            <div className="flex items-start gap-2 mb-3">
+                                                <CheckCircle2 className="h-4 w-4 mt-0.5 text-green-600 shrink-0" />
+                                                <span className="font-medium text-green-800">Inmate found!</span>
+                                            </div>
+                                            <div className="ml-6">
+                                                <p className="text-xs text-muted-foreground mb-2">
+                                                    {form.data.visit_type 
+                                                        ? `Available ${form.data.visit_type} visit days for this cell:`
+                                                        : 'Available visit days for this cell:'}
+                                                </p>
+                                                <div className="flex flex-wrap gap-1">
+                                                    {Object.entries(inmateSearchResult.available_days).map(([day, availability]) => {
+                                                        const dayNum = parseInt(day);
+                                                        const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+                                                        const hasVirtual = availability.virtual;
+                                                        const hasPhysical = availability.physical;
+                                                        
+                                                        // Filter based on selected visit type
+                                                        if (form.data.visit_type === 'virtual' && !hasVirtual) return null;
+                                                        if (form.data.visit_type === 'physical' && !hasPhysical) return null;
+                                                        if (!form.data.visit_type && !hasVirtual && !hasPhysical) return null;
+                                                        
+                                                        // Determine label based on visit type selection
+                                                        let label = '';
+                                                        let badgeClass = '';
+                                                        
+                                                        if (form.data.visit_type === 'virtual') {
+                                                            label = '';
+                                                            badgeClass = 'bg-blue-50 text-blue-700 border-blue-200';
+                                                        } else if (form.data.visit_type === 'physical') {
+                                                            label = '';
+                                                            badgeClass = 'bg-green-50 text-green-700 border-green-200';
+                                                        } else {
+                                                            // No visit type selected yet, show all
+                                                            if (hasVirtual && hasPhysical) {
+                                                                label = ' (Both)';
+                                                                badgeClass = 'bg-purple-50 text-purple-700 border-purple-200';
+                                                            } else if (hasVirtual) {
+                                                                label = ' (Virtual)';
+                                                                badgeClass = 'bg-blue-50 text-blue-700 border-blue-200';
+                                                            } else {
+                                                                label = ' (Physical)';
+                                                                badgeClass = 'bg-green-50 text-green-700 border-green-200';
+                                                            }
+                                                        }
+                                                        
+                                                        return (
+                                                            <Badge 
+                                                                key={day} 
+                                                                variant="outline" 
+                                                                className={`text-xs ${badgeClass}`}
+                                                            >
+                                                                {dayNames[dayNum]}
+                                                                {label}
+                                                            </Badge>
+                                                        );
+                                                    })}
+                                                    {(() => {
+                                                        const filteredDays = Object.entries(inmateSearchResult.available_days).filter(([day, availability]) => {
+                                                            const hasVirtual = availability.virtual;
+                                                            const hasPhysical = availability.physical;
+                                                            if (form.data.visit_type === 'virtual' && !hasVirtual) return false;
+                                                            if (form.data.visit_type === 'physical' && !hasPhysical) return false;
+                                                            return hasVirtual || hasPhysical;
+                                                        });
+                                                        
+                                                        if (filteredDays.length === 0) {
+                                                            return (
+                                                                <span className="text-xs text-destructive">
+                                                                    {form.data.visit_type 
+                                                                        ? `No ${form.data.visit_type} visit days configured for this cell`
+                                                                        : 'No days configured for visits'}
+                                                                </span>
+                                                            );
+                                                        }
+                                                        return null;
+                                                    })()}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+
+                                {/* Cell Availability Error */}
+                                {cellAvailabilityError && (
+                                    <div className="rounded-md bg-amber-500/10 p-3 text-sm text-amber-800 flex items-start gap-2">
+                                        <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                                        <span>{cellAvailabilityError}</span>
+                                    </div>
+                                )}
+
                                 <div className="flex flex-col gap-2">
                                     <Label htmlFor="scheduled_date">
                                         Scheduled Date <span className="text-destructive">*</span>
                                     </Label>
                                     <div className="relative">
-                                        <Calendar className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                                        <CalendarIcon className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                                         <Input
                                             id="scheduled_date"
                                             type="date"
@@ -885,18 +1190,72 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
                                             value={form.data.scheduled_date || ''}
                                             onChange={(e) => {
                                                 const date = e.target.value;
+                                                
+                                                // Validate date against cell schedule
+                                                if (date && inmateSearchResult && form.data.visit_type) {
+                                                    const selectedDate = new Date(date);
+                                                    const dayOfWeek = selectedDate.getDay();
+                                                    const availability = inmateSearchResult.available_days[dayOfWeek];
+                                                    const isAllowed = form.data.visit_type === 'virtual' 
+                                                        ? availability?.virtual 
+                                                        : availability?.physical;
+                                                    
+                                                    if (!isAllowed) {
+                                                        const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                                                        const allowedDays = Object.entries(inmateSearchResult.available_days)
+                                                            .filter(([d, a]) => form.data.visit_type === 'virtual' ? a.virtual : a.physical)
+                                                            .map(([d]) => dayNames[parseInt(d)]);
+                                                        toast.error(`This cell is not available for ${form.data.visit_type} visits on ${dayNames[dayOfWeek]}s. Please select a ${allowedDays.join(', ')}.`);
+                                                        form.setData('scheduled_date', '');
+                                                        setSelectedDate('');
+                                                        return;
+                                                    }
+                                                }
+                                                
                                                 form.setData('scheduled_date', date);
                                                 setSelectedDate(date);
                                                 if (form.data.scheduled_time) {
                                                     form.setData('scheduled_time', '');
                                                 }
+                                                // Check cell availability
+                                                if (form.data.visit_type) {
+                                                    checkCellAvailability(date, form.data.visit_type);
+                                                }
                                             }}
+                                            disabled={!inmateSearchResult || !form.data.visit_type}
                                         />
                                     </div>
                                     <InputError message={form.errors.scheduled_date} />
-                                    <p className="text-xs text-muted-foreground">
-                                        Past dates are not available for selection
-                                    </p>
+                                    {inmateSearchResult && form.data.visit_type && (() => {
+                                        const allowedDays = Object.entries(inmateSearchResult.available_days)
+                                            .filter(([day, availability]) => {
+                                                if (form.data.visit_type === 'virtual') return availability.virtual;
+                                                if (form.data.visit_type === 'physical') return availability.physical;
+                                                return false;
+                                            })
+                                            .map(([day]) => parseInt(day));
+                                        
+                                        const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                                        const allowedDayNames = allowedDays.map(d => dayNames[d]);
+                                        
+                                        if (allowedDayNames.length > 0) {
+                                            return (
+                                                <p className="text-xs text-muted-foreground">
+                                                    Only {allowedDayNames.join(', ')} available for {form.data.visit_type} visits
+                                                </p>
+                                            );
+                                        }
+                                        return (
+                                            <p className="text-xs text-destructive">
+                                                No {form.data.visit_type} visit days available for this cell
+                                            </p>
+                                        );
+                                    })()}
+                                    {!inmateSearchResult && (
+                                        <p className="text-xs text-muted-foreground">
+                                            Past dates are not available for selection
+                                        </p>
+                                    )}
                                 </div>
 
                                 <div className="flex flex-col gap-2">
@@ -947,57 +1306,7 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
                                     <InputError message={form.errors.scheduled_time} />
                                 </div>
 
-                                <div className="space-y-4">
-                                    <h3 className="text-sm font-semibold flex items-center gap-2">
-                                        <User className="size-4" />
-                                        Inmate Information
-                                    </h3>
-
-                                    <div className="flex flex-col gap-2">
-                                        <Label htmlFor="inmate_first_name">
-                                            Inmate First Name <span className="text-destructive">*</span>
-                                        </Label>
-                                        <Input
-                                            id="inmate_first_name"
-                                            type="text"
-                                            required
-                                            name="inmate_first_name"
-                                            placeholder="First name"
-                                            value={form.data.inmate_first_name || ''}
-                                            onChange={(e) => form.setData('inmate_first_name', e.target.value)}
-                                        />
-                                        <InputError message={form.errors.inmate_first_name} />
-                                    </div>
-
-                                    <div className="flex flex-col gap-2">
-                                        <Label htmlFor="inmate_middle_name">Inmate Middle Name</Label>
-                                        <Input
-                                            id="inmate_middle_name"
-                                            type="text"
-                                            name="inmate_middle_name"
-                                            placeholder="Middle name (optional)"
-                                            value={form.data.inmate_middle_name || ''}
-                                            onChange={(e) => form.setData('inmate_middle_name', e.target.value)}
-                                        />
-                                        <InputError message={form.errors.inmate_middle_name} />
-                                    </div>
-
-                                    <div className="flex flex-col gap-2">
-                                        <Label htmlFor="inmate_last_name">
-                                            Inmate Last Name <span className="text-destructive">*</span>
-                                        </Label>
-                                        <Input
-                                            id="inmate_last_name"
-                                            type="text"
-                                            required
-                                            name="inmate_last_name"
-                                            placeholder="Last name"
-                                            value={form.data.inmate_last_name || ''}
-                                            onChange={(e) => form.setData('inmate_last_name', e.target.value)}
-                                        />
-                                        <InputError message={form.errors.inmate_last_name} />
-                                    </div>
-                                </div>
+                               
 
                                 <div className="flex flex-col gap-4">
                                     <h3 className="text-sm font-semibold flex items-center gap-2">
@@ -1091,7 +1400,7 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
                                         Scheduled Date <span className="text-destructive">*</span>
                                     </Label>
                                     <div className="relative">
-                                        <Calendar className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                                        <CalendarIcon className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                                         <Input
                                             id="reschedule_date"
                                             type="date"

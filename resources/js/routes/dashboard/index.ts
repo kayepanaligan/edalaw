@@ -1,4 +1,5 @@
 import { queryParams, type RouteQueryOptions, type RouteDefinition } from './../../wayfinder'
+import bjmpOfficerD3b56b from './bjmp-officer'
 /**
 * @see \App\Http\Controllers\Dashboard\VisitorDashboardController::__invoke
  * @see app/Http/Controllers/Dashboard/VisitorDashboardController.php:21
@@ -44,7 +45,7 @@ visitor.head = (options?: RouteQueryOptions): RouteDefinition<'head'> => ({
 
 /**
 * @see \App\Http\Controllers\Dashboard\SuperAdminDashboardController::__invoke
- * @see app/Http/Controllers/Dashboard/SuperAdminDashboardController.php:28
+ * @see app/Http/Controllers/Dashboard/SuperAdminDashboardController.php:66
  * @route '/dashboard/super-admin'
  */
 export const superAdmin = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -59,7 +60,7 @@ superAdmin.definition = {
 
 /**
 * @see \App\Http\Controllers\Dashboard\SuperAdminDashboardController::__invoke
- * @see app/Http/Controllers/Dashboard/SuperAdminDashboardController.php:28
+ * @see app/Http/Controllers/Dashboard/SuperAdminDashboardController.php:66
  * @route '/dashboard/super-admin'
  */
 superAdmin.url = (options?: RouteQueryOptions) => {
@@ -68,7 +69,7 @@ superAdmin.url = (options?: RouteQueryOptions) => {
 
 /**
 * @see \App\Http\Controllers\Dashboard\SuperAdminDashboardController::__invoke
- * @see app/Http/Controllers/Dashboard/SuperAdminDashboardController.php:28
+ * @see app/Http/Controllers/Dashboard/SuperAdminDashboardController.php:66
  * @route '/dashboard/super-admin'
  */
 superAdmin.get = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -77,7 +78,7 @@ superAdmin.get = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
 })
 /**
 * @see \App\Http\Controllers\Dashboard\SuperAdminDashboardController::__invoke
- * @see app/Http/Controllers/Dashboard/SuperAdminDashboardController.php:28
+ * @see app/Http/Controllers/Dashboard/SuperAdminDashboardController.php:66
  * @route '/dashboard/super-admin'
  */
 superAdmin.head = (options?: RouteQueryOptions): RouteDefinition<'head'> => ({
@@ -86,8 +87,8 @@ superAdmin.head = (options?: RouteQueryOptions): RouteDefinition<'head'> => ({
 })
 
 /**
-* @see \App\Http\Controllers\Dashboard\BjmpOfficerDashboardController::__invoke
- * @see app/Http/Controllers/Dashboard/BjmpOfficerDashboardController.php:11
+* @see \App\Http\Controllers\Dashboard\BjmpOfficerDashboardController::bjmpOfficer
+ * @see app/Http/Controllers/Dashboard/BjmpOfficerDashboardController.php:14
  * @route '/dashboard/bjmp-officer'
  */
 export const bjmpOfficer = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -101,8 +102,8 @@ bjmpOfficer.definition = {
 } satisfies RouteDefinition<["get","head"]>
 
 /**
-* @see \App\Http\Controllers\Dashboard\BjmpOfficerDashboardController::__invoke
- * @see app/Http/Controllers/Dashboard/BjmpOfficerDashboardController.php:11
+* @see \App\Http\Controllers\Dashboard\BjmpOfficerDashboardController::bjmpOfficer
+ * @see app/Http/Controllers/Dashboard/BjmpOfficerDashboardController.php:14
  * @route '/dashboard/bjmp-officer'
  */
 bjmpOfficer.url = (options?: RouteQueryOptions) => {
@@ -110,8 +111,8 @@ bjmpOfficer.url = (options?: RouteQueryOptions) => {
 }
 
 /**
-* @see \App\Http\Controllers\Dashboard\BjmpOfficerDashboardController::__invoke
- * @see app/Http/Controllers/Dashboard/BjmpOfficerDashboardController.php:11
+* @see \App\Http\Controllers\Dashboard\BjmpOfficerDashboardController::bjmpOfficer
+ * @see app/Http/Controllers/Dashboard/BjmpOfficerDashboardController.php:14
  * @route '/dashboard/bjmp-officer'
  */
 bjmpOfficer.get = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -119,8 +120,8 @@ bjmpOfficer.get = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
     method: 'get',
 })
 /**
-* @see \App\Http\Controllers\Dashboard\BjmpOfficerDashboardController::__invoke
- * @see app/Http/Controllers/Dashboard/BjmpOfficerDashboardController.php:11
+* @see \App\Http\Controllers\Dashboard\BjmpOfficerDashboardController::bjmpOfficer
+ * @see app/Http/Controllers/Dashboard/BjmpOfficerDashboardController.php:14
  * @route '/dashboard/bjmp-officer'
  */
 bjmpOfficer.head = (options?: RouteQueryOptions): RouteDefinition<'head'> => ({
@@ -129,8 +130,8 @@ bjmpOfficer.head = (options?: RouteQueryOptions): RouteDefinition<'head'> => ({
 })
 
 /**
-* @see \App\Http\Controllers\Dashboard\MonitoringOfficerDashboardController::__invoke
- * @see app/Http/Controllers/Dashboard/MonitoringOfficerDashboardController.php:13
+* @see \App\Http\Controllers\MonitoringOfficer\AnalyticsController::monitoringOfficer
+ * @see app/Http/Controllers/MonitoringOfficer/AnalyticsController.php:19
  * @route '/dashboard/monitoring-officer'
  */
 export const monitoringOfficer = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -144,8 +145,8 @@ monitoringOfficer.definition = {
 } satisfies RouteDefinition<["get","head"]>
 
 /**
-* @see \App\Http\Controllers\Dashboard\MonitoringOfficerDashboardController::__invoke
- * @see app/Http/Controllers/Dashboard/MonitoringOfficerDashboardController.php:13
+* @see \App\Http\Controllers\MonitoringOfficer\AnalyticsController::monitoringOfficer
+ * @see app/Http/Controllers/MonitoringOfficer/AnalyticsController.php:19
  * @route '/dashboard/monitoring-officer'
  */
 monitoringOfficer.url = (options?: RouteQueryOptions) => {
@@ -153,8 +154,8 @@ monitoringOfficer.url = (options?: RouteQueryOptions) => {
 }
 
 /**
-* @see \App\Http\Controllers\Dashboard\MonitoringOfficerDashboardController::__invoke
- * @see app/Http/Controllers/Dashboard/MonitoringOfficerDashboardController.php:13
+* @see \App\Http\Controllers\MonitoringOfficer\AnalyticsController::monitoringOfficer
+ * @see app/Http/Controllers/MonitoringOfficer/AnalyticsController.php:19
  * @route '/dashboard/monitoring-officer'
  */
 monitoringOfficer.get = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -162,8 +163,8 @@ monitoringOfficer.get = (options?: RouteQueryOptions): RouteDefinition<'get'> =>
     method: 'get',
 })
 /**
-* @see \App\Http\Controllers\Dashboard\MonitoringOfficerDashboardController::__invoke
- * @see app/Http/Controllers/Dashboard/MonitoringOfficerDashboardController.php:13
+* @see \App\Http\Controllers\MonitoringOfficer\AnalyticsController::monitoringOfficer
+ * @see app/Http/Controllers/MonitoringOfficer/AnalyticsController.php:19
  * @route '/dashboard/monitoring-officer'
  */
 monitoringOfficer.head = (options?: RouteQueryOptions): RouteDefinition<'head'> => ({
@@ -173,7 +174,7 @@ monitoringOfficer.head = (options?: RouteQueryOptions): RouteDefinition<'head'> 
 const dashboard = {
     visitor: Object.assign(visitor, visitor),
 superAdmin: Object.assign(superAdmin, superAdmin),
-bjmpOfficer: Object.assign(bjmpOfficer, bjmpOfficer),
+bjmpOfficer: Object.assign(bjmpOfficer, bjmpOfficerD3b56b),
 monitoringOfficer: Object.assign(monitoringOfficer, monitoringOfficer),
 }
 

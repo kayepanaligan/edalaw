@@ -44,7 +44,7 @@ index.head = (options?: RouteQueryOptions): RouteDefinition<'head'> => ({
 
 /**
 * @see \App\Http\Controllers\BjmpOfficer\AppealReviewController::review
- * @see app/Http/Controllers/BjmpOfficer/AppealReviewController.php:102
+ * @see app/Http/Controllers/BjmpOfficer/AppealReviewController.php:126
  * @route '/bjmp-officer/appeals/{appeal}/review'
  */
 export const review = (args: { appeal: number | { id: number } } | [appeal: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -59,7 +59,7 @@ review.definition = {
 
 /**
 * @see \App\Http\Controllers\BjmpOfficer\AppealReviewController::review
- * @see app/Http/Controllers/BjmpOfficer/AppealReviewController.php:102
+ * @see app/Http/Controllers/BjmpOfficer/AppealReviewController.php:126
  * @route '/bjmp-officer/appeals/{appeal}/review'
  */
 review.url = (args: { appeal: number | { id: number } } | [appeal: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions) => {
@@ -92,7 +92,7 @@ review.url = (args: { appeal: number | { id: number } } | [appeal: number | { id
 
 /**
 * @see \App\Http\Controllers\BjmpOfficer\AppealReviewController::review
- * @see app/Http/Controllers/BjmpOfficer/AppealReviewController.php:102
+ * @see app/Http/Controllers/BjmpOfficer/AppealReviewController.php:126
  * @route '/bjmp-officer/appeals/{appeal}/review'
  */
 review.post = (args: { appeal: number | { id: number } } | [appeal: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'post'> => ({

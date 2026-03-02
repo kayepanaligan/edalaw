@@ -92,7 +92,7 @@ export const index = {
 
 /**
 * @see \App\Http\Controllers\Admin\TimeSlotConfigurationController::update
- * @see app/Http/Controllers/Admin/TimeSlotConfigurationController.php:76
+ * @see app/Http/Controllers/Admin/TimeSlotConfigurationController.php:74
  * @route '/admin/time-slot-capacities/{timeSlotCapacity}'
  */
 export const update = (args: { timeSlotCapacity: number | { id: number } } | [timeSlotCapacity: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'put'> => ({
@@ -107,7 +107,7 @@ update.definition = {
 
 /**
 * @see \App\Http\Controllers\Admin\TimeSlotConfigurationController::update
- * @see app/Http/Controllers/Admin/TimeSlotConfigurationController.php:76
+ * @see app/Http/Controllers/Admin/TimeSlotConfigurationController.php:74
  * @route '/admin/time-slot-capacities/{timeSlotCapacity}'
  */
 update.url = (args: { timeSlotCapacity: number | { id: number } } | [timeSlotCapacity: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions) => {
@@ -140,7 +140,7 @@ update.url = (args: { timeSlotCapacity: number | { id: number } } | [timeSlotCap
 
 /**
 * @see \App\Http\Controllers\Admin\TimeSlotConfigurationController::update
- * @see app/Http/Controllers/Admin/TimeSlotConfigurationController.php:76
+ * @see app/Http/Controllers/Admin/TimeSlotConfigurationController.php:74
  * @route '/admin/time-slot-capacities/{timeSlotCapacity}'
  */
 update.put = (args: { timeSlotCapacity: number | { id: number } } | [timeSlotCapacity: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'put'> => ({
@@ -150,7 +150,7 @@ update.put = (args: { timeSlotCapacity: number | { id: number } } | [timeSlotCap
 
 /**
 * @see \App\Http\Controllers\Admin\TimeSlotConfigurationController::updateCapacity
- * @see app/Http/Controllers/Admin/TimeSlotConfigurationController.php:93
+ * @see app/Http/Controllers/Admin/TimeSlotConfigurationController.php:91
  * @route '/admin/time-slot-capacities/update'
  */
 export const updateCapacity = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -165,7 +165,7 @@ updateCapacity.definition = {
 
 /**
 * @see \App\Http\Controllers\Admin\TimeSlotConfigurationController::updateCapacity
- * @see app/Http/Controllers/Admin/TimeSlotConfigurationController.php:93
+ * @see app/Http/Controllers/Admin/TimeSlotConfigurationController.php:91
  * @route '/admin/time-slot-capacities/update'
  */
 updateCapacity.url = (options?: RouteQueryOptions) => {
@@ -174,7 +174,7 @@ updateCapacity.url = (options?: RouteQueryOptions) => {
 
 /**
 * @see \App\Http\Controllers\Admin\TimeSlotConfigurationController::updateCapacity
- * @see app/Http/Controllers/Admin/TimeSlotConfigurationController.php:93
+ * @see app/Http/Controllers/Admin/TimeSlotConfigurationController.php:91
  * @route '/admin/time-slot-capacities/update'
  */
 updateCapacity.post = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({

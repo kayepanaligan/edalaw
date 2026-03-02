@@ -1,7 +1,7 @@
 import { queryParams, type RouteQueryOptions, type RouteDefinition } from './../../../../../wayfinder'
 /**
 * @see \App\Http\Controllers\Dashboard\SuperAdminDashboardController::__invoke
- * @see app/Http/Controllers/Dashboard/SuperAdminDashboardController.php:28
+ * @see app/Http/Controllers/Dashboard/SuperAdminDashboardController.php:66
  * @route '/dashboard/super-admin'
  */
 const SuperAdminDashboardController = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -16,7 +16,7 @@ SuperAdminDashboardController.definition = {
 
 /**
 * @see \App\Http\Controllers\Dashboard\SuperAdminDashboardController::__invoke
- * @see app/Http/Controllers/Dashboard/SuperAdminDashboardController.php:28
+ * @see app/Http/Controllers/Dashboard/SuperAdminDashboardController.php:66
  * @route '/dashboard/super-admin'
  */
 SuperAdminDashboardController.url = (options?: RouteQueryOptions) => {
@@ -25,7 +25,7 @@ SuperAdminDashboardController.url = (options?: RouteQueryOptions) => {
 
 /**
 * @see \App\Http\Controllers\Dashboard\SuperAdminDashboardController::__invoke
- * @see app/Http/Controllers/Dashboard/SuperAdminDashboardController.php:28
+ * @see app/Http/Controllers/Dashboard/SuperAdminDashboardController.php:66
  * @route '/dashboard/super-admin'
  */
 SuperAdminDashboardController.get = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -34,7 +34,7 @@ SuperAdminDashboardController.get = (options?: RouteQueryOptions): RouteDefiniti
 })
 /**
 * @see \App\Http\Controllers\Dashboard\SuperAdminDashboardController::__invoke
- * @see app/Http/Controllers/Dashboard/SuperAdminDashboardController.php:28
+ * @see app/Http/Controllers/Dashboard/SuperAdminDashboardController.php:66
  * @route '/dashboard/super-admin'
  */
 SuperAdminDashboardController.head = (options?: RouteQueryOptions): RouteDefinition<'head'> => ({

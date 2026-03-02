@@ -1,5 +1,12 @@
 import { queryParams, type RouteQueryOptions, type RouteDefinition } from './../../wayfinder'
 import assignedSessions from './assigned-sessions'
+import videoRecordings from './video-recordings'
+import chatRecordings from './chat-recordings'
+import analytics from './analytics'
+import incidents from './incidents'
+import history from './history'
+import inmateTunnels from './inmate-tunnels'
+import notifications from './notifications'
 /**
 * @see \App\Http\Controllers\MonitoringOfficer\VisitMonitoringController::__invoke
  * @see app/Http/Controllers/MonitoringOfficer/VisitMonitoringController.php:16
@@ -89,6 +96,13 @@ const monitoringOfficer = {
     visitMonitoring: Object.assign(visitMonitoring, visitMonitoring),
 eburolMonitoring: Object.assign(eburolMonitoring, eburolMonitoring),
 assignedSessions: Object.assign(assignedSessions, assignedSessions),
+videoRecordings: Object.assign(videoRecordings, videoRecordings),
+chatRecordings: Object.assign(chatRecordings, chatRecordings),
+analytics: Object.assign(analytics, analytics),
+incidents: Object.assign(incidents, incidents),
+history: Object.assign(history, history),
+inmateTunnels: Object.assign(inmateTunnels, inmateTunnels),
+notifications: Object.assign(notifications, notifications),
 }
 
 export default monitoringOfficer

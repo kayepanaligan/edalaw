@@ -289,6 +289,10 @@ Route::middleware(['auth', 'verified', 'approved'])->group(function () {
             ->name('schedule.reschedule');
         Route::get('schedule/booked-slots', [\App\Http\Controllers\Visitor\ScheduleController::class, 'getBookedTimeSlots'])
             ->name('schedule.booked-slots');
+        Route::post('schedule/search-inmate', [\App\Http\Controllers\Visitor\ScheduleController::class, 'searchInmate'])
+            ->name('schedule.search-inmate');
+        Route::post('schedule/check-cell-availability', [\App\Http\Controllers\Visitor\ScheduleController::class, 'checkCellAvailability'])
+            ->name('schedule.check-cell-availability');
         Route::get('call-logs', [\App\Http\Controllers\Visitor\CallLogController::class, 'index'])
             ->name('call-logs.index');
         Route::get('eburol', [\App\Http\Controllers\Visitor\EburolController::class, 'index'])
@@ -390,6 +394,36 @@ Route::middleware(['auth', 'verified', 'approved'])->group(function () {
         // Audit Logs
         Route::get('audit-logs', [\App\Http\Controllers\BjmpOfficer\AuditLogController::class, 'index'])
             ->name('audit-logs.index');
+
+        // Cell Management
+        Route::get('cells', [\App\Http\Controllers\BjmpOfficer\CellManagementController::class, 'index'])
+            ->name('cells.index');
+        Route::post('cells', [\App\Http\Controllers\BjmpOfficer\CellManagementController::class, 'store'])
+            ->name('cells.store');
+        Route::put('cells/{cell}', [\App\Http\Controllers\BjmpOfficer\CellManagementController::class, 'update'])
+            ->name('cells.update');
+        Route::delete('cells/{cell}', [\App\Http\Controllers\BjmpOfficer\CellManagementController::class, 'destroy'])
+            ->name('cells.destroy');
+
+        // Inmate Management
+        Route::get('inmates', [\App\Http\Controllers\BjmpOfficer\InmateManagementController::class, 'index'])
+            ->name('inmates.index');
+        Route::post('inmates', [\App\Http\Controllers\BjmpOfficer\InmateManagementController::class, 'store'])
+            ->name('inmates.store');
+        Route::put('inmates/{inmate}', [\App\Http\Controllers\BjmpOfficer\InmateManagementController::class, 'update'])
+            ->name('inmates.update');
+        Route::delete('inmates/{inmate}', [\App\Http\Controllers\BjmpOfficer\InmateManagementController::class, 'destroy'])
+            ->name('inmates.destroy');
+        Route::post('inmates/{inmate}/transfer', [\App\Http\Controllers\BjmpOfficer\InmateManagementController::class, 'transfer'])
+            ->name('inmates.transfer');
+
+        // Cell Schedule Templates
+        Route::get('cell-schedules', [\App\Http\Controllers\BjmpOfficer\CellScheduleTemplateController::class, 'index'])
+            ->name('cell-schedules.index');
+        Route::put('cell-schedules/{cell}', [\App\Http\Controllers\BjmpOfficer\CellScheduleTemplateController::class, 'update'])
+            ->name('cell-schedules.update');
+        Route::post('cell-schedules/bulk-update', [\App\Http\Controllers\BjmpOfficer\CellScheduleTemplateController::class, 'bulkUpdate'])
+            ->name('cell-schedules.bulk-update');
     });
 
     Route::middleware(['role:super_admin'])->prefix('admin')->name('admin.')->group(function () {

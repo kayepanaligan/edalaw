@@ -1,7 +1,7 @@
 import { queryParams, type RouteQueryOptions, type RouteDefinition, applyUrlDefaults } from './../../../wayfinder'
 /**
 * @see \App\Http\Controllers\Visitor\ScheduleController::index
- * @see app/Http/Controllers/Visitor/ScheduleController.php:24
+ * @see app/Http/Controllers/Visitor/ScheduleController.php:28
  * @route '/visitor/schedule'
  */
 export const index = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -16,7 +16,7 @@ index.definition = {
 
 /**
 * @see \App\Http\Controllers\Visitor\ScheduleController::index
- * @see app/Http/Controllers/Visitor/ScheduleController.php:24
+ * @see app/Http/Controllers/Visitor/ScheduleController.php:28
  * @route '/visitor/schedule'
  */
 index.url = (options?: RouteQueryOptions) => {
@@ -25,7 +25,7 @@ index.url = (options?: RouteQueryOptions) => {
 
 /**
 * @see \App\Http\Controllers\Visitor\ScheduleController::index
- * @see app/Http/Controllers/Visitor/ScheduleController.php:24
+ * @see app/Http/Controllers/Visitor/ScheduleController.php:28
  * @route '/visitor/schedule'
  */
 index.get = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -34,7 +34,7 @@ index.get = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
 })
 /**
 * @see \App\Http\Controllers\Visitor\ScheduleController::index
- * @see app/Http/Controllers/Visitor/ScheduleController.php:24
+ * @see app/Http/Controllers/Visitor/ScheduleController.php:28
  * @route '/visitor/schedule'
  */
 index.head = (options?: RouteQueryOptions): RouteDefinition<'head'> => ({
@@ -44,7 +44,7 @@ index.head = (options?: RouteQueryOptions): RouteDefinition<'head'> => ({
 
 /**
 * @see \App\Http\Controllers\Visitor\ScheduleController::store
- * @see app/Http/Controllers/Visitor/ScheduleController.php:173
+ * @see app/Http/Controllers/Visitor/ScheduleController.php:243
  * @route '/visitor/schedule'
  */
 export const store = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -59,7 +59,7 @@ store.definition = {
 
 /**
 * @see \App\Http\Controllers\Visitor\ScheduleController::store
- * @see app/Http/Controllers/Visitor/ScheduleController.php:173
+ * @see app/Http/Controllers/Visitor/ScheduleController.php:243
  * @route '/visitor/schedule'
  */
 store.url = (options?: RouteQueryOptions) => {
@@ -68,7 +68,7 @@ store.url = (options?: RouteQueryOptions) => {
 
 /**
 * @see \App\Http\Controllers\Visitor\ScheduleController::store
- * @see app/Http/Controllers/Visitor/ScheduleController.php:173
+ * @see app/Http/Controllers/Visitor/ScheduleController.php:243
  * @route '/visitor/schedule'
  */
 store.post = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -78,7 +78,7 @@ store.post = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
 
 /**
 * @see \App\Http\Controllers\Visitor\ScheduleController::cancel
- * @see app/Http/Controllers/Visitor/ScheduleController.php:260
+ * @see app/Http/Controllers/Visitor/ScheduleController.php:361
  * @route '/visitor/schedule/{visit}/cancel'
  */
 export const cancel = (args: { visit: number | { id: number } } | [visit: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -93,7 +93,7 @@ cancel.definition = {
 
 /**
 * @see \App\Http\Controllers\Visitor\ScheduleController::cancel
- * @see app/Http/Controllers/Visitor/ScheduleController.php:260
+ * @see app/Http/Controllers/Visitor/ScheduleController.php:361
  * @route '/visitor/schedule/{visit}/cancel'
  */
 cancel.url = (args: { visit: number | { id: number } } | [visit: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions) => {
@@ -126,7 +126,7 @@ cancel.url = (args: { visit: number | { id: number } } | [visit: number | { id: 
 
 /**
 * @see \App\Http\Controllers\Visitor\ScheduleController::cancel
- * @see app/Http/Controllers/Visitor/ScheduleController.php:260
+ * @see app/Http/Controllers/Visitor/ScheduleController.php:361
  * @route '/visitor/schedule/{visit}/cancel'
  */
 cancel.post = (args: { visit: number | { id: number } } | [visit: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -136,7 +136,7 @@ cancel.post = (args: { visit: number | { id: number } } | [visit: number | { id:
 
 /**
 * @see \App\Http\Controllers\Visitor\ScheduleController::reschedule
- * @see app/Http/Controllers/Visitor/ScheduleController.php:301
+ * @see app/Http/Controllers/Visitor/ScheduleController.php:402
  * @route '/visitor/schedule/{visit}/reschedule'
  */
 export const reschedule = (args: { visit: number | { id: number } } | [visit: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -151,7 +151,7 @@ reschedule.definition = {
 
 /**
 * @see \App\Http\Controllers\Visitor\ScheduleController::reschedule
- * @see app/Http/Controllers/Visitor/ScheduleController.php:301
+ * @see app/Http/Controllers/Visitor/ScheduleController.php:402
  * @route '/visitor/schedule/{visit}/reschedule'
  */
 reschedule.url = (args: { visit: number | { id: number } } | [visit: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions) => {
@@ -184,7 +184,7 @@ reschedule.url = (args: { visit: number | { id: number } } | [visit: number | { 
 
 /**
 * @see \App\Http\Controllers\Visitor\ScheduleController::reschedule
- * @see app/Http/Controllers/Visitor/ScheduleController.php:301
+ * @see app/Http/Controllers/Visitor/ScheduleController.php:402
  * @route '/visitor/schedule/{visit}/reschedule'
  */
 reschedule.post = (args: { visit: number | { id: number } } | [visit: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -194,7 +194,7 @@ reschedule.post = (args: { visit: number | { id: number } } | [visit: number | {
 
 /**
 * @see \App\Http\Controllers\Visitor\ScheduleController::bookedSlots
- * @see app/Http/Controllers/Visitor/ScheduleController.php:133
+ * @see app/Http/Controllers/Visitor/ScheduleController.php:155
  * @route '/visitor/schedule/booked-slots'
  */
 export const bookedSlots = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -209,7 +209,7 @@ bookedSlots.definition = {
 
 /**
 * @see \App\Http\Controllers\Visitor\ScheduleController::bookedSlots
- * @see app/Http/Controllers/Visitor/ScheduleController.php:133
+ * @see app/Http/Controllers/Visitor/ScheduleController.php:155
  * @route '/visitor/schedule/booked-slots'
  */
 bookedSlots.url = (options?: RouteQueryOptions) => {
@@ -218,7 +218,7 @@ bookedSlots.url = (options?: RouteQueryOptions) => {
 
 /**
 * @see \App\Http\Controllers\Visitor\ScheduleController::bookedSlots
- * @see app/Http/Controllers/Visitor/ScheduleController.php:133
+ * @see app/Http/Controllers/Visitor/ScheduleController.php:155
  * @route '/visitor/schedule/booked-slots'
  */
 bookedSlots.get = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -227,12 +227,80 @@ bookedSlots.get = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
 })
 /**
 * @see \App\Http\Controllers\Visitor\ScheduleController::bookedSlots
- * @see app/Http/Controllers/Visitor/ScheduleController.php:133
+ * @see app/Http/Controllers/Visitor/ScheduleController.php:155
  * @route '/visitor/schedule/booked-slots'
  */
 bookedSlots.head = (options?: RouteQueryOptions): RouteDefinition<'head'> => ({
     url: bookedSlots.url(options),
     method: 'head',
+})
+
+/**
+* @see \App\Http\Controllers\Visitor\ScheduleController::searchInmate
+ * @see app/Http/Controllers/Visitor/ScheduleController.php:485
+ * @route '/visitor/schedule/search-inmate'
+ */
+export const searchInmate = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
+    url: searchInmate.url(options),
+    method: 'post',
+})
+
+searchInmate.definition = {
+    methods: ["post"],
+    url: '/visitor/schedule/search-inmate',
+} satisfies RouteDefinition<["post"]>
+
+/**
+* @see \App\Http\Controllers\Visitor\ScheduleController::searchInmate
+ * @see app/Http/Controllers/Visitor/ScheduleController.php:485
+ * @route '/visitor/schedule/search-inmate'
+ */
+searchInmate.url = (options?: RouteQueryOptions) => {
+    return searchInmate.definition.url + queryParams(options)
+}
+
+/**
+* @see \App\Http\Controllers\Visitor\ScheduleController::searchInmate
+ * @see app/Http/Controllers/Visitor/ScheduleController.php:485
+ * @route '/visitor/schedule/search-inmate'
+ */
+searchInmate.post = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
+    url: searchInmate.url(options),
+    method: 'post',
+})
+
+/**
+* @see \App\Http\Controllers\Visitor\ScheduleController::checkCellAvailability
+ * @see app/Http/Controllers/Visitor/ScheduleController.php:540
+ * @route '/visitor/schedule/check-cell-availability'
+ */
+export const checkCellAvailability = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
+    url: checkCellAvailability.url(options),
+    method: 'post',
+})
+
+checkCellAvailability.definition = {
+    methods: ["post"],
+    url: '/visitor/schedule/check-cell-availability',
+} satisfies RouteDefinition<["post"]>
+
+/**
+* @see \App\Http\Controllers\Visitor\ScheduleController::checkCellAvailability
+ * @see app/Http/Controllers/Visitor/ScheduleController.php:540
+ * @route '/visitor/schedule/check-cell-availability'
+ */
+checkCellAvailability.url = (options?: RouteQueryOptions) => {
+    return checkCellAvailability.definition.url + queryParams(options)
+}
+
+/**
+* @see \App\Http\Controllers\Visitor\ScheduleController::checkCellAvailability
+ * @see app/Http/Controllers/Visitor/ScheduleController.php:540
+ * @route '/visitor/schedule/check-cell-availability'
+ */
+checkCellAvailability.post = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
+    url: checkCellAvailability.url(options),
+    method: 'post',
 })
 const schedule = {
     index: Object.assign(index, index),
@@ -240,6 +308,8 @@ store: Object.assign(store, store),
 cancel: Object.assign(cancel, cancel),
 reschedule: Object.assign(reschedule, reschedule),
 bookedSlots: Object.assign(bookedSlots, bookedSlots),
+searchInmate: Object.assign(searchInmate, searchInmate),
+checkCellAvailability: Object.assign(checkCellAvailability, checkCellAvailability),
 }
 
 export default schedule

@@ -1,5 +1,8 @@
 import { queryParams, type RouteQueryOptions, type RouteDefinition, applyUrlDefaults } from './../../wayfinder'
+import reset0fffd7 from './reset'
 import confirmD7e05f from './confirm'
+import forgot from './forgot'
+import verifyOtp from './verify-otp'
 /**
 * @see \Laravel\Fortify\Http\Controllers\PasswordResetLinkController::request
  * @see vendor/laravel/fortify/src/Http/Controllers/PasswordResetLinkController.php:22
@@ -260,11 +263,13 @@ confirmation.head = (options?: RouteQueryOptions): RouteDefinition<'head'> => ({
 })
 const password = {
     request: Object.assign(request, request),
-reset: Object.assign(reset, reset),
+reset: Object.assign(reset, reset0fffd7),
 email: Object.assign(email, email),
 update: Object.assign(update, update),
 confirm: Object.assign(confirm, confirmD7e05f),
 confirmation: Object.assign(confirmation, confirmation),
+forgot: Object.assign(forgot, forgot),
+verifyOtp: Object.assign(verifyOtp, verifyOtp),
 }
 
 export default password

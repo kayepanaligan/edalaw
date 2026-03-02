@@ -8,6 +8,8 @@ import SuggestionManagementController from './SuggestionManagementController'
 import NotificationManagementController from './NotificationManagementController'
 import SessionManagementController from './SessionManagementController'
 import AuditLogController from './AuditLogController'
+import IncidentReportingController from './IncidentReportingController'
+import InmateTunnelController from './InmateTunnelController'
 const Admin = {
     UserManagementController: Object.assign(UserManagementController, UserManagementController),
 ScheduleManagementController: Object.assign(ScheduleManagementController, ScheduleManagementController),
@@ -19,6 +21,8 @@ SuggestionManagementController: Object.assign(SuggestionManagementController, Su
 NotificationManagementController: Object.assign(NotificationManagementController, NotificationManagementController),
 SessionManagementController: Object.assign(SessionManagementController, SessionManagementController),
 AuditLogController: Object.assign(AuditLogController, AuditLogController),
+IncidentReportingController: Object.assign(IncidentReportingController, IncidentReportingController),
+InmateTunnelController: Object.assign(InmateTunnelController, InmateTunnelController),
 }
 
 export default Admin

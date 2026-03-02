@@ -1,7 +1,8 @@
 import { queryParams, type RouteQueryOptions, type RouteDefinition, applyUrlDefaults } from './../../../wayfinder'
+import document from './document'
 /**
 * @see \App\Http\Controllers\Visitor\EburolController::index
- * @see app/Http/Controllers/Visitor/EburolController.php:24
+ * @see app/Http/Controllers/Visitor/EburolController.php:26
  * @route '/visitor/eburol'
  */
 export const index = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -16,7 +17,7 @@ index.definition = {
 
 /**
 * @see \App\Http\Controllers\Visitor\EburolController::index
- * @see app/Http/Controllers/Visitor/EburolController.php:24
+ * @see app/Http/Controllers/Visitor/EburolController.php:26
  * @route '/visitor/eburol'
  */
 index.url = (options?: RouteQueryOptions) => {
@@ -25,7 +26,7 @@ index.url = (options?: RouteQueryOptions) => {
 
 /**
 * @see \App\Http\Controllers\Visitor\EburolController::index
- * @see app/Http/Controllers/Visitor/EburolController.php:24
+ * @see app/Http/Controllers/Visitor/EburolController.php:26
  * @route '/visitor/eburol'
  */
 index.get = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -34,7 +35,7 @@ index.get = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
 })
 /**
 * @see \App\Http\Controllers\Visitor\EburolController::index
- * @see app/Http/Controllers/Visitor/EburolController.php:24
+ * @see app/Http/Controllers/Visitor/EburolController.php:26
  * @route '/visitor/eburol'
  */
 index.head = (options?: RouteQueryOptions): RouteDefinition<'head'> => ({
@@ -43,8 +44,51 @@ index.head = (options?: RouteQueryOptions): RouteDefinition<'head'> => ({
 })
 
 /**
+* @see \App\Http\Controllers\Visitor\EburolController::slotAvailability
+ * @see app/Http/Controllers/Visitor/EburolController.php:118
+ * @route '/visitor/eburol/slot-availability'
+ */
+export const slotAvailability = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
+    url: slotAvailability.url(options),
+    method: 'get',
+})
+
+slotAvailability.definition = {
+    methods: ["get","head"],
+    url: '/visitor/eburol/slot-availability',
+} satisfies RouteDefinition<["get","head"]>
+
+/**
+* @see \App\Http\Controllers\Visitor\EburolController::slotAvailability
+ * @see app/Http/Controllers/Visitor/EburolController.php:118
+ * @route '/visitor/eburol/slot-availability'
+ */
+slotAvailability.url = (options?: RouteQueryOptions) => {
+    return slotAvailability.definition.url + queryParams(options)
+}
+
+/**
+* @see \App\Http\Controllers\Visitor\EburolController::slotAvailability
+ * @see app/Http/Controllers/Visitor/EburolController.php:118
+ * @route '/visitor/eburol/slot-availability'
+ */
+slotAvailability.get = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
+    url: slotAvailability.url(options),
+    method: 'get',
+})
+/**
+* @see \App\Http\Controllers\Visitor\EburolController::slotAvailability
+ * @see app/Http/Controllers/Visitor/EburolController.php:118
+ * @route '/visitor/eburol/slot-availability'
+ */
+slotAvailability.head = (options?: RouteQueryOptions): RouteDefinition<'head'> => ({
+    url: slotAvailability.url(options),
+    method: 'head',
+})
+
+/**
 * @see \App\Http\Controllers\Visitor\EburolController::store
- * @see app/Http/Controllers/Visitor/EburolController.php:84
+ * @see app/Http/Controllers/Visitor/EburolController.php:150
  * @route '/visitor/eburol'
  */
 export const store = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -59,7 +103,7 @@ store.definition = {
 
 /**
 * @see \App\Http\Controllers\Visitor\EburolController::store
- * @see app/Http/Controllers/Visitor/EburolController.php:84
+ * @see app/Http/Controllers/Visitor/EburolController.php:150
  * @route '/visitor/eburol'
  */
 store.url = (options?: RouteQueryOptions) => {
@@ -68,7 +112,7 @@ store.url = (options?: RouteQueryOptions) => {
 
 /**
 * @see \App\Http\Controllers\Visitor\EburolController::store
- * @see app/Http/Controllers/Visitor/EburolController.php:84
+ * @see app/Http/Controllers/Visitor/EburolController.php:150
  * @route '/visitor/eburol'
  */
 store.post = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -78,7 +122,7 @@ store.post = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
 
 /**
 * @see \App\Http\Controllers\Visitor\EburolController::show
- * @see app/Http/Controllers/Visitor/EburolController.php:169
+ * @see app/Http/Controllers/Visitor/EburolController.php:246
  * @route '/visitor/eburol/{eburol}'
  */
 export const show = (args: { eburol: number | { id: number } } | [eburol: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -93,7 +137,7 @@ show.definition = {
 
 /**
 * @see \App\Http\Controllers\Visitor\EburolController::show
- * @see app/Http/Controllers/Visitor/EburolController.php:169
+ * @see app/Http/Controllers/Visitor/EburolController.php:246
  * @route '/visitor/eburol/{eburol}'
  */
 show.url = (args: { eburol: number | { id: number } } | [eburol: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions) => {
@@ -126,7 +170,7 @@ show.url = (args: { eburol: number | { id: number } } | [eburol: number | { id: 
 
 /**
 * @see \App\Http\Controllers\Visitor\EburolController::show
- * @see app/Http/Controllers/Visitor/EburolController.php:169
+ * @see app/Http/Controllers/Visitor/EburolController.php:246
  * @route '/visitor/eburol/{eburol}'
  */
 show.get = (args: { eburol: number | { id: number } } | [eburol: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -135,7 +179,7 @@ show.get = (args: { eburol: number | { id: number } } | [eburol: number | { id: 
 })
 /**
 * @see \App\Http\Controllers\Visitor\EburolController::show
- * @see app/Http/Controllers/Visitor/EburolController.php:169
+ * @see app/Http/Controllers/Visitor/EburolController.php:246
  * @route '/visitor/eburol/{eburol}'
  */
 show.head = (args: { eburol: number | { id: number } } | [eburol: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'head'> => ({
@@ -145,7 +189,7 @@ show.head = (args: { eburol: number | { id: number } } | [eburol: number | { id:
 
 /**
 * @see \App\Http\Controllers\Visitor\EburolController::update
- * @see app/Http/Controllers/Visitor/EburolController.php:206
+ * @see app/Http/Controllers/Visitor/EburolController.php:283
  * @route '/visitor/eburol/{eburol}'
  */
 export const update = (args: { eburol: number | { id: number } } | [eburol: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'put'> => ({
@@ -160,7 +204,7 @@ update.definition = {
 
 /**
 * @see \App\Http\Controllers\Visitor\EburolController::update
- * @see app/Http/Controllers/Visitor/EburolController.php:206
+ * @see app/Http/Controllers/Visitor/EburolController.php:283
  * @route '/visitor/eburol/{eburol}'
  */
 update.url = (args: { eburol: number | { id: number } } | [eburol: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions) => {
@@ -193,7 +237,7 @@ update.url = (args: { eburol: number | { id: number } } | [eburol: number | { id
 
 /**
 * @see \App\Http\Controllers\Visitor\EburolController::update
- * @see app/Http/Controllers/Visitor/EburolController.php:206
+ * @see app/Http/Controllers/Visitor/EburolController.php:283
  * @route '/visitor/eburol/{eburol}'
  */
 update.put = (args: { eburol: number | { id: number } } | [eburol: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'put'> => ({
@@ -203,7 +247,7 @@ update.put = (args: { eburol: number | { id: number } } | [eburol: number | { id
 
 /**
 * @see \App\Http\Controllers\Visitor\EburolController::reschedule
- * @see app/Http/Controllers/Visitor/EburolController.php:296
+ * @see app/Http/Controllers/Visitor/EburolController.php:375
  * @route '/visitor/eburol/{eburol}/reschedule'
  */
 export const reschedule = (args: { eburol: number | { id: number } } | [eburol: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -218,7 +262,7 @@ reschedule.definition = {
 
 /**
 * @see \App\Http\Controllers\Visitor\EburolController::reschedule
- * @see app/Http/Controllers/Visitor/EburolController.php:296
+ * @see app/Http/Controllers/Visitor/EburolController.php:375
  * @route '/visitor/eburol/{eburol}/reschedule'
  */
 reschedule.url = (args: { eburol: number | { id: number } } | [eburol: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions) => {
@@ -251,7 +295,7 @@ reschedule.url = (args: { eburol: number | { id: number } } | [eburol: number | 
 
 /**
 * @see \App\Http\Controllers\Visitor\EburolController::reschedule
- * @see app/Http/Controllers/Visitor/EburolController.php:296
+ * @see app/Http/Controllers/Visitor/EburolController.php:375
  * @route '/visitor/eburol/{eburol}/reschedule'
  */
 reschedule.post = (args: { eburol: number | { id: number } } | [eburol: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -261,7 +305,7 @@ reschedule.post = (args: { eburol: number | { id: number } } | [eburol: number |
 
 /**
 * @see \App\Http\Controllers\Visitor\EburolController::destroy
- * @see app/Http/Controllers/Visitor/EburolController.php:355
+ * @see app/Http/Controllers/Visitor/EburolController.php:434
  * @route '/visitor/eburol/{eburol}'
  */
 export const destroy = (args: { eburol: number | { id: number } } | [eburol: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'delete'> => ({
@@ -276,7 +320,7 @@ destroy.definition = {
 
 /**
 * @see \App\Http\Controllers\Visitor\EburolController::destroy
- * @see app/Http/Controllers/Visitor/EburolController.php:355
+ * @see app/Http/Controllers/Visitor/EburolController.php:434
  * @route '/visitor/eburol/{eburol}'
  */
 destroy.url = (args: { eburol: number | { id: number } } | [eburol: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions) => {
@@ -309,7 +353,7 @@ destroy.url = (args: { eburol: number | { id: number } } | [eburol: number | { i
 
 /**
 * @see \App\Http\Controllers\Visitor\EburolController::destroy
- * @see app/Http/Controllers/Visitor/EburolController.php:355
+ * @see app/Http/Controllers/Visitor/EburolController.php:434
  * @route '/visitor/eburol/{eburol}'
  */
 destroy.delete = (args: { eburol: number | { id: number } } | [eburol: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'delete'> => ({
@@ -318,8 +362,10 @@ destroy.delete = (args: { eburol: number | { id: number } } | [eburol: number | 
 })
 const eburol = {
     index: Object.assign(index, index),
+slotAvailability: Object.assign(slotAvailability, slotAvailability),
 store: Object.assign(store, store),
 show: Object.assign(show, show),
+document: Object.assign(document, document),
 update: Object.assign(update, update),
 reschedule: Object.assign(reschedule, reschedule),
 destroy: Object.assign(destroy, destroy),

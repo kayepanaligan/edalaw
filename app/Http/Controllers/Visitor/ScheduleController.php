@@ -5,12 +5,15 @@ namespace App\Http\Controllers\Visitor;
 use App\AppealStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Appeal;
+use App\Models\CellScheduleTemplate;
+use App\Models\Inmate;
 use App\Models\Visit;
 use App\Services\AuditLogService;
 use App\Services\NotificationService;
 use App\Services\VisitorScheduleConflictService;
 use App\VisitStatus;
 use App\VisitType;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -474,5 +477,105 @@ class ScheduleController extends Controller
         );
 
         return redirect()->back()->with('success', 'Visit schedule rescheduled successfully. Your rescheduled request has been sent to the BJMP officer for review.');
+    }
+
+    /**
+     * Search for an inmate by name and return their details including cell information.
+     */
+    public function searchInmate(Request $request): JsonResponse
+    {
+        $request->validate([
+            'first_name' => ['required', 'string', 'max:100'],
+            'middle_name' => ['nullable', 'string', 'max:100'],
+            'last_name' => ['required', 'string', 'max:100'],
+        ]);
+
+        // Use case-insensitive search
+        $firstName = strtolower($request->first_name);
+        $lastName = strtolower($request->last_name);
+        $middleName = $request->middle_name ? strtolower($request->middle_name) : null;
+
+        $query = Inmate::with('cell.scheduleTemplates')
+            ->whereRaw('LOWER(first_name) LIKE ?', ['%' . $firstName . '%'])
+            ->whereRaw('LOWER(last_name) LIKE ?', ['%' . $lastName . '%'])
+            ->where('status', 'active');
+
+        if ($request->filled('middle_name')) {
+            $query->whereRaw('LOWER(middle_name) LIKE ?', ['%' . $middleName . '%']);
+        }
+
+        $inmate = $query->first();
+
+        if (! $inmate) {
+            return response()->json([
+                'found' => false,
+                'message' => 'No inmate found with the provided name. Please check the spelling and try again.',
+            ], 404);
+        }
+
+        // Get cell schedule templates
+        $availableDays = [];
+        foreach ($inmate->cell->scheduleTemplates as $template) {
+            $availableDays[$template->day_of_week] = [
+                'virtual' => $template->virtual_available,
+                'physical' => $template->physical_available,
+            ];
+        }
+
+        return response()->json([
+            'found' => true,
+            'inmate' => [
+                'id' => $inmate->id,
+                'first_name' => $inmate->first_name,
+                'middle_name' => $inmate->middle_name,
+                'last_name' => $inmate->last_name,
+                'inmate_number' => $inmate->inmate_number,
+                'cell' => [
+                    'id' => $inmate->cell->id,
+                    'cell_number' => $inmate->cell->cell_number,
+                ],
+                'available_days' => $availableDays,
+            ],
+        ]);
+    }
+
+    /**
+     * Check if a specific date is available for an inmate's cell based on schedule template.
+     */
+    public function checkCellAvailability(Request $request): JsonResponse
+    {
+        $request->validate([
+            'inmate_id' => ['required', 'integer', 'exists:inmates,id'],
+            'date' => ['required', 'date'],
+            'visit_type' => ['required', 'string', 'in:virtual,physical'],
+        ]);
+
+        $inmate = Inmate::with('cell.scheduleTemplates')->findOrFail($request->inmate_id);
+        $date = \Carbon\Carbon::parse($request->date);
+        $dayOfWeek = (int) $date->format('w'); // 0 = Sunday, 6 = Saturday
+        $visitType = $request->visit_type;
+
+        // Find the schedule template for this day
+        $scheduleTemplate = $inmate->cell->scheduleTemplates
+            ->where('day_of_week', $dayOfWeek)
+            ->first();
+
+        $isAvailable = false;
+        if ($scheduleTemplate) {
+            $isAvailable = $visitType === 'virtual'
+                ? $scheduleTemplate->virtual_available
+                : $scheduleTemplate->physical_available;
+        }
+
+        $dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+        return response()->json([
+            'available' => $isAvailable,
+            'cell_number' => $inmate->cell->cell_number,
+            'day_name' => $dayNames[$dayOfWeek],
+            'message' => $isAvailable
+                ? null
+                : "This cell ({$inmate->cell->cell_number}) is not available for {$visitType} visits on {$dayNames[$dayOfWeek]}s. Please select a different date.",
+        ]);
     }
 }

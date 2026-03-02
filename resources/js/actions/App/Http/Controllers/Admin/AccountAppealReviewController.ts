@@ -1,7 +1,7 @@
 import { queryParams, type RouteQueryOptions, type RouteDefinition, applyUrlDefaults } from './../../../../../wayfinder'
 /**
 * @see \App\Http\Controllers\Admin\AccountAppealReviewController::index
- * @see app/Http/Controllers/Admin/AccountAppealReviewController.php:20
+ * @see app/Http/Controllers/Admin/AccountAppealReviewController.php:21
  * @route '/admin/account-appeals'
  */
 export const index = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -16,7 +16,7 @@ index.definition = {
 
 /**
 * @see \App\Http\Controllers\Admin\AccountAppealReviewController::index
- * @see app/Http/Controllers/Admin/AccountAppealReviewController.php:20
+ * @see app/Http/Controllers/Admin/AccountAppealReviewController.php:21
  * @route '/admin/account-appeals'
  */
 index.url = (options?: RouteQueryOptions) => {
@@ -25,7 +25,7 @@ index.url = (options?: RouteQueryOptions) => {
 
 /**
 * @see \App\Http\Controllers\Admin\AccountAppealReviewController::index
- * @see app/Http/Controllers/Admin/AccountAppealReviewController.php:20
+ * @see app/Http/Controllers/Admin/AccountAppealReviewController.php:21
  * @route '/admin/account-appeals'
  */
 index.get = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -34,7 +34,7 @@ index.get = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
 })
 /**
 * @see \App\Http\Controllers\Admin\AccountAppealReviewController::index
- * @see app/Http/Controllers/Admin/AccountAppealReviewController.php:20
+ * @see app/Http/Controllers/Admin/AccountAppealReviewController.php:21
  * @route '/admin/account-appeals'
  */
 index.head = (options?: RouteQueryOptions): RouteDefinition<'head'> => ({
@@ -44,7 +44,7 @@ index.head = (options?: RouteQueryOptions): RouteDefinition<'head'> => ({
 
 /**
 * @see \App\Http\Controllers\Admin\AccountAppealReviewController::review
- * @see app/Http/Controllers/Admin/AccountAppealReviewController.php:65
+ * @see app/Http/Controllers/Admin/AccountAppealReviewController.php:67
  * @route '/admin/account-appeals/{appeal}/review'
  */
 export const review = (args: { appeal: number | { id: number } } | [appeal: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -59,7 +59,7 @@ review.definition = {
 
 /**
 * @see \App\Http\Controllers\Admin\AccountAppealReviewController::review
- * @see app/Http/Controllers/Admin/AccountAppealReviewController.php:65
+ * @see app/Http/Controllers/Admin/AccountAppealReviewController.php:67
  * @route '/admin/account-appeals/{appeal}/review'
  */
 review.url = (args: { appeal: number | { id: number } } | [appeal: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions) => {
@@ -92,7 +92,7 @@ review.url = (args: { appeal: number | { id: number } } | [appeal: number | { id
 
 /**
 * @see \App\Http\Controllers\Admin\AccountAppealReviewController::review
- * @see app/Http/Controllers/Admin/AccountAppealReviewController.php:65
+ * @see app/Http/Controllers/Admin/AccountAppealReviewController.php:67
  * @route '/admin/account-appeals/{appeal}/review'
  */
 review.post = (args: { appeal: number | { id: number } } | [appeal: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'post'> => ({

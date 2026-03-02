@@ -44,7 +44,7 @@ index.head = (options?: RouteQueryOptions): RouteDefinition<'head'> => ({
 
 /**
 * @see \App\Http\Controllers\BjmpOfficer\ScheduleManagementController::approve
- * @see app/Http/Controllers/BjmpOfficer/ScheduleManagementController.php:89
+ * @see app/Http/Controllers/BjmpOfficer/ScheduleManagementController.php:102
  * @route '/bjmp-officer/schedules/{visit}/approve'
  */
 export const approve = (args: { visit: number | { id: number } } | [visit: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -59,7 +59,7 @@ approve.definition = {
 
 /**
 * @see \App\Http\Controllers\BjmpOfficer\ScheduleManagementController::approve
- * @see app/Http/Controllers/BjmpOfficer/ScheduleManagementController.php:89
+ * @see app/Http/Controllers/BjmpOfficer/ScheduleManagementController.php:102
  * @route '/bjmp-officer/schedules/{visit}/approve'
  */
 approve.url = (args: { visit: number | { id: number } } | [visit: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions) => {
@@ -92,7 +92,7 @@ approve.url = (args: { visit: number | { id: number } } | [visit: number | { id:
 
 /**
 * @see \App\Http\Controllers\BjmpOfficer\ScheduleManagementController::approve
- * @see app/Http/Controllers/BjmpOfficer/ScheduleManagementController.php:89
+ * @see app/Http/Controllers/BjmpOfficer/ScheduleManagementController.php:102
  * @route '/bjmp-officer/schedules/{visit}/approve'
  */
 approve.post = (args: { visit: number | { id: number } } | [visit: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -102,7 +102,7 @@ approve.post = (args: { visit: number | { id: number } } | [visit: number | { id
 
 /**
 * @see \App\Http\Controllers\BjmpOfficer\ScheduleManagementController::reject
- * @see app/Http/Controllers/BjmpOfficer/ScheduleManagementController.php:204
+ * @see app/Http/Controllers/BjmpOfficer/ScheduleManagementController.php:208
  * @route '/bjmp-officer/schedules/{visit}/reject'
  */
 export const reject = (args: { visit: number | { id: number } } | [visit: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -117,7 +117,7 @@ reject.definition = {
 
 /**
 * @see \App\Http\Controllers\BjmpOfficer\ScheduleManagementController::reject
- * @see app/Http/Controllers/BjmpOfficer/ScheduleManagementController.php:204
+ * @see app/Http/Controllers/BjmpOfficer/ScheduleManagementController.php:208
  * @route '/bjmp-officer/schedules/{visit}/reject'
  */
 reject.url = (args: { visit: number | { id: number } } | [visit: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions) => {
@@ -150,7 +150,7 @@ reject.url = (args: { visit: number | { id: number } } | [visit: number | { id: 
 
 /**
 * @see \App\Http\Controllers\BjmpOfficer\ScheduleManagementController::reject
- * @see app/Http/Controllers/BjmpOfficer/ScheduleManagementController.php:204
+ * @see app/Http/Controllers/BjmpOfficer/ScheduleManagementController.php:208
  * @route '/bjmp-officer/schedules/{visit}/reject'
  */
 reject.post = (args: { visit: number | { id: number } } | [visit: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -160,7 +160,7 @@ reject.post = (args: { visit: number | { id: number } } | [visit: number | { id:
 
 /**
 * @see \App\Http\Controllers\BjmpOfficer\ScheduleManagementController::updateStatus
- * @see app/Http/Controllers/BjmpOfficer/ScheduleManagementController.php:233
+ * @see app/Http/Controllers/BjmpOfficer/ScheduleManagementController.php:237
  * @route '/bjmp-officer/schedules/{visit}/update-status'
  */
 export const updateStatus = (args: { visit: number | { id: number } } | [visit: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -175,7 +175,7 @@ updateStatus.definition = {
 
 /**
 * @see \App\Http\Controllers\BjmpOfficer\ScheduleManagementController::updateStatus
- * @see app/Http/Controllers/BjmpOfficer/ScheduleManagementController.php:233
+ * @see app/Http/Controllers/BjmpOfficer/ScheduleManagementController.php:237
  * @route '/bjmp-officer/schedules/{visit}/update-status'
  */
 updateStatus.url = (args: { visit: number | { id: number } } | [visit: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions) => {
@@ -208,7 +208,7 @@ updateStatus.url = (args: { visit: number | { id: number } } | [visit: number | 
 
 /**
 * @see \App\Http\Controllers\BjmpOfficer\ScheduleManagementController::updateStatus
- * @see app/Http/Controllers/BjmpOfficer/ScheduleManagementController.php:233
+ * @see app/Http/Controllers/BjmpOfficer/ScheduleManagementController.php:237
  * @route '/bjmp-officer/schedules/{visit}/update-status'
  */
 updateStatus.post = (args: { visit: number | { id: number } } | [visit: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -218,7 +218,7 @@ updateStatus.post = (args: { visit: number | { id: number } } | [visit: number |
 
 /**
 * @see \App\Http\Controllers\BjmpOfficer\ScheduleManagementController::generateAccessKey
- * @see app/Http/Controllers/BjmpOfficer/ScheduleManagementController.php:319
+ * @see app/Http/Controllers/BjmpOfficer/ScheduleManagementController.php:347
  * @route '/bjmp-officer/schedules/{visit}/generate-access-key'
  */
 export const generateAccessKey = (args: { visit: number | { id: number } } | [visit: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -233,7 +233,7 @@ generateAccessKey.definition = {
 
 /**
 * @see \App\Http\Controllers\BjmpOfficer\ScheduleManagementController::generateAccessKey
- * @see app/Http/Controllers/BjmpOfficer/ScheduleManagementController.php:319
+ * @see app/Http/Controllers/BjmpOfficer/ScheduleManagementController.php:347
  * @route '/bjmp-officer/schedules/{visit}/generate-access-key'
  */
 generateAccessKey.url = (args: { visit: number | { id: number } } | [visit: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions) => {
@@ -266,7 +266,7 @@ generateAccessKey.url = (args: { visit: number | { id: number } } | [visit: numb
 
 /**
 * @see \App\Http\Controllers\BjmpOfficer\ScheduleManagementController::generateAccessKey
- * @see app/Http/Controllers/BjmpOfficer/ScheduleManagementController.php:319
+ * @see app/Http/Controllers/BjmpOfficer/ScheduleManagementController.php:347
  * @route '/bjmp-officer/schedules/{visit}/generate-access-key'
  */
 generateAccessKey.post = (args: { visit: number | { id: number } } | [visit: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -276,7 +276,7 @@ generateAccessKey.post = (args: { visit: number | { id: number } } | [visit: num
 
 /**
 * @see \App\Http\Controllers\BjmpOfficer\ScheduleManagementController::reschedule
- * @see app/Http/Controllers/BjmpOfficer/ScheduleManagementController.php:346
+ * @see app/Http/Controllers/BjmpOfficer/ScheduleManagementController.php:374
  * @route '/bjmp-officer/schedules/{visit}/reschedule'
  */
 export const reschedule = (args: { visit: number | { id: number } } | [visit: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -291,7 +291,7 @@ reschedule.definition = {
 
 /**
 * @see \App\Http\Controllers\BjmpOfficer\ScheduleManagementController::reschedule
- * @see app/Http/Controllers/BjmpOfficer/ScheduleManagementController.php:346
+ * @see app/Http/Controllers/BjmpOfficer/ScheduleManagementController.php:374
  * @route '/bjmp-officer/schedules/{visit}/reschedule'
  */
 reschedule.url = (args: { visit: number | { id: number } } | [visit: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions) => {
@@ -324,7 +324,7 @@ reschedule.url = (args: { visit: number | { id: number } } | [visit: number | { 
 
 /**
 * @see \App\Http\Controllers\BjmpOfficer\ScheduleManagementController::reschedule
- * @see app/Http/Controllers/BjmpOfficer/ScheduleManagementController.php:346
+ * @see app/Http/Controllers/BjmpOfficer/ScheduleManagementController.php:374
  * @route '/bjmp-officer/schedules/{visit}/reschedule'
  */
 reschedule.post = (args: { visit: number | { id: number } } | [visit: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'post'> => ({

@@ -1,7 +1,7 @@
 import { queryParams, type RouteQueryOptions, type RouteDefinition } from './../../../wayfinder'
 /**
 * @see \App\Http\Controllers\Visitor\ScheduleController::bookedSlots
- * @see app/Http/Controllers/Visitor/ScheduleController.php:133
+ * @see app/Http/Controllers/Visitor/ScheduleController.php:155
  * @route '/visitor/schedules/booked-slots'
  */
 export const bookedSlots = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -16,7 +16,7 @@ bookedSlots.definition = {
 
 /**
 * @see \App\Http\Controllers\Visitor\ScheduleController::bookedSlots
- * @see app/Http/Controllers/Visitor/ScheduleController.php:133
+ * @see app/Http/Controllers/Visitor/ScheduleController.php:155
  * @route '/visitor/schedules/booked-slots'
  */
 bookedSlots.url = (options?: RouteQueryOptions) => {
@@ -25,7 +25,7 @@ bookedSlots.url = (options?: RouteQueryOptions) => {
 
 /**
 * @see \App\Http\Controllers\Visitor\ScheduleController::bookedSlots
- * @see app/Http/Controllers/Visitor/ScheduleController.php:133
+ * @see app/Http/Controllers/Visitor/ScheduleController.php:155
  * @route '/visitor/schedules/booked-slots'
  */
 bookedSlots.get = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -34,7 +34,7 @@ bookedSlots.get = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
 })
 /**
 * @see \App\Http\Controllers\Visitor\ScheduleController::bookedSlots
- * @see app/Http/Controllers/Visitor/ScheduleController.php:133
+ * @see app/Http/Controllers/Visitor/ScheduleController.php:155
  * @route '/visitor/schedules/booked-slots'
  */
 bookedSlots.head = (options?: RouteQueryOptions): RouteDefinition<'head'> => ({

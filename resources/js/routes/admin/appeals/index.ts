@@ -1,7 +1,8 @@
 import { queryParams, type RouteQueryOptions, type RouteDefinition, applyUrlDefaults } from './../../../wayfinder'
+import documents from './documents'
 /**
 * @see \App\Http\Controllers\Admin\AppealsOversightController::index
- * @see app/Http/Controllers/Admin/AppealsOversightController.php:24
+ * @see app/Http/Controllers/Admin/AppealsOversightController.php:26
  * @route '/admin/appeals'
  */
 export const index = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -16,7 +17,7 @@ index.definition = {
 
 /**
 * @see \App\Http\Controllers\Admin\AppealsOversightController::index
- * @see app/Http/Controllers/Admin/AppealsOversightController.php:24
+ * @see app/Http/Controllers/Admin/AppealsOversightController.php:26
  * @route '/admin/appeals'
  */
 index.url = (options?: RouteQueryOptions) => {
@@ -25,7 +26,7 @@ index.url = (options?: RouteQueryOptions) => {
 
 /**
 * @see \App\Http\Controllers\Admin\AppealsOversightController::index
- * @see app/Http/Controllers/Admin/AppealsOversightController.php:24
+ * @see app/Http/Controllers/Admin/AppealsOversightController.php:26
  * @route '/admin/appeals'
  */
 index.get = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -34,7 +35,7 @@ index.get = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
 })
 /**
 * @see \App\Http\Controllers\Admin\AppealsOversightController::index
- * @see app/Http/Controllers/Admin/AppealsOversightController.php:24
+ * @see app/Http/Controllers/Admin/AppealsOversightController.php:26
  * @route '/admin/appeals'
  */
 index.head = (options?: RouteQueryOptions): RouteDefinition<'head'> => ({
@@ -44,7 +45,7 @@ index.head = (options?: RouteQueryOptions): RouteDefinition<'head'> => ({
 
 /**
 * @see \App\Http\Controllers\Admin\AppealsOversightController::review
- * @see app/Http/Controllers/Admin/AppealsOversightController.php:106
+ * @see app/Http/Controllers/Admin/AppealsOversightController.php:113
  * @route '/admin/appeals/{appeal}/review'
  */
 export const review = (args: { appeal: number | { id: number } } | [appeal: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -59,7 +60,7 @@ review.definition = {
 
 /**
 * @see \App\Http\Controllers\Admin\AppealsOversightController::review
- * @see app/Http/Controllers/Admin/AppealsOversightController.php:106
+ * @see app/Http/Controllers/Admin/AppealsOversightController.php:113
  * @route '/admin/appeals/{appeal}/review'
  */
 review.url = (args: { appeal: number | { id: number } } | [appeal: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions) => {
@@ -92,7 +93,7 @@ review.url = (args: { appeal: number | { id: number } } | [appeal: number | { id
 
 /**
 * @see \App\Http\Controllers\Admin\AppealsOversightController::review
- * @see app/Http/Controllers/Admin/AppealsOversightController.php:106
+ * @see app/Http/Controllers/Admin/AppealsOversightController.php:113
  * @route '/admin/appeals/{appeal}/review'
  */
 review.post = (args: { appeal: number | { id: number } } | [appeal: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -102,7 +103,7 @@ review.post = (args: { appeal: number | { id: number } } | [appeal: number | { i
 
 /**
 * @see \App\Http\Controllers\Admin\AppealsOversightController::updateStatus
- * @see app/Http/Controllers/Admin/AppealsOversightController.php:153
+ * @see app/Http/Controllers/Admin/AppealsOversightController.php:160
  * @route '/admin/appeals/{appeal}/update-status'
  */
 export const updateStatus = (args: { appeal: number | { id: number } } | [appeal: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'put'> => ({
@@ -117,7 +118,7 @@ updateStatus.definition = {
 
 /**
 * @see \App\Http\Controllers\Admin\AppealsOversightController::updateStatus
- * @see app/Http/Controllers/Admin/AppealsOversightController.php:153
+ * @see app/Http/Controllers/Admin/AppealsOversightController.php:160
  * @route '/admin/appeals/{appeal}/update-status'
  */
 updateStatus.url = (args: { appeal: number | { id: number } } | [appeal: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions) => {
@@ -150,7 +151,7 @@ updateStatus.url = (args: { appeal: number | { id: number } } | [appeal: number 
 
 /**
 * @see \App\Http\Controllers\Admin\AppealsOversightController::updateStatus
- * @see app/Http/Controllers/Admin/AppealsOversightController.php:153
+ * @see app/Http/Controllers/Admin/AppealsOversightController.php:160
  * @route '/admin/appeals/{appeal}/update-status'
  */
 updateStatus.put = (args: { appeal: number | { id: number } } | [appeal: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'put'> => ({
@@ -161,6 +162,7 @@ const appeals = {
     index: Object.assign(index, index),
 review: Object.assign(review, review),
 updateStatus: Object.assign(updateStatus, updateStatus),
+documents: Object.assign(documents, documents),
 }
 
 export default appeals

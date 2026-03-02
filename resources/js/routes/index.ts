@@ -159,6 +159,45 @@ home.head = (options?: RouteQueryOptions): RouteDefinition<'head'> => ({
 })
 
 /**
+ * @see routes/web.php:78
+ * @route '/concurrent-login-warning'
+ */
+export const concurrentLoginWarning = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
+    url: concurrentLoginWarning.url(options),
+    method: 'get',
+})
+
+concurrentLoginWarning.definition = {
+    methods: ["get","head"],
+    url: '/concurrent-login-warning',
+} satisfies RouteDefinition<["get","head"]>
+
+/**
+ * @see routes/web.php:78
+ * @route '/concurrent-login-warning'
+ */
+concurrentLoginWarning.url = (options?: RouteQueryOptions) => {
+    return concurrentLoginWarning.definition.url + queryParams(options)
+}
+
+/**
+ * @see routes/web.php:78
+ * @route '/concurrent-login-warning'
+ */
+concurrentLoginWarning.get = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
+    url: concurrentLoginWarning.url(options),
+    method: 'get',
+})
+/**
+ * @see routes/web.php:78
+ * @route '/concurrent-login-warning'
+ */
+concurrentLoginWarning.head = (options?: RouteQueryOptions): RouteDefinition<'head'> => ({
+    url: concurrentLoginWarning.url(options),
+    method: 'head',
+})
+
+/**
 * @see \App\Http\Controllers\Auth\AccountStatusController::accountPending
  * @see app/Http/Controllers/Auth/AccountStatusController.php:16
  * @route '/account-pending'
@@ -245,7 +284,7 @@ accountRejected.head = (options?: RouteQueryOptions): RouteDefinition<'head'> =>
 })
 
 /**
- * @see routes/web.php:82
+ * @see routes/web.php:119
  * @route '/dashboard'
  */
 export const dashboard = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -259,7 +298,7 @@ dashboard.definition = {
 } satisfies RouteDefinition<["get","head"]>
 
 /**
- * @see routes/web.php:82
+ * @see routes/web.php:119
  * @route '/dashboard'
  */
 dashboard.url = (options?: RouteQueryOptions) => {
@@ -267,7 +306,7 @@ dashboard.url = (options?: RouteQueryOptions) => {
 }
 
 /**
- * @see routes/web.php:82
+ * @see routes/web.php:119
  * @route '/dashboard'
  */
 dashboard.get = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -275,7 +314,7 @@ dashboard.get = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
     method: 'get',
 })
 /**
- * @see routes/web.php:82
+ * @see routes/web.php:119
  * @route '/dashboard'
  */
 dashboard.head = (options?: RouteQueryOptions): RouteDefinition<'head'> => ({

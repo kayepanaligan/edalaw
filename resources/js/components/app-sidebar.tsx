@@ -1,5 +1,5 @@
 import { Link, usePage } from '@inertiajs/react';
-import { AlertTriangle, BarChart3, Bell, Calendar, CalendarCheck, FileText, LayoutGrid, Link2, MessageSquare, Phone, Scale, Shield, Users, Heart, Monitor, Video, Camera, Flag, Settings, Sliders, Film, MessageCircle } from 'lucide-react';
+import { AlertTriangle, BarChart3, Bell, Calendar, CalendarCheck, FileText, LayoutGrid, Link2, MessageSquare, Phone, Scale, Shield, Users, Heart, Monitor, Video, Camera, Flag, Settings, Sliders, Film, MessageCircle, Building, Clock } from 'lucide-react';
 
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
@@ -243,6 +243,14 @@ export function AppSidebar() {
                     { title: 'E-Burol', href: '/bjmp-officer/eburols', icon: Heart },
                     { title: 'Visit Schedules', href: '/bjmp-officer/schedules', icon: Calendar },
                     { title: 'Appeals', href: '/bjmp-officer/appeals', icon: Scale },
+                ],
+            },
+            {
+                label: 'Facility Management',
+                items: [
+                    { title: 'Cell Management', href: '/bjmp-officer/cells', icon: Building },
+                    { title: 'Inmate Management', href: '/bjmp-officer/inmates', icon: Users },
+                    { title: 'Cell Schedules', href: '/bjmp-officer/cell-schedules', icon: Clock },
                 ],
             },
             {

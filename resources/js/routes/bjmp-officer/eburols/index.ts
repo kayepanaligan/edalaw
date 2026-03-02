@@ -1,4 +1,5 @@
 import { queryParams, type RouteQueryOptions, type RouteDefinition, applyUrlDefaults } from './../../../wayfinder'
+import document from './document'
 /**
 * @see \App\Http\Controllers\BjmpOfficer\EburolManagementController::index
  * @see app/Http/Controllers/BjmpOfficer/EburolManagementController.php:22
@@ -102,7 +103,7 @@ approve.post = (args: { eburol: number | { id: number } } | [eburol: number | { 
 
 /**
 * @see \App\Http\Controllers\BjmpOfficer\EburolManagementController::reject
- * @see app/Http/Controllers/BjmpOfficer/EburolManagementController.php:157
+ * @see app/Http/Controllers/BjmpOfficer/EburolManagementController.php:162
  * @route '/bjmp-officer/eburols/{eburol}/reject'
  */
 export const reject = (args: { eburol: number | { id: number } } | [eburol: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -117,7 +118,7 @@ reject.definition = {
 
 /**
 * @see \App\Http\Controllers\BjmpOfficer\EburolManagementController::reject
- * @see app/Http/Controllers/BjmpOfficer/EburolManagementController.php:157
+ * @see app/Http/Controllers/BjmpOfficer/EburolManagementController.php:162
  * @route '/bjmp-officer/eburols/{eburol}/reject'
  */
 reject.url = (args: { eburol: number | { id: number } } | [eburol: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions) => {
@@ -150,7 +151,7 @@ reject.url = (args: { eburol: number | { id: number } } | [eburol: number | { id
 
 /**
 * @see \App\Http\Controllers\BjmpOfficer\EburolManagementController::reject
- * @see app/Http/Controllers/BjmpOfficer/EburolManagementController.php:157
+ * @see app/Http/Controllers/BjmpOfficer/EburolManagementController.php:162
  * @route '/bjmp-officer/eburols/{eburol}/reject'
  */
 reject.post = (args: { eburol: number | { id: number } } | [eburol: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -160,7 +161,7 @@ reject.post = (args: { eburol: number | { id: number } } | [eburol: number | { i
 
 /**
 * @see \App\Http\Controllers\BjmpOfficer\EburolManagementController::updateStatus
- * @see app/Http/Controllers/BjmpOfficer/EburolManagementController.php:186
+ * @see app/Http/Controllers/BjmpOfficer/EburolManagementController.php:191
  * @route '/bjmp-officer/eburols/{eburol}/update-status'
  */
 export const updateStatus = (args: { eburol: number | { id: number } } | [eburol: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -175,7 +176,7 @@ updateStatus.definition = {
 
 /**
 * @see \App\Http\Controllers\BjmpOfficer\EburolManagementController::updateStatus
- * @see app/Http/Controllers/BjmpOfficer/EburolManagementController.php:186
+ * @see app/Http/Controllers/BjmpOfficer/EburolManagementController.php:191
  * @route '/bjmp-officer/eburols/{eburol}/update-status'
  */
 updateStatus.url = (args: { eburol: number | { id: number } } | [eburol: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions) => {
@@ -208,7 +209,7 @@ updateStatus.url = (args: { eburol: number | { id: number } } | [eburol: number 
 
 /**
 * @see \App\Http\Controllers\BjmpOfficer\EburolManagementController::updateStatus
- * @see app/Http/Controllers/BjmpOfficer/EburolManagementController.php:186
+ * @see app/Http/Controllers/BjmpOfficer/EburolManagementController.php:191
  * @route '/bjmp-officer/eburols/{eburol}/update-status'
  */
 updateStatus.post = (args: { eburol: number | { id: number } } | [eburol: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -217,6 +218,7 @@ updateStatus.post = (args: { eburol: number | { id: number } } | [eburol: number
 })
 const eburols = {
     index: Object.assign(index, index),
+document: Object.assign(document, document),
 approve: Object.assign(approve, approve),
 reject: Object.assign(reject, reject),
 updateStatus: Object.assign(updateStatus, updateStatus),
