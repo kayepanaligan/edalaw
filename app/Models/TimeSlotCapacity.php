@@ -15,8 +15,6 @@ class TimeSlotCapacity extends Model
         'time_slot',
         'visit_type',
         'max_capacity',
-        'duration_minutes',
-        'interval_minutes',
     ];
 
     /**
@@ -28,8 +26,6 @@ class TimeSlotCapacity extends Model
     {
         return [
             'max_capacity' => 'integer',
-            'duration_minutes' => 'integer',
-            'interval_minutes' => 'integer',
         ];
     }
 
