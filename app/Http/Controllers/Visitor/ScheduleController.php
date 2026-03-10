@@ -171,23 +171,18 @@ class ScheduleController extends Controller
             $nowTime >= $dayCutoff || $nowTime > $latestSlotEnd
         );
 
-        // Get duration and interval settings from database
-        $settings = \App\Models\TimeSlotCapacity::where('visit_type', $visitType)->first();
-        $durationMinutes = $settings?->duration_minutes ?? ($isPhysical ? 30 : 20);
-        $intervalMinutes = $settings?->interval_minutes ?? ($isPhysical ? 10 : 5);
-        $slotInterval = $durationMinutes + $intervalMinutes;
-
-        // Generate time slots based on duration and interval settings
+        // Physical: hourly slots 07:00–17:00 (7am–6pm). Virtual: 10-minute slots 7:00–17:50
         $allTimeSlots = [];
-        $startMinutes = 7 * 60; // 7:00 AM
-        $endMinutes = 18 * 60; // 6:00 PM
-
-        $currentMinutes = $startMinutes;
-        while ($currentMinutes < $endMinutes) {
-            $hour = intdiv($currentMinutes, 60);
-            $minute = $currentMinutes % 60;
-            $allTimeSlots[] = sprintf('%02d:%02d', $hour, $minute);
-            $currentMinutes += $slotInterval;
+        if ($isPhysical) {
+            for ($hour = 7; $hour < 18; $hour++) {
+                $allTimeSlots[] = sprintf('%02d:00', $hour);
+            }
+        } else {
+            for ($hour = 7; $hour < 18; $hour++) {
+                for ($minute = 0; $minute < 60; $minute += 10) {
+                    $allTimeSlots[] = sprintf('%02d:%02d', $hour, $minute);
+                }
+            }
         }
 
         // Get capacity information for each slot (when day is unavailable, treat all as full)
@@ -239,8 +234,6 @@ class ScheduleController extends Controller
             'slotCapacities' => $slotCapacities,
             'isDayUnavailable' => $isDayUnavailable,
             'userBookedSlots' => $userBookedSlots,
-            'durationMinutes' => $durationMinutes,
-            'intervalMinutes' => $intervalMinutes,
         ]);
     }
 
