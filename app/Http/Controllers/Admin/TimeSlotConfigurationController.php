@@ -41,6 +41,8 @@ class TimeSlotConfigurationController extends Controller
                 'time_slot' => $timeSlot,
                 'visit_type' => 'virtual',
                 'max_capacity' => $capacity?->max_capacity ?? 4,
+                'duration_minutes' => $capacity?->duration_minutes ?? 20,
+                'interval_minutes' => $capacity?->interval_minutes ?? 5,
             ];
         }
         foreach ($physicalSlots as $timeSlot) {
@@ -51,6 +53,8 @@ class TimeSlotConfigurationController extends Controller
                 'time_slot' => $timeSlot,
                 'visit_type' => 'physical',
                 'max_capacity' => $capacity?->max_capacity ?? 4,
+                'duration_minutes' => $capacity?->duration_minutes ?? 20,
+                'interval_minutes' => $capacity?->interval_minutes ?? 5,
             ];
         }
 
@@ -75,10 +79,14 @@ class TimeSlotConfigurationController extends Controller
     {
         $request->validate([
             'max_capacity' => ['required', 'integer', 'min:1', 'max:100'],
+            'duration_minutes' => ['required', 'integer', 'min:1', 'max:180'],
+            'interval_minutes' => ['required', 'integer', 'min:0', 'max:60'],
         ]);
 
         $timeSlotCapacity->update([
             'max_capacity' => $request->max_capacity,
+            'duration_minutes' => $request->duration_minutes,
+            'interval_minutes' => $request->interval_minutes,
         ]);
 
         return redirect()->back()
@@ -94,6 +102,8 @@ class TimeSlotConfigurationController extends Controller
             'time_slot' => ['required', 'string', 'regex:/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/'],
             'visit_type' => ['required', 'string', 'in:physical,virtual'],
             'max_capacity' => ['required', 'integer', 'min:1', 'max:100'],
+            'duration_minutes' => ['required', 'integer', 'min:1', 'max:180'],
+            'interval_minutes' => ['required', 'integer', 'min:0', 'max:60'],
         ]);
 
         TimeSlotCapacity::updateOrCreate(
@@ -103,10 +113,37 @@ class TimeSlotConfigurationController extends Controller
             ],
             [
                 'max_capacity' => $request->max_capacity,
+                'duration_minutes' => $request->duration_minutes,
+                'interval_minutes' => $request->interval_minutes,
             ]
         );
 
         return redirect()->back()
             ->with('success', 'Time slot capacity updated successfully.');
+    }
+
+    /**
+     * Update duration and interval settings for all time slots of a visit type.
+     */
+    public function updateSettings(Request $request): RedirectResponse
+    {
+        $request->validate([
+            'visit_type' => ['required', 'string', 'in:physical,virtual'],
+            'duration_minutes' => ['required', 'integer', 'min:1', 'max:180'],
+            'interval_minutes' => ['required', 'integer', 'min:0', 'max:60'],
+        ]);
+
+        $visitType = $request->visit_type;
+        $durationMinutes = $request->duration_minutes;
+        $intervalMinutes = $request->interval_minutes;
+
+        // Update all existing time slots for this visit type
+        TimeSlotCapacity::where('visit_type', $visitType)->update([
+            'duration_minutes' => $durationMinutes,
+            'interval_minutes' => $intervalMinutes,
+        ]);
+
+        return redirect()->back()
+            ->with('success', ucfirst($visitType).' visit settings updated successfully.');
     }
 }
