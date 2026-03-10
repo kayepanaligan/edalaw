@@ -292,6 +292,8 @@ Route::middleware(['auth', 'verified', 'approved'])->group(function () {
             ->name('time-slot-capacities.update');
         Route::post('time-slot-capacities/update', [\App\Http\Controllers\Admin\TimeSlotConfigurationController::class, 'updateCapacity'])
             ->name('time-slot-capacities.update-capacity');
+        Route::post('time-slot-capacities/update-settings', [\App\Http\Controllers\Admin\TimeSlotConfigurationController::class, 'updateSettings'])
+            ->name('time-slot-capacities.update-settings');
     });
 
     Route::middleware(['role:visitor'])->prefix('visitor')->name('visitor.')->group(function () {
