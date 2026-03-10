@@ -29,10 +29,10 @@ class ChatChannel
 
         // Allow access if:
         // 1. User is the visitor
-        // 2. User is a monitoring officer
+        // 2. User is a jail officer
         // 3. User is a super admin
         $isVisitor = $session->visitor_id === $user->id;
-        $isMonitor = $user->role?->slug === 'monitoring_officer';
+        $isMonitor = $user->role?->slug === 'jail_officer';
         $isSuperAdmin = $user->role?->slug === 'super_admin';
 
         return $isVisitor || $isMonitor || $isSuperAdmin;

@@ -21,8 +21,8 @@ class VisitSessionService
             return null;
         }
 
-        if (! $visit->monitoring_officer_id) {
-            Log::warning('VisitSessionService: Cannot create session for visit without monitoring officer', ['visit_id' => $visit->id]);
+        if (! $visit->jail_officer_id) {
+            Log::warning('VisitSessionService: Cannot create session for visit without jail officer', ['visit_id' => $visit->id]);
 
             return null;
         }
@@ -34,7 +34,7 @@ class VisitSessionService
             'visit_id' => $visit->id,
             'eburol_id' => null,
             'room_id' => $roomId,
-            'monitor_id' => $visit->monitoring_officer_id,
+            'monitor_id' => $visit->jail_officer_id,
             'scheduled_start' => $scheduledStart,
             'scheduled_end' => $scheduledEnd,
             'status' => 'scheduled',
@@ -51,8 +51,8 @@ class VisitSessionService
      */
     public function createForEburol(Eburol $eburol, string $roomId): ?VisitSession
     {
-        if (! $eburol->monitoring_officer_id) {
-            Log::warning('VisitSessionService: Cannot create session for eburol without monitoring officer', ['eburol_id' => $eburol->id]);
+        if (! $eburol->jail_officer_id) {
+            Log::warning('VisitSessionService: Cannot create session for eburol without jail officer', ['eburol_id' => $eburol->id]);
 
             return null;
         }
@@ -67,7 +67,7 @@ class VisitSessionService
             'visit_id' => null,
             'eburol_id' => $eburol->id,
             'room_id' => $roomId,
-            'monitor_id' => $eburol->monitoring_officer_id,
+            'monitor_id' => $eburol->jail_officer_id,
             'scheduled_start' => $scheduledStart,
             'scheduled_end' => $scheduledEnd,
             'status' => 'scheduled',

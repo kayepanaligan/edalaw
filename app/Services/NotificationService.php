@@ -506,11 +506,11 @@ class NotificationService
     }
 
     /**
-     * Notify monitoring officer when assigned to a visit.
+     * Notify jail officer when assigned to a visit.
      */
     public static function notifyMonitoringOfficerAboutVisit(Visit $visit): void
     {
-        if (! $visit->monitoring_officer_id) {
+        if (! $visit->jail_officer_id) {
             return;
         }
 
@@ -519,7 +519,7 @@ class NotificationService
         $visitorName = trim("{$visit->user->first_name} {$visit->user->last_name}");
 
         Notification::create([
-            'user_id' => $visit->monitoring_officer_id,
+            'user_id' => $visit->jail_officer_id,
             'type' => 'monitoring_assignment',
             'title' => 'New Visit Assignment',
             'message' => "You have been assigned to monitor a {$visitType} visit. Visitor: {$visitorName}. Inmate: {$inmateName}. Scheduled for: {$visit->scheduled_date->format('M d, Y')} at {$visit->scheduled_time}.",
@@ -529,11 +529,11 @@ class NotificationService
     }
 
     /**
-     * Notify monitoring officer when assigned to an e-burol.
+     * Notify jail officer when assigned to an e-burol.
      */
     public static function notifyMonitoringOfficerAboutEburol(Eburol $eburol): void
     {
-        if (! $eburol->monitoring_officer_id) {
+        if (! $eburol->jail_officer_id) {
             return;
         }
 
@@ -541,7 +541,7 @@ class NotificationService
         $visitorName = trim("{$eburol->user->first_name} {$eburol->user->last_name}");
 
         Notification::create([
-            'user_id' => $eburol->monitoring_officer_id,
+            'user_id' => $eburol->jail_officer_id,
             'type' => 'monitoring_assignment',
             'title' => 'New E-Burol Assignment',
             'message' => "You have been assigned to monitor an e-burol. Visitor: {$visitorName}. Deceased: {$deceasedName}. Wake period: {$eburol->wake_start_date->format('M d, Y')} - {$eburol->wake_end_date->format('M d, Y')}.",

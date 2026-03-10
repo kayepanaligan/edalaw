@@ -14,7 +14,7 @@ export type User = {
     municipality: string | null;
     province: string | null;
     postal_code: string | null;
-    role: 'super_admin' | 'bjmp_officer' | 'visitor' | 'monitoring_officer';
+    role: 'super_admin' | 'bjmp_officer' | 'visitor' | 'monitoring_officer' | 'jail_officer';
     created_at: string;
     updated_at: string;
     [key: string]: unknown;

@@ -595,7 +595,7 @@ export default function Appeals({ appeals, rejected_visits, rejected_eburols }: 
                                         <div className="flex flex-wrap gap-2 pt-2">
                                             {selectedAppeal.documents.map((doc) => (
                                                 <Button key={doc.id} variant="outline" size="sm" asChild>
-                                                    <a href={doc.file_path} target="_blank" rel="noopener noreferrer">
+                                                    <a href={`/visitor/appeals/documents/${doc.id}/download`} target="_blank" rel="noopener noreferrer">
                                                         <FileText className="mr-2 h-4 w-4" />
                                                         {doc.file_name}
                                                     </a>

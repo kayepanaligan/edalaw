@@ -1,6 +1,6 @@
-import { Head } from '@inertiajs/react';
+import { Head, Link } from '@inertiajs/react';
 import type { ColumnDef } from '@tanstack/react-table';
-import { Download } from 'lucide-react';
+import { Download, Eye } from 'lucide-react';
 import { useMemo } from 'react';
 
 import { Badge } from '@/components/ui/badge';
@@ -57,6 +57,19 @@ export default function ChatRecordings({ sessions, filters }: Props) {
         },
         { accessorKey: 'status', header: 'Status', cell: ({ row }) => <Badge variant="secondary">{row.original.status}</Badge> },
         { accessorKey: 'total_messages', header: 'Messages', cell: ({ row }) => row.original.total_messages },
+        {
+            id: 'view',
+            header: 'View',
+            cell: ({ row }) => (
+                <Link
+                    href={`/monitoring/chat-logs/session/${row.original.id}`}
+                    className="inline-flex items-center gap-1 rounded border px-2 py-1 text-sm hover:bg-muted"
+                >
+                    <Eye className="h-3 w-3" />
+                    View Chat
+                </Link>
+            ),
+        },
         {
             accessorKey: 'flagged_count',
             header: 'Flagged',

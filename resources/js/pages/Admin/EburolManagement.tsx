@@ -67,7 +67,7 @@ type Eburol = {
     status: 'pending' | 'approved' | 'rejected' | 'completed';
     admin_notes: string | null;
     rejection_reason: string | null;
-    monitoring_officer_id: number | null;
+    jail_officer_id: number | null;
     death_certificate_path: string | null;
     relationship_proof_path: string | null;
     created_at: string;
@@ -147,24 +147,24 @@ export default function EburolManagement({ eburols, stats, visitors = [], monito
     });
 
     const approveForm = useForm({
-        monitoring_officer_id: '',
+        jail_officer_id: '',
     });
 
     const statusForm = useForm({
         status: 'pending' as 'pending' | 'approved' | 'rejected' | 'completed',
         rejection_reason: '',
-        monitoring_officer_id: '',
+        jail_officer_id: '',
     });
 
     const openApproveModal = (eburol: Eburol) => {
         setSelectedEburol(eburol);
-        approveForm.setData('monitoring_officer_id', '');
+        approveForm.setData('jail_officer_id', '');
         setIsApproveModalOpen(true);
     };
 
     const handleApproveSubmit = () => {
-        if (!selectedEburol || !approveForm.data.monitoring_officer_id) {
-            toast.error('Please select a monitoring officer.');
+        if (!selectedEburol || !approveForm.data.jail_officer_id) {
+            toast.error('Please select a jail officer.');
             return;
         }
         approveForm.post(`/admin/eburols/${selectedEburol.id}/approve`, {
@@ -360,7 +360,7 @@ export default function EburolManagement({ eburols, stats, visitors = [], monito
                                     statusForm.setData({
                                         status: eburol.status,
                                         rejection_reason: eburol.rejection_reason || '',
-                                        monitoring_officer_id: eburol.monitoring_officer_id?.toString() ?? '',
+                                        jail_officer_id: eburol.jail_officer_id?.toString() ?? '',
                                     });
                                     setIsStatusModalOpen(true);
                                 }}
@@ -662,15 +662,15 @@ export default function EburolManagement({ eburols, stats, visitors = [], monito
                                 </div>
                             )}
                             <div className="space-y-2">
-                                <Label htmlFor="approve_monitoring_officer_id">
-                                    Monitoring Officer <span className="text-destructive">*</span>
+                                <Label htmlFor="approve_jail_officer_id">
+                                    Jail Officer <span className="text-destructive">*</span>
                                 </Label>
                                 <Select
-                                    value={approveForm.data.monitoring_officer_id}
-                                    onValueChange={(value) => approveForm.setData('monitoring_officer_id', value)}
+                                    value={approveForm.data.jail_officer_id}
+                                    onValueChange={(value) => approveForm.setData('jail_officer_id', value)}
                                 >
-                                    <SelectTrigger id="approve_monitoring_officer_id">
-                                        <SelectValue placeholder="Select monitoring officer" />
+                                    <SelectTrigger id="approve_jail_officer_id">
+                                        <SelectValue placeholder="Select jail officer" />
                                     </SelectTrigger>
                                     <SelectContent>
                                         {monitoringOfficers.map((officer) => (
@@ -680,7 +680,7 @@ export default function EburolManagement({ eburols, stats, visitors = [], monito
                                         ))}
                                     </SelectContent>
                                 </Select>
-                                <InputError message={approveForm.errors.monitoring_officer_id} />
+                                <InputError message={approveForm.errors.jail_officer_id} />
                             </div>
                         </div>
                         <DialogFooter>
@@ -808,15 +808,15 @@ export default function EburolManagement({ eburols, stats, visitors = [], monito
                             )}
                             {monitoringOfficers && monitoringOfficers.length > 0 && (
                                 <div className="space-y-2">
-                                    <Label htmlFor="status_monitoring_officer_id">
-                                        Monitoring Officer
+                                    <Label htmlFor="status_jail_officer_id">
+                                        Jail Officer
                                     </Label>
                                     <Select
-                                        value={statusForm.data.monitoring_officer_id}
-                                        onValueChange={(value) => statusForm.setData('monitoring_officer_id', value)}
+                                        value={statusForm.data.jail_officer_id}
+                                        onValueChange={(value) => statusForm.setData('jail_officer_id', value)}
                                     >
-                                        <SelectTrigger id="status_monitoring_officer_id">
-                                            <SelectValue placeholder="Select monitoring officer" />
+                                        <SelectTrigger id="status_jail_officer_id">
+                                            <SelectValue placeholder="Select jail officer" />
                                         </SelectTrigger>
                                         <SelectContent>
                                             {monitoringOfficers.map((officer) => (
@@ -826,7 +826,7 @@ export default function EburolManagement({ eburols, stats, visitors = [], monito
                                             ))}
                                         </SelectContent>
                                     </Select>
-                                    <InputError message={statusForm.errors.monitoring_officer_id} />
+                                    <InputError message={statusForm.errors.jail_officer_id} />
                                     <p className="text-xs text-muted-foreground">
                                         Officer responsible for overseeing this e-burol
                                     </p>

@@ -23,7 +23,7 @@ class ScheduleManagementController extends Controller
      */
     public function index(): Response
     {
-        $visits = Visit::with(['user', 'monitoringOfficer', 'visitSessions' => fn ($q) => $q->orderBy('scheduled_start', 'desc')->limit(1)])
+        $visits = Visit::with(['user', 'jailOfficer', 'visitSessions' => fn ($q) => $q->orderBy('scheduled_start', 'desc')->limit(1)])
             ->orderBy('scheduled_date', 'desc')
             ->orderBy('created_at', 'desc')
             ->get()
@@ -55,8 +55,8 @@ class ScheduleManagementController extends Controller
                     'meeting_link' => $visit->meeting_link ?? $visit->daily_co_room_url,
                     'access_key' => $visit->access_key,
                     'access_key_expires_at' => $visit->access_key_expires_at?->format('Y-m-d H:i:s'),
-                    'monitoring_officer_id' => $visit->monitoring_officer_id,
-                    'monitoring_officer_name' => $visit->monitoringOfficer ? trim("{$visit->monitoringOfficer->first_name} {$visit->monitoringOfficer->middle_name} {$visit->monitoringOfficer->last_name}") : null,
+                    'jail_officer_id' => $visit->jail_officer_id,
+                    'jail_officer_name' => $visit->jailOfficer ? trim("{$visit->jailOfficer->first_name} {$visit->jailOfficer->middle_name} {$visit->jailOfficer->last_name}") : null,
                     'rejection_reason' => $visit->rejection_reason,
                     'created_at' => $visit->created_at->format('Y-m-d H:i:s'),
                     'schedule_started' => $scheduleStarted,
@@ -74,9 +74,9 @@ class ScheduleManagementController extends Controller
             'missed' => $visits->where('status', 'missed')->count(),
         ];
 
-        // Get all monitoring officers
+        // Get all jail officers
         $monitoringOfficers = \App\Models\User::whereHas('role', function ($query) {
-            $query->where('slug', 'monitoring_officer');
+            $query->where('slug', 'jail_officer');
         })
             ->where('approval_status', 'approved')
             ->orderBy('first_name')
@@ -112,17 +112,17 @@ class ScheduleManagementController extends Controller
         }
 
         $rules = [
-            'monitoring_officer_id' => ['nullable', 'exists:users,id'],
+            'jail_officer_id' => ['nullable', 'exists:users,id'],
         ];
         if ($visit->visit_type === VisitType::Virtual) {
-            $rules['monitoring_officer_id'] = ['required', 'exists:users,id'];
+            $rules['jail_officer_id'] = ['required', 'exists:users,id'];
         }
         $request->validate($rules);
 
-        $oldMonitoringOfficerId = $visit->monitoring_officer_id;
+        $oldJailOfficerId = $visit->jail_officer_id;
         $updateData = [
             'status' => VisitStatus::Approved,
-            'monitoring_officer_id' => $request->monitoring_officer_id,
+            'jail_officer_id' => $request->jail_officer_id,
         ];
 
         $roomId = null;
@@ -155,7 +155,7 @@ class ScheduleManagementController extends Controller
                 ]);
 
                 return redirect()->back()
-                    ->withInput($request->only('monitoring_officer_id'))
+                    ->withInput($request->only('jail_officer_id'))
                     ->withErrors([
                         'meeting_link' => 'Video room creation failed: '.($roomResult['error'] ?? 'Unknown error').'. A meeting link is required for virtual visits. Please check VideoSDK configuration and try again.',
                     ]);
@@ -183,8 +183,8 @@ class ScheduleManagementController extends Controller
             app(\App\Services\VisitSessionService::class)->createForVisit($visit, $roomId);
         }
 
-        // Notify monitoring officer if assigned and it's a new assignment
-        if ($request->monitoring_officer_id && $oldMonitoringOfficerId !== $request->monitoring_officer_id) {
+        // Notify jail officer if assigned and it's a new assignment
+        if ($request->jail_officer_id && $oldJailOfficerId !== $request->jail_officer_id) {
             NotificationService::notifyMonitoringOfficerAboutVisit($visit);
         }
 
@@ -236,23 +236,23 @@ class ScheduleManagementController extends Controller
      */
     public function updateStatus(Request $request, Visit $visit): RedirectResponse
     {
-        // Normalize empty or invalid monitoring_officer_id so validation and update work when changing to pending/rejected
-        $moId = $request->input('monitoring_officer_id');
+        // Normalize empty or invalid jail_officer_id so validation and update work when changing to pending/rejected
+        $moId = $request->input('jail_officer_id');
         if ($moId === '' || $moId === null || (is_string($moId) && trim($moId) === '')) {
-            $request->merge(['monitoring_officer_id' => null]);
+            $request->merge(['jail_officer_id' => null]);
         }
 
         $rules = [
             'status' => 'required|in:pending,approved,rejected,completed,missed,cancelled',
             'rejection_reason' => ['required_if:status,rejected', 'string', 'min:10', 'max:1000'],
-            'monitoring_officer_id' => ['nullable', 'exists:users,id'],
+            'jail_officer_id' => ['nullable', 'exists:users,id'],
         ];
         if ($request->status === 'approved' && $visit->visit_type === VisitType::Virtual) {
-            $rules['monitoring_officer_id'] = ['required', 'exists:users,id'];
+            $rules['jail_officer_id'] = ['required', 'exists:users,id'];
         }
         $request->validate($rules);
 
-        $oldMonitoringOfficerId = $visit->monitoring_officer_id;
+        $oldJailOfficerId = $visit->jail_officer_id;
         $updateData = ['status' => VisitStatus::from($request->status)];
 
         if ($request->status === 'rejected') {
@@ -261,10 +261,10 @@ class ScheduleManagementController extends Controller
             $updateData['rejection_reason'] = null;
         }
 
-        if ($request->status === 'approved' && $request->filled('monitoring_officer_id')) {
-            $updateData['monitoring_officer_id'] = $request->monitoring_officer_id;
+        if ($request->status === 'approved' && $request->filled('jail_officer_id')) {
+            $updateData['jail_officer_id'] = $request->jail_officer_id;
         } elseif (in_array($request->status, ['rejected', 'pending'], true)) {
-            $updateData['monitoring_officer_id'] = null;
+            $updateData['jail_officer_id'] = null;
         }
 
         // When approving virtual visit, auto-generate meeting link if not already set (required)
@@ -312,7 +312,7 @@ class ScheduleManagementController extends Controller
             app(\App\Services\VisitSessionService::class)->createForVisit($visit, $visit->daily_co_room_id);
         }
 
-        if ($request->monitoring_officer_id && $oldMonitoringOfficerId !== $request->monitoring_officer_id && in_array($request->status, ['approved', 'pending'])) {
+        if ($request->jail_officer_id && $oldJailOfficerId !== $request->jail_officer_id && in_array($request->status, ['approved', 'pending'])) {
             NotificationService::notifyMonitoringOfficerAboutVisit($visit);
         }
 

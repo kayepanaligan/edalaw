@@ -36,6 +36,9 @@ Route::get('/', function () {
         if ($role === 'visitor') {
             return redirect()->route('dashboard.visitor');
         }
+        if ($role === 'jail_officer') {
+            return redirect()->route('dashboard.jail-officer');
+        }
 
         return redirect()->route('dashboard');
     }
@@ -132,6 +135,9 @@ Route::middleware(['auth', 'verified', 'approved'])->group(function () {
         if ($role === 'monitoring_officer') {
             return redirect()->route('dashboard.monitoring-officer');
         }
+        if ($role === 'jail_officer') {
+            return redirect()->route('dashboard.jail-officer');
+        }
 
         return Inertia::render('dashboard');
 
@@ -152,6 +158,9 @@ Route::middleware(['auth', 'verified', 'approved'])->group(function () {
 
     Route::middleware(['role:monitoring_officer'])->get('dashboard/monitoring-officer', [\App\Http\Controllers\MonitoringOfficer\AnalyticsController::class, 'index'])
         ->name('dashboard.monitoring-officer');
+
+    Route::middleware(['role:jail_officer'])->get('dashboard/jail-officer', [\App\Http\Controllers\JailOfficer\AnalyticsController::class, 'index'])
+        ->name('dashboard.jail-officer');
 
     Route::middleware(['role:super_admin,monitoring_officer'])->prefix('monitoring')->name('monitoring.')->group(function () {
         Route::get('video-recordings', [\App\Http\Controllers\MonitoringOfficer\VideoRecordingsController::class, 'index'])
@@ -182,6 +191,15 @@ Route::middleware(['auth', 'verified', 'approved'])->group(function () {
             ->name('video-recordings.index');
         Route::get('chat-recordings', [\App\Http\Controllers\MonitoringOfficer\ChatRecordingsController::class, 'index'])
             ->name('chat-recordings.index');
+
+        // Chat Logs Management
+        Route::get('chat-logs', [\App\Http\Controllers\JailOfficer\ChatLogsController::class, 'index'])
+            ->name('chat-logs.index');
+        Route::get('chat-logs/export', [\App\Http\Controllers\JailOfficer\ChatLogsController::class, 'exportCsv'])
+            ->name('chat-logs.export');
+        Route::get('chat-logs/session/{session}', [\App\Http\Controllers\JailOfficer\ChatLogsController::class, 'showSession'])
+            ->name('chat-logs.session');
+
         Route::get('analytics', [\App\Http\Controllers\MonitoringOfficer\AnalyticsController::class, 'index'])
             ->name('analytics.index');
         Route::get('analytics/export/csv', [\App\Http\Controllers\MonitoringOfficer\AnalyticsController::class, 'exportCsv'])
@@ -329,6 +347,8 @@ Route::middleware(['auth', 'verified', 'approved'])->group(function () {
             ->name('appeals.index');
         Route::post('appeals', [\App\Http\Controllers\Visitor\AppealController::class, 'store'])
             ->name('appeals.store');
+        Route::get('appeals/documents/{document}/download', [\App\Http\Controllers\Visitor\AppealController::class, 'downloadDocument'])
+            ->name('appeals.documents.download');
         Route::get('suggestions', [\App\Http\Controllers\Visitor\SuggestionController::class, 'index'])
             ->name('suggestions.index');
         Route::post('suggestions', [\App\Http\Controllers\Visitor\SuggestionController::class, 'store'])
@@ -426,6 +446,147 @@ Route::middleware(['auth', 'verified', 'approved'])->group(function () {
             ->name('cell-schedules.bulk-update');
     });
 
+    // Unified Jail Officer Routes (combines Monitoring Officer + BJMP Officer features)
+    Route::middleware(['role:jail_officer'])->prefix('jail-officer')->name('jail-officer.')->group(function () {
+        // Dashboard
+        Route::get('dashboard', [\App\Http\Controllers\JailOfficer\AnalyticsController::class, 'index'])
+            ->name('dashboard');
+        Route::get('dashboard/export/csv', [\App\Http\Controllers\JailOfficer\AnalyticsController::class, 'exportCsv'])
+            ->name('dashboard.export.csv');
+
+        // Notifications
+        Route::get('notifications', [\App\Http\Controllers\JailOfficer\NotificationController::class, 'index'])
+            ->name('notifications.index');
+        Route::post('notifications/{notification}/read', [\App\Http\Controllers\JailOfficer\NotificationController::class, 'markAsRead'])
+            ->name('notifications.read');
+        Route::post('notifications/read-all', [\App\Http\Controllers\JailOfficer\NotificationController::class, 'markAllAsRead'])
+            ->name('notifications.read-all');
+
+        // Schedule Management (Visits)
+        Route::get('schedules', [\App\Http\Controllers\JailOfficer\ScheduleManagementController::class, 'index'])
+            ->name('schedules.index');
+        Route::post('schedules/{visit}/approve', [\App\Http\Controllers\JailOfficer\ScheduleManagementController::class, 'approve'])
+            ->name('schedules.approve');
+        Route::post('schedules/{visit}/reject', [\App\Http\Controllers\JailOfficer\ScheduleManagementController::class, 'reject'])
+            ->name('schedules.reject');
+        Route::post('schedules/{visit}/update-status', [\App\Http\Controllers\JailOfficer\ScheduleManagementController::class, 'updateStatus'])
+            ->name('schedules.update-status');
+        Route::post('schedules/{visit}/generate-access-key', [\App\Http\Controllers\JailOfficer\ScheduleManagementController::class, 'generateAccessKey'])
+            ->name('schedules.generate-access-key');
+        Route::post('schedules/{visit}/reschedule', [\App\Http\Controllers\JailOfficer\ScheduleManagementController::class, 'reschedule'])
+            ->name('schedules.reschedule');
+        Route::get('visit-session/{session}/join', [\App\Http\Controllers\StaffVisitSessionJoinController::class, 'join'])
+            ->name('visit-session.join');
+
+        // Eburol Management
+        Route::get('eburols', [\App\Http\Controllers\JailOfficer\EburolManagementController::class, 'index'])
+            ->name('eburols.index');
+        Route::get('eburols/{eburol}/document/death-certificate', [\App\Http\Controllers\JailOfficer\EburolManagementController::class, 'deathCertificate'])
+            ->name('eburols.document.death-certificate');
+        Route::get('eburols/{eburol}/document/relationship-proof', [\App\Http\Controllers\JailOfficer\EburolManagementController::class, 'relationshipProof'])
+            ->name('eburols.document.relationship-proof');
+        Route::post('eburols/{eburol}/approve', [\App\Http\Controllers\JailOfficer\EburolManagementController::class, 'approve'])
+            ->name('eburols.approve');
+        Route::post('eburols/{eburol}/reject', [\App\Http\Controllers\JailOfficer\EburolManagementController::class, 'reject'])
+            ->name('eburols.reject');
+        Route::post('eburols/{eburol}/update-status', [\App\Http\Controllers\JailOfficer\EburolManagementController::class, 'updateStatus'])
+            ->name('eburols.update-status');
+
+        // Session Monitoring & Assigned Sessions
+        Route::get('assigned-sessions', [\App\Http\Controllers\JailOfficer\AssignedSessionsController::class, 'index'])
+            ->name('assigned-sessions.index');
+        Route::post('assigned-sessions/{session}/generate-tunnel', [\App\Http\Controllers\JailOfficer\AssignedSessionsController::class, 'generateTunnel'])
+            ->name('assigned-sessions.generate-tunnel');
+        Route::post('assigned-sessions/{session}/start', [\App\Http\Controllers\JailOfficer\AssignedSessionsController::class, 'startSession'])
+            ->name('assigned-sessions.start');
+        Route::post('assigned-sessions/{session}/end', [\App\Http\Controllers\JailOfficer\AssignedSessionsController::class, 'endSession'])
+            ->name('assigned-sessions.end');
+        Route::post('assigned-sessions/{session}/lock-chat', [\App\Http\Controllers\JailOfficer\AssignedSessionsController::class, 'lockChat'])
+            ->name('assigned-sessions.lock-chat');
+        Route::post('assigned-sessions/{session}/unlock-chat', [\App\Http\Controllers\JailOfficer\AssignedSessionsController::class, 'unlockChat'])
+            ->name('assigned-sessions.unlock-chat');
+        Route::get('assigned-sessions/{session}/join', [\App\Http\Controllers\JailOfficer\AssignedSessionsController::class, 'joinAsObserver'])
+            ->name('assigned-sessions.join');
+
+        // Visit & Eburol Monitoring
+        Route::get('visit-monitoring', \App\Http\Controllers\JailOfficer\VisitMonitoringController::class)
+            ->name('visit-monitoring');
+        Route::get('eburol-monitoring', \App\Http\Controllers\JailOfficer\EburolMonitoringController::class)
+            ->name('eburol-monitoring');
+        Route::get('session-monitoring', [\App\Http\Controllers\JailOfficer\SessionMonitoringController::class, 'index'])
+            ->name('session-monitoring.index');
+
+        // Recordings
+        Route::get('video-recordings', [\App\Http\Controllers\JailOfficer\VideoRecordingsController::class, 'index'])
+            ->name('video-recordings.index');
+        Route::get('chat-recordings', [\App\Http\Controllers\JailOfficer\ChatRecordingsController::class, 'index'])
+            ->name('chat-recordings.index');
+        Route::get('chat-recordings/session/{session}', [\App\Http\Controllers\JailOfficer\ChatRecordingsController::class, 'viewSession'])
+            ->name('chat-recordings.view-session');
+        Route::get('chat-recordings/session/{session}/export', [\App\Http\Controllers\JailOfficer\ChatRecordingsController::class, 'exportSession'])
+            ->name('chat-recordings.export-session');
+
+        // Incident Reporting
+        Route::get('incidents', [\App\Http\Controllers\JailOfficer\IncidentReportingController::class, 'index'])
+            ->name('incidents.index');
+
+        // History
+        Route::get('history', [\App\Http\Controllers\JailOfficer\HistoryController::class, 'index'])
+            ->name('history.index');
+
+        // Inmate Tunnels
+        Route::get('inmate-tunnels', [\App\Http\Controllers\JailOfficer\InmateTunnelController::class, 'index'])
+            ->name('inmate-tunnels.index');
+
+        // Appeal Review
+        Route::get('appeals', [\App\Http\Controllers\JailOfficer\AppealReviewController::class, 'index'])
+            ->name('appeals.index');
+        Route::post('appeals/{appeal}/review', [\App\Http\Controllers\JailOfficer\AppealReviewController::class, 'review'])
+            ->name('appeals.review');
+
+        // Audit Logs
+        Route::get('audit-logs', [\App\Http\Controllers\JailOfficer\AuditLogController::class, 'index'])
+            ->name('audit-logs.index');
+
+        // Cell Management
+        Route::get('cells', [\App\Http\Controllers\JailOfficer\CellManagementController::class, 'index'])
+            ->name('cells.index');
+        Route::post('cells', [\App\Http\Controllers\JailOfficer\CellManagementController::class, 'store'])
+            ->name('cells.store');
+        Route::put('cells/{cell}', [\App\Http\Controllers\JailOfficer\CellManagementController::class, 'update'])
+            ->name('cells.update');
+        Route::delete('cells/{cell}', [\App\Http\Controllers\JailOfficer\CellManagementController::class, 'destroy'])
+            ->name('cells.destroy');
+
+        // Inmate Management
+        Route::get('inmates', [\App\Http\Controllers\JailOfficer\InmateManagementController::class, 'index'])
+            ->name('inmates.index');
+        Route::post('inmates', [\App\Http\Controllers\JailOfficer\InmateManagementController::class, 'store'])
+            ->name('inmates.store');
+        Route::put('inmates/{inmate}', [\App\Http\Controllers\JailOfficer\InmateManagementController::class, 'update'])
+            ->name('inmates.update');
+        Route::delete('inmates/{inmate}', [\App\Http\Controllers\JailOfficer\InmateManagementController::class, 'destroy'])
+            ->name('inmates.destroy');
+        Route::post('inmates/{inmate}/transfer', [\App\Http\Controllers\JailOfficer\InmateManagementController::class, 'transfer'])
+            ->name('inmates.transfer');
+
+        // Cell Schedule Templates
+        Route::get('cell-schedules', [\App\Http\Controllers\JailOfficer\CellScheduleTemplateController::class, 'index'])
+            ->name('cell-schedules.index');
+        Route::put('cell-schedules/{cell}', [\App\Http\Controllers\JailOfficer\CellScheduleTemplateController::class, 'update'])
+            ->name('cell-schedules.update');
+        Route::post('cell-schedules/bulk-update', [\App\Http\Controllers\JailOfficer\CellScheduleTemplateController::class, 'bulkUpdate'])
+            ->name('cell-schedules.bulk-update');
+
+        // Chat Logs Management
+        Route::get('chat-logs', [\App\Http\Controllers\JailOfficer\ChatLogsController::class, 'index'])
+            ->name('chat-logs.index');
+        Route::get('chat-logs/export', [\App\Http\Controllers\JailOfficer\ChatLogsController::class, 'exportCsv'])
+            ->name('chat-logs.export');
+        Route::get('chat-logs/session/{session}', [\App\Http\Controllers\JailOfficer\ChatLogsController::class, 'showSession'])
+            ->name('chat-logs.session');
+    });
+
     Route::middleware(['role:super_admin'])->prefix('admin')->name('admin.')->group(function () {
         Route::get('appeals', [\App\Http\Controllers\Admin\AppealsOversightController::class, 'index'])
             ->name('appeals.index');
@@ -465,6 +626,22 @@ Route::middleware(['auth', 'verified', 'approved'])->group(function () {
             ->name('incident-reporting.index');
         Route::get('inmate-tunnels', [\App\Http\Controllers\Admin\InmateTunnelController::class, 'index'])
             ->name('inmate-tunnels.index');
+
+        // Chat Logs Management
+        Route::get('chat-logs', [\App\Http\Controllers\JailOfficer\ChatLogsController::class, 'index'])
+            ->name('chat-logs.index');
+        Route::get('chat-logs/export', [\App\Http\Controllers\JailOfficer\ChatLogsController::class, 'exportCsv'])
+            ->name('chat-logs.export');
+        Route::get('chat-logs/session/{session}', [\App\Http\Controllers\JailOfficer\ChatLogsController::class, 'showSession'])
+            ->name('chat-logs.session');
+
+        // Chat Recordings Management
+        Route::get('chat-recordings', [\App\Http\Controllers\JailOfficer\ChatRecordingsController::class, 'index'])
+            ->name('chat-recordings.index');
+        Route::get('chat-recordings/session/{session}', [\App\Http\Controllers\JailOfficer\ChatRecordingsController::class, 'viewSession'])
+            ->name('chat-recordings.view-session');
+        Route::get('chat-recordings/session/{session}/export', [\App\Http\Controllers\JailOfficer\ChatRecordingsController::class, 'exportSession'])
+            ->name('chat-recordings.export-session');
     });
 });
 

@@ -88,8 +88,8 @@ type Visit = {
     join_url: string | null;
     access_key: string | null;
     access_key_expires_at: string | null;
-    monitoring_officer_id: number | null;
-    monitoring_officer_name: string | null;
+    jail_officer_id: number | null;
+    jail_officer_name: string | null;
     rejection_reason: string | null;
     created_at: string;
     can_appeal?: boolean;
@@ -657,15 +657,15 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
             },
         },
         {
-            id: 'monitoring_officer',
-            header: 'Monitoring Officer',
+            id: 'jail_officer',
+            header: 'Jail Officer',
             cell: ({ row }) => {
                 const visit = row.original;
                 if (visit.visit_type === 'physical') {
                     return <span className="text-sm text-muted-foreground">Not applicable</span>;
                 }
-                if (visit.monitoring_officer_name) {
-                    return <span className="text-sm">{visit.monitoring_officer_name}</span>;
+                if (visit.jail_officer_name) {
+                    return <span className="text-sm">{visit.jail_officer_name}</span>;
                 }
                 return <span className="text-sm text-muted-foreground">Not assigned</span>;
             },
@@ -912,7 +912,6 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
                     </CardContent>
                 </Card>
 
-                {/* Video Call Terms & Conditions Modal */}
                 <Dialog open={videoTermsModalOpen} onOpenChange={setVideoTermsModalOpen}>
                     <DialogContent>
                         <DialogHeader>

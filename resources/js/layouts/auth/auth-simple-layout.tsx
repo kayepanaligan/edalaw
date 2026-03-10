@@ -16,11 +16,26 @@ export default function AuthSimpleLayout({
                             href={home()}
                             className="flex flex-col items-center gap-2 font-medium"
                         >
-                            <div className="mb-1 flex h-30 w-30 items-center justify-center rounded-md">
+                            <div className="mb-4 flex items-center justify-center gap-4 md:gap-8">
+                                <img
+                                    src="/cids_logo.png"
+                                    alt="CIDS Logo"
+                                    className="h-20 w-auto object-contain md:h-35"
+                                />
+                                <img
+                                    src="/dssc_logo.png"
+                                    alt="DSSC Logo"
+                                    className="h-18 w-auto object-contain md:h-30"
+                                />
                                 <img
                                     src="/edalaw_logo.png"
                                     alt="EDALaw Logo"
-                                    className="h-100 w-auto object-contain"
+                                    className="h-18 w-auto object-contain md:h-30"
+                                />
+                                <img
+                                    src="/bjmp_logo.png"
+                                    alt="BJMP Logo"
+                                    className="h-18 w-auto object-contain md:h-30"
                                 />
                             </div>
                             <span className="sr-only">{title}</span>
