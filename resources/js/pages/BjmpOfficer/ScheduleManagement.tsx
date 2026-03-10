@@ -65,8 +65,8 @@ type Visit = {
     notes: string | null;
     meeting_link: string | null;
     rejection_reason: string | null;
-    monitoring_officer_id: number | null;
-    monitoring_officer_name: string | null;
+    jail_officer_id: number | null;
+    jail_officer_name: string | null;
     access_key: string | null;
     created_at: string;
     schedule_started?: boolean;
@@ -175,13 +175,13 @@ export default function ScheduleManagement({ visits, stats, monitoringOfficers }
     });
 
     const approveForm = useForm({
-        monitoring_officer_id: '',
+        jail_officer_id: '',
     });
 
     const statusForm = useForm({
         status: 'pending' as 'pending' | 'approved' | 'rejected' | 'missed' | 'completed',
         rejection_reason: '',
-        monitoring_officer_id: '',
+        jail_officer_id: '',
     });
 
     const rescheduleForm = useForm({
@@ -194,14 +194,14 @@ export default function ScheduleManagement({ visits, stats, monitoringOfficers }
             return;
         }
 
-        if (selectedVisit.visit_type === 'virtual' && !approveForm.data.monitoring_officer_id) {
-            toast.error('Please select a monitoring officer for this virtual visit.');
+        if (selectedVisit.visit_type === 'virtual' && !approveForm.data.jail_officer_id) {
+            toast.error('Please select a jail officer for this virtual visit.');
             return;
         }
 
-        const payload: { monitoring_officer_id?: string } = {};
+        const payload: { jail_officer_id?: string } = {};
         if (selectedVisit.visit_type === 'virtual') {
-            payload.monitoring_officer_id = approveForm.data.monitoring_officer_id;
+            payload.jail_officer_id = approveForm.data.jail_officer_id;
         }
         router.post(`/bjmp-officer/schedules/${selectedVisit.id}/approve`, payload, {
             preserveScroll: true,
@@ -254,8 +254,8 @@ export default function ScheduleManagement({ visits, stats, monitoringOfficers }
         }
 
         if (statusForm.data.status === 'approved' && selectedVisit.visit_type === 'virtual') {
-            if (!statusForm.data.monitoring_officer_id) {
-                toast.error('Please select the monitoring officer responsible for this virtual visit.');
+            if (!statusForm.data.jail_officer_id) {
+                toast.error('Please select the jail officer responsible for this virtual visit.');
                 return;
             }
         }
@@ -376,15 +376,15 @@ export default function ScheduleManagement({ visits, stats, monitoringOfficers }
             },
         },
         {
-            id: 'monitoring_officer',
-            header: 'Monitoring Officer',
+            id: 'jail_officer',
+            header: 'Jail Officer',
             cell: ({ row }) => {
                 const visit = row.original;
                 if (visit.visit_type === 'physical') {
                     return <span className="text-sm text-muted-foreground">Not applicable</span>;
                 }
-                if (visit.monitoring_officer_name) {
-                    return <span className="text-sm">{visit.monitoring_officer_name}</span>;
+                if (visit.jail_officer_name) {
+                    return <span className="text-sm">{visit.jail_officer_name}</span>;
                 }
                 return <span className="text-sm text-muted-foreground">Not assigned</span>;
             },
@@ -418,6 +418,24 @@ export default function ScheduleManagement({ visits, stats, monitoringOfficers }
             header: '',
             cell: ({ row }) => {
                 const visit = row.original;
+                // Join video call button for approved virtual visits with active sessions
+                if (visit.visit_type === 'virtual' && visit.status === 'approved' && visit.visit_session_id) {
+                    return (
+                        <Button 
+                            size="sm" 
+                            variant="outline" 
+                            className="bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
+                            onClick={() => {
+                                // Open video call in new tab
+                                window.open(`/visit-session/${visit.visit_session_id}/join`, '_blank');
+                            }}
+                            title="Join video call in new tab"
+                        >
+                            <Video className="mr-1 h-4 w-4" />
+                            Join
+                        </Button>
+                    );
+                }
                 if (visit.visit_type === 'physical' && visit.status === 'approved') {
                     return (
                         <Button size="sm" variant="outline" asChild>
@@ -477,7 +495,7 @@ export default function ScheduleManagement({ visits, stats, monitoringOfficers }
                                     statusForm.setData({
                                         status: visit.status,
                                         rejection_reason: visit.rejection_reason || '',
-                                        monitoring_officer_id: visit.monitoring_officer_id?.toString() ?? '',
+                                        jail_officer_id: visit.jail_officer_id?.toString() ?? '',
                                     });
                                     setIsStatusModalOpen(true);
                                 }}
@@ -493,7 +511,7 @@ export default function ScheduleManagement({ visits, stats, monitoringOfficers }
                                             setSelectedVisit(visit);
                                             approveForm.reset();
                                             if (visit.visit_type === 'virtual') {
-                                                approveForm.setData('monitoring_officer_id', visit.monitoring_officer_id?.toString() ?? '');
+                                                approveForm.setData('jail_officer_id', visit.jail_officer_id?.toString() ?? '');
                                             }
                                             setIsApproveModalOpen(true);
                                         }}
@@ -719,15 +737,15 @@ export default function ScheduleManagement({ visits, stats, monitoringOfficers }
                         <div className="space-y-4">
                             {selectedVisit && selectedVisit.visit_type === 'virtual' && (
                                 <div className="space-y-2">
-                                    <Label htmlFor="monitoring_officer_id">
-                                        Monitoring Officer <span className="text-destructive">*</span>
+                                    <Label htmlFor="approve_jail_officer_id">
+                                        Jail Officer <span className="text-destructive">*</span>
                                     </Label>
                                     <Select
-                                        value={approveForm.data.monitoring_officer_id}
-                                        onValueChange={(value) => approveForm.setData('monitoring_officer_id', value)}
+                                        value={approveForm.data.jail_officer_id}
+                                        onValueChange={(value) => approveForm.setData('jail_officer_id', value)}
                                     >
-                                        <SelectTrigger id="monitoring_officer_id">
-                                            <SelectValue placeholder="Select monitoring officer" />
+                                        <SelectTrigger id="approve_jail_officer_id">
+                                            <SelectValue placeholder="Select jail officer" />
                                         </SelectTrigger>
                                         <SelectContent>
                                             {monitoringOfficers.map((officer) => (
@@ -737,7 +755,7 @@ export default function ScheduleManagement({ visits, stats, monitoringOfficers }
                                             ))}
                                         </SelectContent>
                                     </Select>
-                                    <InputError message={approveForm.errors.monitoring_officer_id} />
+                                    <InputError message={approveForm.errors.jail_officer_id} />
                                     <p className="text-xs text-muted-foreground">
                                         The selected officer will oversee this virtual visit and will be notified. A video meeting link is created automatically.
                                     </p>
@@ -870,15 +888,15 @@ export default function ScheduleManagement({ visits, stats, monitoringOfficers }
                             )}
                             {statusForm.data.status === 'approved' && selectedVisit?.visit_type === 'virtual' && monitoringOfficers && monitoringOfficers.length > 0 && (
                                 <div className="space-y-2">
-                                    <Label htmlFor="status_monitoring_officer_id">
-                                        Monitoring Officer <span className="text-destructive">*</span>
+                                    <Label htmlFor="status_jail_officer_id">
+                                        Jail Officer <span className="text-destructive">*</span>
                                     </Label>
                                     <Select
-                                        value={statusForm.data.monitoring_officer_id}
-                                        onValueChange={(value) => statusForm.setData('monitoring_officer_id', value)}
+                                        value={statusForm.data.jail_officer_id}
+                                        onValueChange={(value) => statusForm.setData('jail_officer_id', value)}
                                     >
-                                        <SelectTrigger id="status_monitoring_officer_id">
-                                            <SelectValue placeholder="Select monitoring officer" />
+                                        <SelectTrigger id="status_jail_officer_id">
+                                            <SelectValue placeholder="Select jail officer" />
                                         </SelectTrigger>
                                         <SelectContent>
                                             {monitoringOfficers.map((officer) => (
@@ -888,7 +906,7 @@ export default function ScheduleManagement({ visits, stats, monitoringOfficers }
                                             ))}
                                         </SelectContent>
                                     </Select>
-                                    <InputError message={statusForm.errors.monitoring_officer_id} />
+                                    <InputError message={statusForm.errors.jail_officer_id} />
                                     <p className="text-xs text-muted-foreground">
                                         Required when approving. A meeting link is generated automatically if not already set.
                                     </p>

@@ -107,6 +107,9 @@ function MeetingInitializer({
         return (
             <div className="flex h-full w-full flex-col items-center justify-center gap-4 bg-background p-6">
                 <p className="text-muted-foreground">Connecting…</p>
+                <p className="text-sm text-blue-600">
+                    Voice communication is disabled. Please use the chat feature to communicate.
+                </p>
                 {connectingTooLong && (
                     <p className="max-w-sm text-center text-sm text-muted-foreground">
                         Taking a while? The meeting may be unavailable, or your network may be blocking the connection.
@@ -328,6 +331,8 @@ export default function VideoRoom({
     }
 
     // MeetingProvider mounts only after user clicked Join and props are validated. Join is called inside child (MeetingInitializer) once.
+    // For visitors and inmates: mic is disabled (chat-only communication), webcam can be enabled
+    // For observers: both mic and webcam are disabled
     return (
         <>
             <Head title="Video Call" />
@@ -335,8 +340,8 @@ export default function VideoRoom({
                 <MeetingProvider
                     config={{
                         meetingId,
-                        micEnabled: !is_observer,
-                        webcamEnabled: !is_observer,
+                        micEnabled: false, // Always disable microphone - chat only communication
+                        webcamEnabled: !is_observer, // Only visitors/inmates can enable webcam, not observers
                         name: participant_name,
                         mode: is_observer ? 'RECV_ONLY' : 'SEND_AND_RECV',
                         debugMode: import.meta.env.DEV,

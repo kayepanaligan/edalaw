@@ -19,6 +19,7 @@ class SampleUsersSeeder extends Seeder
         $bjmpOfficerRole = Role::where('slug', 'bjmp_officer')->first();
         $visitorRole = Role::where('slug', 'visitor')->first();
         $monitoringOfficerRole = Role::where('slug', 'monitoring_officer')->first();
+        $jailOfficerRole = Role::where('slug', 'jail_officer')->first();
 
         // Super Admin
         User::updateOrCreate(
@@ -103,6 +104,28 @@ class SampleUsersSeeder extends Seeder
                 'province' => 'Davao del Sur',
                 'postal_code' => '8002',
                 'role_id' => $monitoringOfficerRole->id,
+                'approval_status' => ApprovalStatus::Approved,
+                'email_verified_at' => now(),
+            ]
+        );
+
+        // Jail Officer (Unified Role - combines BJMP Officer + Monitoring Officer)
+        User::updateOrCreate(
+            ['email' => 'jailofficer@example.com'],
+            [
+                'first_name' => 'Roberto',
+                'middle_name' => 'Diaz',
+                'last_name' => 'Fernandez',
+                'email' => 'jailofficer@example.com',
+                'password' => Hash::make('asdf1234'),
+                'dob' => '1983-07-25',
+                'gender' => 'male',
+                'street' => '555 Jail Facility Road',
+                'brgy' => 'Central',
+                'municipality' => 'Digos City',
+                'province' => 'Davao del Sur',
+                'postal_code' => '8002',
+                'role_id' => $jailOfficerRole?->id,
                 'approval_status' => ApprovalStatus::Approved,
                 'email_verified_at' => now(),
             ]

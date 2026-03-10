@@ -31,5 +31,10 @@ class RoleSeeder extends Seeder
             ['slug' => 'monitoring_officer'],
             ['name' => 'Monitoring Officer']
         );
+
+        Role::firstOrCreate(
+            ['slug' => 'jail_officer'],
+            ['name' => 'Jail Officer']
+        );
     }
 }

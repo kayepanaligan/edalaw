@@ -21,7 +21,7 @@ class Visit extends Model
      */
     protected $fillable = [
         'user_id',
-        'monitoring_officer_id',
+        'jail_officer_id',
         'scheduled_date',
         'scheduled_time',
         'visit_type',
@@ -147,13 +147,13 @@ class Visit extends Model
     }
 
     /**
-     * Get the monitoring officer assigned to the visit.
+     * Get the jail officer assigned to the visit.
      *
      * @return BelongsTo<User, Visit>
      */
-    public function monitoringOfficer(): BelongsTo
+    public function jailOfficer(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'monitoring_officer_id');
+        return $this->belongsTo(User::class, 'jail_officer_id');
     }
 
     /**

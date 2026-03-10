@@ -49,7 +49,7 @@ class EburolManagementController extends Controller
                     'status' => $eburol->status->value,
                     'admin_notes' => $eburol->admin_notes,
                     'rejection_reason' => $eburol->rejection_reason,
-                    'monitoring_officer_id' => $eburol->monitoring_officer_id,
+                    'jail_officer_id' => $eburol->jail_officer_id,
                     'death_certificate_path' => $eburol->death_certificate_path ? route('bjmp-officer.eburols.document.death-certificate', $eburol) : null,
                     'relationship_proof_path' => $eburol->relationship_proof_path ? route('bjmp-officer.eburols.document.relationship-proof', $eburol) : null,
                     'created_at' => $eburol->created_at->format('Y-m-d H:i:s'),
@@ -65,7 +65,7 @@ class EburolManagementController extends Controller
         ];
 
         $monitoringOfficers = \App\Models\User::whereHas('role', function ($query) {
-            $query->where('slug', 'monitoring_officer');
+            $query->where('slug', 'jail_officer');
         })
             ->where('approval_status', 'approved')
             ->orderBy('first_name')
@@ -91,7 +91,7 @@ class EburolManagementController extends Controller
     public function approve(Request $request, Eburol $eburol): RedirectResponse
     {
         $request->validate([
-            'monitoring_officer_id' => ['required', 'exists:users,id'],
+            'jail_officer_id' => ['required', 'exists:users,id'],
         ]);
 
         // Create VideoSDK room and visit session (with inmate tunnel) before approving
@@ -113,7 +113,7 @@ class EburolManagementController extends Controller
         $roomId = $roomResult['room_id'] ?? null;
         $updateData = [
             'status' => EburolStatus::Approved,
-            'monitoring_officer_id' => $request->monitoring_officer_id,
+            'jail_officer_id' => $request->jail_officer_id,
             'daily_co_room_id' => $roomId,
             'daily_co_room_name' => $roomResult['room_name'] ?? $roomName,
             'daily_co_room_url' => $roomResult['room_url'] ?? null,
@@ -191,17 +191,17 @@ class EburolManagementController extends Controller
     public function updateStatus(Request $request, Eburol $eburol): RedirectResponse
     {
         $request->merge([
-            'monitoring_officer_id' => $request->filled('monitoring_officer_id') ? $request->monitoring_officer_id : null,
+            'jail_officer_id' => $request->filled('jail_officer_id') ? $request->jail_officer_id : null,
         ]);
 
         $request->validate([
             'status' => 'required|in:pending,approved,rejected,completed',
             'rejection_reason' => ['required_if:status,rejected', 'string', 'min:10', 'max:1000'],
-            'monitoring_officer_id' => ['nullable', 'exists:users,id'],
+            'jail_officer_id' => ['nullable', 'exists:users,id'],
         ]);
 
         $oldStatus = $eburol->status->value;
-        $oldMonitoringOfficerId = $eburol->monitoring_officer_id;
+        $oldJailOfficerId = $eburol->jail_officer_id;
         $updateData = ['status' => EburolStatus::from($request->status)];
 
         // If rejecting, require and store rejection reason
@@ -212,16 +212,16 @@ class EburolManagementController extends Controller
             $updateData['rejection_reason'] = null;
         }
 
-        if ($request->filled('monitoring_officer_id')) {
-            $updateData['monitoring_officer_id'] = $request->monitoring_officer_id;
+        if ($request->filled('jail_officer_id')) {
+            $updateData['jail_officer_id'] = $request->jail_officer_id;
         } elseif (in_array($request->status, ['pending', 'rejected', 'completed'], true)) {
-            $updateData['monitoring_officer_id'] = null;
+            $updateData['jail_officer_id'] = null;
         }
 
         $eburol->update($updateData);
 
         $eburol->refresh();
-        if ($request->monitoring_officer_id && $oldMonitoringOfficerId != $request->monitoring_officer_id && in_array($request->status, ['approved', 'pending'])) {
+        if ($request->jail_officer_id && $oldJailOfficerId != $request->jail_officer_id && in_array($request->status, ['approved', 'pending'])) {
             \App\Services\NotificationService::notifyMonitoringOfficerAboutEburol($eburol);
         }
 

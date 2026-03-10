@@ -115,6 +115,11 @@ export function AppSidebar() {
                         href: '/admin/inmate-tunnels',
                         icon: Link2,
                     },
+                    {
+                        title: 'Chat Logs',
+                        href: '/admin/chat-logs',
+                        icon: MessageCircle,
+                    },
                 ],
             },
             {
@@ -337,6 +342,149 @@ export function AppSidebar() {
         ];
     }
 
+    // Jail Officer navigation (combines BJMP Officer + Monitoring Officer features)
+    let jailOfficerNavGroups: Array<{ label: string; items: NavItem[] }> | undefined;
+    if (userRole === 'jail_officer') {
+        const unreadJailCount = page.props.unreadNotificationCount ?? 0;
+        jailOfficerNavGroups = [
+            {
+                label: 'Main',
+                items: [
+                    {
+                        title: 'Dashboard',
+                        href: '/dashboard/jail-officer',
+                        icon: LayoutGrid,
+                    },
+                    {
+                        title: 'Notifications',
+                        href: '/jail-officer/notifications',
+                        icon: Bell,
+                        badge: unreadJailCount > 0 ? unreadJailCount : undefined,
+                    },
+                ],
+            },
+            {
+                label: 'Services',
+                items: [
+                    {
+                        title: 'Visit Schedules',
+                        href: '/jail-officer/schedules',
+                        icon: Calendar,
+                    },
+                    {
+                        title: 'E-Burol',
+                        href: '/jail-officer/eburols',
+                        icon: Heart,
+                    },
+                    {
+                        title: 'Appeals',
+                        href: '/jail-officer/appeals',
+                        icon: Scale,
+                    },
+                ],
+            },
+            {
+                label: 'Session Monitoring',
+                items: [
+                    {
+                        title: 'Assigned Sessions',
+                        href: '/jail-officer/assigned-sessions',
+                        icon: Video,
+                    },
+                    {
+                        title: 'Visit Monitoring',
+                        href: '/jail-officer/visit-monitoring',
+                        icon: Camera,
+                    },
+                    {
+                        title: 'Eburol Monitoring',
+                        href: '/jail-officer/eburol-monitoring',
+                        icon: Monitor,
+                    },
+                    {
+                        title: 'Session Monitoring',
+                        href: '/jail-officer/session-monitoring',
+                        icon: Shield,
+                    },
+                ],
+            },
+            {
+                label: 'Recordings',
+                items: [
+                    {
+                        title: 'Video Recordings',
+                        href: '/jail-officer/video-recordings',
+                        icon: Film,
+                    },
+                    {
+                        title: 'Chat Recordings',
+                        href: '/jail-officer/chat-recordings',
+                        icon: MessageCircle,
+                    },
+                    {
+                        title: 'History',
+                        href: '/jail-officer/history',
+                        icon: FileText,
+                    },
+                ],
+            },
+            {
+                label: 'Facility Management',
+                items: [
+                    {
+                        title: 'Cell Management',
+                        href: '/jail-officer/cells',
+                        icon: Building,
+                    },
+                    {
+                        title: 'Inmate Management',
+                        href: '/jail-officer/inmates',
+                        icon: Users,
+                    },
+                    {
+                        title: 'Cell Schedules',
+                        href: '/jail-officer/cell-schedules',
+                        icon: Clock,
+                    },
+                    {
+                        title: 'Inmate Tunnels',
+                        href: '/jail-officer/inmate-tunnels',
+                        icon: Link2,
+                    },
+                ],
+            },
+            {
+                label: 'Security & Reports',
+                items: [
+                    {
+                        title: 'Incident Reporting',
+                        href: '/jail-officer/incidents',
+                        icon: Flag,
+                    },
+                    {
+                        title: 'Chat Logs',
+                        href: '/jail-officer/chat-logs',
+                        icon: MessageCircle,
+                    },
+                    {
+                        title: 'Audit Logs',
+                        href: '/jail-officer/audit-logs',
+                        icon: FileText,
+                    },
+                ],
+            },
+            {
+                label: 'Configuration',
+                items: [
+                    {
+                        title: 'Settings',
+                        href: '/settings',
+                        icon: Settings,
+                    },
+                ],
+            },
+        ];
+    }
 
     return (
         <Sidebar collapsible="icon" variant="inset">
@@ -361,6 +509,8 @@ export function AppSidebar() {
                     <NavMain groups={bjmpOfficerNavGroups} />
                 ) : userRole === 'monitoring_officer' && monitoringOfficerNavGroups ? (
                     <NavMain groups={monitoringOfficerNavGroups} />
+                ) : userRole === 'jail_officer' && jailOfficerNavGroups ? (
+                    <NavMain groups={jailOfficerNavGroups} />
                 ) : (
                     <NavMain items={mainNavItems} />
                 )}

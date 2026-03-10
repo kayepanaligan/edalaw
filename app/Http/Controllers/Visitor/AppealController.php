@@ -38,26 +38,50 @@ class AppealController extends Controller
 
                 if ($appeal->appealable_type === Visit::class) {
                     $visit = $appeal->appealable;
-                    $appealableData = [
-                        'type' => 'visit',
-                        'id' => $visit->id,
-                        'scheduled_date' => $visit->scheduled_date->format('Y-m-d'),
-                        'scheduled_time' => $visit->scheduled_time,
-                        'visit_type' => $visit->visit_type->value,
-                        'inmate_name' => trim("{$visit->inmate_first_name} {$visit->inmate_middle_name} {$visit->inmate_last_name}"),
-                        'status' => $visit->status->value,
-                    ];
+                    if ($visit) {
+                        $appealableData = [
+                            'type' => 'visit',
+                            'id' => $visit->id,
+                            'scheduled_date' => $visit->scheduled_date->format('Y-m-d'),
+                            'scheduled_time' => $visit->scheduled_time,
+                            'visit_type' => $visit->visit_type->value,
+                            'inmate_name' => trim("{$visit->inmate_first_name} {$visit->inmate_middle_name} {$visit->inmate_last_name}"),
+                            'status' => $visit->status->value,
+                        ];
+                    } else {
+                        $appealableData = [
+                            'type' => 'visit',
+                            'id' => null,
+                            'scheduled_date' => 'N/A',
+                            'scheduled_time' => null,
+                            'visit_type' => 'N/A',
+                            'inmate_name' => 'Record not found',
+                            'status' => 'deleted',
+                        ];
+                    }
                 } else {
                     $eburol = $appeal->appealable;
-                    $appealableData = [
-                        'type' => 'eburol',
-                        'id' => $eburol->id,
-                        'deceased_name' => trim("{$eburol->deceased_first_name} {$eburol->deceased_middle_name} {$eburol->deceased_last_name}"),
-                        'inmate_name' => trim("{$eburol->inmate_first_name} {$eburol->inmate_middle_name} {$eburol->inmate_last_name}"),
-                        'wake_start_date' => $eburol->wake_start_date->format('Y-m-d'),
-                        'wake_end_date' => $eburol->wake_end_date->format('Y-m-d'),
-                        'status' => $eburol->status->value,
-                    ];
+                    if ($eburol) {
+                        $appealableData = [
+                            'type' => 'eburol',
+                            'id' => $eburol->id,
+                            'deceased_name' => trim("{$eburol->deceased_first_name} {$eburol->deceased_middle_name} {$eburol->deceased_last_name}"),
+                            'inmate_name' => trim("{$eburol->inmate_first_name} {$eburol->inmate_middle_name} {$eburol->inmate_last_name}"),
+                            'wake_start_date' => $eburol->wake_start_date->format('Y-m-d'),
+                            'wake_end_date' => $eburol->wake_end_date->format('Y-m-d'),
+                            'status' => $eburol->status->value,
+                        ];
+                    } else {
+                        $appealableData = [
+                            'type' => 'eburol',
+                            'id' => null,
+                            'deceased_name' => 'Record not found',
+                            'inmate_name' => 'Record not found',
+                            'wake_start_date' => 'N/A',
+                            'wake_end_date' => 'N/A',
+                            'status' => 'deleted',
+                        ];
+                    }
                 }
 
                 return [
@@ -278,5 +302,26 @@ class AppealController extends Controller
             // Notify user
             NotificationService::createAppealStatusNotification($appeal);
         }
+    }
+
+    /**
+     * Download an appeal document.
+     */
+    public function downloadDocument(AppealDocument $document)
+    {
+        // Check if the document belongs to an appeal owned by the current user
+        $appeal = Appeal::where('id', $document->appeal_id)
+            ->where('user_id', auth()->id())
+            ->first();
+
+        if (! $appeal) {
+            abort(403, 'You do not have permission to access this document.');
+        }
+
+        if (! Storage::exists($document->file_path)) {
+            abort(404, 'File not found.');
+        }
+
+        return Storage::download($document->file_path, $document->file_name);
     }
 }

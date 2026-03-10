@@ -27,7 +27,7 @@ class ScheduleController extends Controller
      */
     public function index(Request $request): Response
     {
-        $visits = Visit::with(['monitoringOfficer', 'visitSessions' => fn ($q) => $q->orderBy('scheduled_start', 'desc')->limit(1)])
+        $visits = Visit::with(['jailOfficer', 'visitSessions' => fn ($q) => $q->orderBy('scheduled_start', 'desc')->limit(1)])
             ->where('user_id', auth()->id())
             ->orderBy('scheduled_date', 'desc')
             ->orderBy('scheduled_time', 'desc')
@@ -98,8 +98,8 @@ class ScheduleController extends Controller
                     'join_url' => $joinUrl,
                     'access_key' => $visit->access_key,
                     'access_key_expires_at' => $visit->access_key_expires_at?->format('Y-m-d H:i:s'),
-                    'monitoring_officer_id' => $visit->monitoring_officer_id,
-                    'monitoring_officer_name' => $visit->monitoringOfficer ? trim("{$visit->monitoringOfficer->first_name} {$visit->monitoringOfficer->middle_name} {$visit->monitoringOfficer->last_name}") : null,
+                    'jail_officer_id' => $visit->jail_officer_id,
+                    'jail_officer_name' => $visit->jailOfficer ? trim("{$visit->jailOfficer->first_name} {$visit->jailOfficer->middle_name} {$visit->jailOfficer->last_name}") : null,
                     'rejection_reason' => $visit->rejection_reason,
                     'created_at' => $visit->created_at->format('Y-m-d H:i:s'),
                     'can_appeal' => $canAppeal,
