@@ -133,7 +133,7 @@ class UserManagementController extends Controller
     {
         $request->validate([
             'approval_status' => 'required|in:pending,approved,rejected',
-            'rejection_reason' => ['required_if:approval_status,rejected', 'string', 'min:10', 'max:1000'],
+            'rejection_reason' => ['exclude_unless:approval_status,rejected', 'string', 'min:10', 'max:1000'],
         ]);
 
         $updateData = [

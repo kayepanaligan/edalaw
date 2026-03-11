@@ -94,6 +94,14 @@ Route::middleware('guest')->group(function () {
     Route::post('otp-verification/resend', [\App\Http\Controllers\Auth\OtpVerificationController::class, 'resend'])
         ->name('otp-verification.resend');
 
+    // Registration OTP Verification (visitor registration)
+    Route::get('registration/otp', [\App\Http\Controllers\Auth\RegistrationOtpController::class, 'show'])
+        ->name('registration-otp.show');
+    Route::post('registration/otp/verify', [\App\Http\Controllers\Auth\RegistrationOtpController::class, 'verify'])
+        ->name('registration-otp.verify');
+    Route::post('registration/otp/resend', [\App\Http\Controllers\Auth\RegistrationOtpController::class, 'resend'])
+        ->name('registration-otp.resend');
+
     // Password reset via OTP (send OTP to contact number, verify, then reset and logout other sessions)
     Route::get('password/forgot', [\App\Http\Controllers\Auth\PasswordResetOtpController::class, 'showForgotForm'])
         ->name('password.forgot.show');

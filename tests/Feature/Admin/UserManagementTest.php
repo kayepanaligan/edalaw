@@ -1,7 +1,6 @@
 <?php
 
 use App\ApprovalStatus;
-use App\Models\Role;
 use App\Models\User;
 use Database\Seeders\RoleSeeder;
 
@@ -53,10 +52,32 @@ test('super admin can reject a pending user', function () {
         'approval_status' => ApprovalStatus::Pending,
     ]);
 
-    $response = $this->actingAs($superAdmin)->post(route('admin.users.reject', $pendingUser));
+    $response = $this->actingAs($superAdmin)->post(route('admin.users.reject', $pendingUser), [
+        'rejection_reason' => 'Incomplete documents provided.',
+    ]);
 
     $response->assertRedirect();
     expect($pendingUser->fresh()->approval_status)->toBe(ApprovalStatus::Rejected);
+});
+
+test('super admin can update status to approved without providing rejection reason', function () {
+    $superAdmin = User::factory()->superAdmin()->create([
+        'approval_status' => ApprovalStatus::Approved,
+    ]);
+
+    $pendingUser = User::factory()->visitor()->create([
+        'approval_status' => ApprovalStatus::Pending,
+        'rejection_reason' => 'Old reason should be cleared.',
+    ]);
+
+    $response = $this->actingAs($superAdmin)->post(route('admin.users.update-status', $pendingUser), [
+        'approval_status' => 'approved',
+        'rejection_reason' => null,
+    ]);
+
+    $response->assertRedirect();
+    expect($pendingUser->fresh()->approval_status)->toBe(ApprovalStatus::Approved);
+    expect($pendingUser->fresh()->rejection_reason)->toBeNull();
 });
 
 test('user management page displays all users with their status', function () {

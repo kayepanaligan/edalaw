@@ -1,8 +1,8 @@
-import { Head } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 
 import { Button } from '@/components/ui/button';
 import AuthLayout from '@/layouts/auth-layout';
-import { login } from '@/routes';
+import { login, logout } from '@/routes';
 
 type Props = {
     message?: string;
@@ -58,7 +58,11 @@ export default function AccountPending({ message }: Props) {
                         type="button"
                         variant="outline"
                         onClick={() => {
-                            window.location.href = login();
+                            router.post(logout().url, {}, {
+                                onSuccess: () => {
+                                    window.location.href = login().url;
+                                },
+                            });
                         }}
                         className="w-full"
                     >

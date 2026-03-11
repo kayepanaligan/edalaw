@@ -56,8 +56,8 @@ class AppealsOversightController extends Controller
                             'id' => $eburol->id,
                             'deceased_name' => trim("{$eburol->deceased_first_name} {$eburol->deceased_middle_name} {$eburol->deceased_last_name}"),
                             'inmate_name' => trim("{$eburol->inmate_first_name} {$eburol->inmate_middle_name} {$eburol->inmate_last_name}"),
-                            'wake_start_date' => $eburol->wake_start_date->format('Y-m-d'),
-                            'wake_end_date' => $eburol->wake_end_date->format('Y-m-d'),
+                            'wake_start_date' => $eburol->wake_start_date?->format('Y-m-d'),
+                            'wake_end_date' => $eburol->wake_end_date?->format('Y-m-d'),
                             'status' => $eburol->status->value,
                             'admin_notes' => $eburol->admin_notes,
                         ]

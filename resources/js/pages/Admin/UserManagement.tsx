@@ -1,6 +1,6 @@
 import { Head, router, useForm } from '@inertiajs/react';
 import type { ColumnDef } from '@tanstack/react-table';
-import { Plus, MoreVertical, Eye, Edit, Trash2, RefreshCw, Circle, X, LogOut } from 'lucide-react';
+import { Plus, MoreVertical, Eye, Edit, Trash2, RefreshCw, Circle, X, Check, LogOut } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -242,6 +242,18 @@ export default function UserManagement({ users = [], roles: rolesProp = [] }: Pr
         rejectForm.setData('rejection_reason', '');
         setIsRejectDialogOpen(true);
     }, [rejectForm]);
+
+    const handleApprove = useCallback((user: User) => {
+        router.post(`/admin/users/${user.id}/approve`, {}, {
+            preserveScroll: true,
+            onSuccess: () => {
+                toast.success('User approved successfully');
+            },
+            onError: () => {
+                toast.error('Failed to approve user');
+            },
+        });
+    }, []);
 
     const handleDelete = useCallback((user: User) => {
         setSelectedUser(user);
@@ -528,12 +540,18 @@ export default function UserManagement({ users = [], roles: rolesProp = [] }: Pr
                                     Log out user (all devices)
                                 </DropdownMenuItem>
                                 {user.approval_status === 'pending' && (
+                                    <DropdownMenuItem onClick={() => handleApprove(user)}>
+                                        <Check className="mr-2 h-4 w-4" />
+                                        Quick approve
+                                    </DropdownMenuItem>
+                                )}
+                                {user.approval_status === 'pending' && (
                                     <DropdownMenuItem
                                         onClick={() => handleReject(user)}
                                         className="text-destructive focus:text-destructive"
                                     >
                                         <X className="mr-2 h-4 w-4" />
-                                        Reject
+                                        Quick reject
                                     </DropdownMenuItem>
                                 )}
                                 <DropdownMenuSeparator />
@@ -550,7 +568,7 @@ export default function UserManagement({ users = [], roles: rolesProp = [] }: Pr
                 },
             },
         ],
-        [handleView, handleEdit, handleUpdateStatus, handleDelete, handleLogoutUser],
+        [handleView, handleEdit, handleUpdateStatus, handleDelete, handleLogoutUser, handleApprove, handleReject],
     );
 
     const headerActions = useMemo(
@@ -650,91 +668,86 @@ export default function UserManagement({ users = [], roles: rolesProp = [] }: Pr
                             </DialogDescription>
                         </DialogHeader>
                         {selectedUser && (
-                            <div className="space-y-6">
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <Label className="text-muted-foreground">First Name</Label>
-                                        <p className="font-medium">{selectedUser.first_name || 'N/A'}</p>
-                                    </div>
-                                    <div>
-                                        <Label className="text-muted-foreground">Middle Name</Label>
-                                        <p className="font-medium">{selectedUser.middle_name || 'N/A'}</p>
-                                    </div>
-                                    <div>
-                                        <Label className="text-muted-foreground">Last Name</Label>
-                                        <p className="font-medium">{selectedUser.last_name || 'N/A'}</p>
-                                    </div>
-                                    <div>
-                                        <Label className="text-muted-foreground">Date of Birth</Label>
-                                        <p className="font-medium">
-                                            {selectedUser.dob ? new Date(selectedUser.dob).toLocaleDateString() : 'N/A'}
-                                        </p>
-                                    </div>
-                                    <div>
-                                        <Label className="text-muted-foreground">Gender</Label>
-                                        <p className="font-medium">{selectedUser.gender || 'N/A'}</p>
-                                    </div>
-                                    <div>
-                                        <Label className="text-muted-foreground">Email</Label>
-                                        <p className="font-medium">{selectedUser.email}</p>
-                                    </div>
-                                    <div>
-                                        <Label className="text-muted-foreground">Contact Number</Label>
-                                        <p className="font-medium">{selectedUser.contact_number || 'N/A'}</p>
-                                    </div>
-                                    <div>
-                                        <Label className="text-muted-foreground">Role</Label>
-                                        <div className="mt-1">{getRoleBadge(selectedUser.role)}</div>
-                                    </div>
-                                    <div>
-                                        <Label className="text-muted-foreground">Approval Status</Label>
-                                        <div className="mt-1">{getStatusBadge(selectedUser.approval_status)}</div>
-                                    </div>
-                                    <div>
-                                        <Label className="text-muted-foreground">Active Status</Label>
-                                        <div className="flex items-center gap-2 mt-1">
-                                            <Circle
-                                                className={`h-3 w-3 ${selectedUser.is_active ? 'text-green-600 dark:text-green-400 fill-current' : 'text-gray-400'}`}
-                                            />
-                                            <span className={selectedUser.is_active ? 'text-green-600 dark:text-green-400' : 'text-gray-500'}>
-                                                {selectedUser.is_active ? 'Active' : 'Inactive'}
-                                            </span>
-                                        </div>
-                                    </div>
-                                    <div className="col-span-2">
-                                        <Label className="text-muted-foreground">Street</Label>
-                                        <p className="font-medium">{selectedUser.street || 'N/A'}</p>
-                                    </div>
-                                    <div>
-                                        <Label className="text-muted-foreground">Barangay</Label>
-                                        <p className="font-medium">{selectedUser.brgy || 'N/A'}</p>
-                                    </div>
-                                    <div>
-                                        <Label className="text-muted-foreground">Municipality</Label>
-                                        <p className="font-medium">{selectedUser.municipality || 'N/A'}</p>
-                                    </div>
-                                    <div>
-                                        <Label className="text-muted-foreground">Province</Label>
-                                        <p className="font-medium">{selectedUser.province || 'N/A'}</p>
-                                    </div>
-                                    <div>
-                                        <Label className="text-muted-foreground">Postal Code</Label>
-                                        <p className="font-medium">{selectedUser.postal_code || 'N/A'}</p>
-                                    </div>
-                                    <div>
-                                        <Label className="text-muted-foreground">Created At</Label>
-                                        <p className="font-medium">
-                                            {new Date(selectedUser.created_at).toLocaleString()}
-                                        </p>
-                                    </div>
-                                    {selectedUser.email_verified_at && (
-                                        <div>
-                                            <Label className="text-muted-foreground">Email Verified At</Label>
-                                            <p className="font-medium">
-                                                {new Date(selectedUser.email_verified_at).toLocaleString()}
-                                            </p>
-                                        </div>
-                                    )}
+                            <div className="space-y-3">
+                                <div className="space-y-2">
+                                    <Label htmlFor="view_first_name">First Name</Label>
+                                    <Input id="view_first_name" readOnly value={selectedUser.first_name || 'N/A'} />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="view_middle_name">Middle Name</Label>
+                                    <Input id="view_middle_name" readOnly value={selectedUser.middle_name || 'N/A'} />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="view_last_name">Last Name</Label>
+                                    <Input id="view_last_name" readOnly value={selectedUser.last_name || 'N/A'} />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="view_dob">Date of Birth</Label>
+                                    <Input
+                                        id="view_dob"
+                                        readOnly
+                                        value={selectedUser.dob ? new Date(selectedUser.dob).toLocaleDateString() : 'N/A'}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="view_gender">Gender</Label>
+                                    <Input id="view_gender" readOnly value={selectedUser.gender || 'N/A'} />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="view_email">Email</Label>
+                                    <Input id="view_email" readOnly value={selectedUser.email || 'N/A'} />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="view_contact_number">Contact Number</Label>
+                                    <Input id="view_contact_number" readOnly value={selectedUser.contact_number || 'N/A'} />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="view_role">Role</Label>
+                                    <Input id="view_role" readOnly value={selectedUser.role_name || selectedUser.role || 'N/A'} />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="view_approval_status">Approval Status</Label>
+                                    <Input
+                                        id="view_approval_status"
+                                        readOnly
+                                        value={selectedUser.approval_status ? selectedUser.approval_status.toUpperCase() : 'N/A'}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="view_active">Active Status</Label>
+                                    <Input id="view_active" readOnly value={selectedUser.is_active ? 'Active' : 'Inactive'} />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="view_street">Street</Label>
+                                    <Input id="view_street" readOnly value={selectedUser.street || 'N/A'} />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="view_brgy">Barangay</Label>
+                                    <Input id="view_brgy" readOnly value={selectedUser.brgy || 'N/A'} />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="view_municipality">Municipality</Label>
+                                    <Input id="view_municipality" readOnly value={selectedUser.municipality || 'N/A'} />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="view_province">Province</Label>
+                                    <Input id="view_province" readOnly value={selectedUser.province || 'N/A'} />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="view_postal_code">Postal Code</Label>
+                                    <Input id="view_postal_code" readOnly value={selectedUser.postal_code || 'N/A'} />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="view_created_at">Created At</Label>
+                                    <Input id="view_created_at" readOnly value={new Date(selectedUser.created_at).toLocaleString()} />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="view_email_verified_at">Email Verified At</Label>
+                                    <Input
+                                        id="view_email_verified_at"
+                                        readOnly
+                                        value={selectedUser.email_verified_at ? new Date(selectedUser.email_verified_at).toLocaleString() : 'N/A'}
+                                    />
                                 </div>
                             </div>
                         )}

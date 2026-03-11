@@ -24,39 +24,34 @@ class CreateNewUser implements CreatesNewUsers
     {
         $request = request();
 
-        // Validate role_id
-        $role = Role::find($input['role_id'] ?? null);
-        if (! $role || ! in_array($role->slug, ['visitor', 'bjmp_officer', 'monitoring_officer'], true)) {
-            Validator::make([], [
-                'role_id' => 'required',
-            ])->after(function ($validator) {
-                $validator->errors()->add('role_id', 'Please select a valid account type.');
-            })->validate();
+        $role = Role::where('slug', 'visitor')->first();
+        if (! $role) {
+            Validator::make([], ['role_id' => 'required'])
+                ->after(function ($validator) {
+                    $validator->errors()->add('role_id', 'Visitor role is not configured. Please contact support.');
+                })
+                ->validate();
         }
 
-        // Validate ID documents for visitor, BJMP officer, and monitoring officer (at least 2 proofs of identity)
-        if (in_array($role->slug, ['visitor', 'bjmp_officer', 'monitoring_officer'], true)) {
-            Validator::make($request->all(), [
-                'id_document_1' => ['required', 'file', 'mimes:jpeg,jpg,png,pdf', 'max:5120'],
-                'id_document_2' => ['required', 'file', 'mimes:jpeg,jpg,png,pdf', 'max:5120'],
-            ], [
-                'id_document_1.required' => 'Please upload at least two proofs of identity (e.g. valid ID, birth certificate).',
-                'id_document_2.required' => 'Please upload a second proof of identity.',
-            ])->validate();
-        }
+        // Validate ID documents for visitor (at least 2 proofs of identity)
+        Validator::make($request->all(), [
+            'id_document_1' => ['required', 'file', 'mimes:jpeg,jpg,png,pdf', 'max:5120'],
+            'id_document_2' => ['required', 'file', 'mimes:jpeg,jpg,png,pdf', 'max:5120'],
+        ], [
+            'id_document_1.required' => 'Please upload at least two proofs of identity (e.g. valid ID, birth certificate).',
+            'id_document_2.required' => 'Please upload a second proof of identity.',
+        ])->validate();
 
         Validator::make($input, [
             ...$this->profileRules(),
             'password' => $this->passwordRules(),
-            'role_id' => ['required', 'exists:roles,id'],
         ])->validate();
 
         // Store ID documents for visitor, BJMP officer, and monitoring officer
         $idDocument1Path = null;
         $idDocument2Path = null;
 
-        if (in_array($role->slug, ['visitor', 'bjmp_officer', 'monitoring_officer'], true)
-            && $request->hasFile('id_document_1') && $request->hasFile('id_document_2')) {
+        if ($request->hasFile('id_document_1') && $request->hasFile('id_document_2')) {
             $idDocument1Path = $request->file('id_document_1')->store('users/id_documents', 'public');
             $idDocument2Path = $request->file('id_document_2')->store('users/id_documents', 'public');
         }
@@ -84,13 +79,10 @@ class CreateNewUser implements CreatesNewUsers
         // Send OTP to email and SMS for verification
         $otpService = new OtpService;
 
-        // Send OTP to SMS
-        if ($user->contact_number) {
-            $otpService->generateAndSend($user, 'phone_verification');
+        $otpResult = $otpService->generateAndSendRegistration($user);
+        if (! $otpResult['success']) {
+            session()->flash('otp_warning', $otpResult['error'] ?? 'Unable to deliver OTP. Please contact support.');
         }
-
-        // Send OTP to email
-        $otpService->generateAndSend($user, 'email_verification');
 
         // Notify super admins about new user registration
         \App\Services\NotificationService::notifySuperAdminsAboutNewUser($user);

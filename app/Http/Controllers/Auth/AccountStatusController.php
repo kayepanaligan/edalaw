@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Auth;
 
 use App\ApprovalStatus;
 use App\Http\Controllers\Controller;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -13,13 +15,22 @@ class AccountStatusController extends Controller
     /**
      * Show the account pending page.
      */
-    public function showPending(Request $request): Response
+    public function showPending(Request $request): Response|RedirectResponse
     {
         if (! auth()->check()) {
             return redirect()->route('login');
         }
 
         $user = auth()->user();
+
+        if ($user->approval_status === ApprovalStatus::Approved) {
+            Auth::logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+
+            return redirect()->route('login')
+                ->with('status', 'Your account has been approved. Please log in.');
+        }
 
         if ($user->approval_status !== ApprovalStatus::Pending) {
             return redirect()->route('dashboard');
