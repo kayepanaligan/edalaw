@@ -1,12 +1,12 @@
-import notifications from './notifications'
-import eburols from './eburols'
-import schedules from './schedules'
-import visitSession from './visit-session'
 import appeals from './appeals'
 import auditLogs from './audit-logs'
-import cells from './cells'
-import inmates from './inmates'
 import cellSchedules from './cell-schedules'
+import cells from './cells'
+import eburols from './eburols'
+import inmates from './inmates'
+import notifications from './notifications'
+import schedules from './schedules'
+import visitSession from './visit-session'
 const bjmpOfficer = {
     notifications: Object.assign(notifications, notifications),
 eburols: Object.assign(eburols, eburols),

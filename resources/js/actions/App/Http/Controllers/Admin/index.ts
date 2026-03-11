@@ -1,15 +1,15 @@
-import UserManagementController from './UserManagementController'
-import ScheduleManagementController from './ScheduleManagementController'
-import EburolManagementController from './EburolManagementController'
-import TimeSlotConfigurationController from './TimeSlotConfigurationController'
-import AppealsOversightController from './AppealsOversightController'
 import AccountAppealReviewController from './AccountAppealReviewController'
-import SuggestionManagementController from './SuggestionManagementController'
-import NotificationManagementController from './NotificationManagementController'
-import SessionManagementController from './SessionManagementController'
+import AppealsOversightController from './AppealsOversightController'
 import AuditLogController from './AuditLogController'
+import EburolManagementController from './EburolManagementController'
 import IncidentReportingController from './IncidentReportingController'
 import InmateTunnelController from './InmateTunnelController'
+import NotificationManagementController from './NotificationManagementController'
+import ScheduleManagementController from './ScheduleManagementController'
+import SessionManagementController from './SessionManagementController'
+import SuggestionManagementController from './SuggestionManagementController'
+import TimeSlotConfigurationController from './TimeSlotConfigurationController'
+import UserManagementController from './UserManagementController'
 const Admin = {
     UserManagementController: Object.assign(UserManagementController, UserManagementController),
 ScheduleManagementController: Object.assign(ScheduleManagementController, ScheduleManagementController),

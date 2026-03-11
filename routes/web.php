@@ -370,6 +370,39 @@ Route::middleware(['auth', 'verified', 'approved'])->group(function () {
             ->name('visit-session.participant-joined');
     });
 
+    // Cell, Inmate, and Cell Schedule Management (accessible by both BJMP Officer and Jail Officer)
+    Route::middleware(['role:bjmp_officer,jail_officer'])->prefix('bjmp-officer')->name('bjmp-officer.')->group(function () {
+        // Cell Management
+        Route::get('cells', [\App\Http\Controllers\BjmpOfficer\CellManagementController::class, 'index'])
+            ->name('cells.index');
+        Route::post('cells', [\App\Http\Controllers\BjmpOfficer\CellManagementController::class, 'store'])
+            ->name('cells.store');
+        Route::put('cells/{cell}', [\App\Http\Controllers\BjmpOfficer\CellManagementController::class, 'update'])
+            ->name('cells.update');
+        Route::delete('cells/{cell}', [\App\Http\Controllers\BjmpOfficer\CellManagementController::class, 'destroy'])
+            ->name('cells.destroy');
+
+        // Inmate Management
+        Route::get('inmates', [\App\Http\Controllers\BjmpOfficer\InmateManagementController::class, 'index'])
+            ->name('inmates.index');
+        Route::post('inmates', [\App\Http\Controllers\BjmpOfficer\InmateManagementController::class, 'store'])
+            ->name('inmates.store');
+        Route::put('inmates/{inmate}', [\App\Http\Controllers\BjmpOfficer\InmateManagementController::class, 'update'])
+            ->name('inmates.update');
+        Route::delete('inmates/{inmate}', [\App\Http\Controllers\BjmpOfficer\InmateManagementController::class, 'destroy'])
+            ->name('inmates.destroy');
+        Route::post('inmates/{inmate}/transfer', [\App\Http\Controllers\BjmpOfficer\InmateManagementController::class, 'transfer'])
+            ->name('inmates.transfer');
+
+        // Cell Schedule Templates
+        Route::get('cell-schedules', [\App\Http\Controllers\BjmpOfficer\CellScheduleTemplateController::class, 'index'])
+            ->name('cell-schedules.index');
+        Route::put('cell-schedules/{cell}', [\App\Http\Controllers\BjmpOfficer\CellScheduleTemplateController::class, 'update'])
+            ->name('cell-schedules.update');
+        Route::post('cell-schedules/bulk-update', [\App\Http\Controllers\BjmpOfficer\CellScheduleTemplateController::class, 'bulkUpdate'])
+            ->name('cell-schedules.bulk-update');
+    });
+
     Route::middleware(['role:bjmp_officer'])->prefix('bjmp-officer')->name('bjmp-officer.')->group(function () {
         Route::get('notifications', [\App\Http\Controllers\BjmpOfficer\NotificationController::class, 'index'])
             ->name('notifications.index');
@@ -416,36 +449,6 @@ Route::middleware(['auth', 'verified', 'approved'])->group(function () {
         // Audit Logs
         Route::get('audit-logs', [\App\Http\Controllers\BjmpOfficer\AuditLogController::class, 'index'])
             ->name('audit-logs.index');
-
-        // Cell Management
-        Route::get('cells', [\App\Http\Controllers\BjmpOfficer\CellManagementController::class, 'index'])
-            ->name('cells.index');
-        Route::post('cells', [\App\Http\Controllers\BjmpOfficer\CellManagementController::class, 'store'])
-            ->name('cells.store');
-        Route::put('cells/{cell}', [\App\Http\Controllers\BjmpOfficer\CellManagementController::class, 'update'])
-            ->name('cells.update');
-        Route::delete('cells/{cell}', [\App\Http\Controllers\BjmpOfficer\CellManagementController::class, 'destroy'])
-            ->name('cells.destroy');
-
-        // Inmate Management
-        Route::get('inmates', [\App\Http\Controllers\BjmpOfficer\InmateManagementController::class, 'index'])
-            ->name('inmates.index');
-        Route::post('inmates', [\App\Http\Controllers\BjmpOfficer\InmateManagementController::class, 'store'])
-            ->name('inmates.store');
-        Route::put('inmates/{inmate}', [\App\Http\Controllers\BjmpOfficer\InmateManagementController::class, 'update'])
-            ->name('inmates.update');
-        Route::delete('inmates/{inmate}', [\App\Http\Controllers\BjmpOfficer\InmateManagementController::class, 'destroy'])
-            ->name('inmates.destroy');
-        Route::post('inmates/{inmate}/transfer', [\App\Http\Controllers\BjmpOfficer\InmateManagementController::class, 'transfer'])
-            ->name('inmates.transfer');
-
-        // Cell Schedule Templates
-        Route::get('cell-schedules', [\App\Http\Controllers\BjmpOfficer\CellScheduleTemplateController::class, 'index'])
-            ->name('cell-schedules.index');
-        Route::put('cell-schedules/{cell}', [\App\Http\Controllers\BjmpOfficer\CellScheduleTemplateController::class, 'update'])
-            ->name('cell-schedules.update');
-        Route::post('cell-schedules/bulk-update', [\App\Http\Controllers\BjmpOfficer\CellScheduleTemplateController::class, 'bulkUpdate'])
-            ->name('cell-schedules.bulk-update');
     });
 
     // Unified Jail Officer Routes (combines Monitoring Officer + BJMP Officer features)
@@ -549,36 +552,6 @@ Route::middleware(['auth', 'verified', 'approved'])->group(function () {
         // Audit Logs
         Route::get('audit-logs', [\App\Http\Controllers\JailOfficer\AuditLogController::class, 'index'])
             ->name('audit-logs.index');
-
-        // Cell Management
-        Route::get('cells', [\App\Http\Controllers\JailOfficer\CellManagementController::class, 'index'])
-            ->name('cells.index');
-        Route::post('cells', [\App\Http\Controllers\JailOfficer\CellManagementController::class, 'store'])
-            ->name('cells.store');
-        Route::put('cells/{cell}', [\App\Http\Controllers\JailOfficer\CellManagementController::class, 'update'])
-            ->name('cells.update');
-        Route::delete('cells/{cell}', [\App\Http\Controllers\JailOfficer\CellManagementController::class, 'destroy'])
-            ->name('cells.destroy');
-
-        // Inmate Management
-        Route::get('inmates', [\App\Http\Controllers\JailOfficer\InmateManagementController::class, 'index'])
-            ->name('inmates.index');
-        Route::post('inmates', [\App\Http\Controllers\JailOfficer\InmateManagementController::class, 'store'])
-            ->name('inmates.store');
-        Route::put('inmates/{inmate}', [\App\Http\Controllers\JailOfficer\InmateManagementController::class, 'update'])
-            ->name('inmates.update');
-        Route::delete('inmates/{inmate}', [\App\Http\Controllers\JailOfficer\InmateManagementController::class, 'destroy'])
-            ->name('inmates.destroy');
-        Route::post('inmates/{inmate}/transfer', [\App\Http\Controllers\JailOfficer\InmateManagementController::class, 'transfer'])
-            ->name('inmates.transfer');
-
-        // Cell Schedule Templates
-        Route::get('cell-schedules', [\App\Http\Controllers\JailOfficer\CellScheduleTemplateController::class, 'index'])
-            ->name('cell-schedules.index');
-        Route::put('cell-schedules/{cell}', [\App\Http\Controllers\JailOfficer\CellScheduleTemplateController::class, 'update'])
-            ->name('cell-schedules.update');
-        Route::post('cell-schedules/bulk-update', [\App\Http\Controllers\JailOfficer\CellScheduleTemplateController::class, 'bulkUpdate'])
-            ->name('cell-schedules.bulk-update');
 
         // Chat Logs Management
         Route::get('chat-logs', [\App\Http\Controllers\JailOfficer\ChatLogsController::class, 'index'])

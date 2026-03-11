@@ -1,13 +1,13 @@
 import { Head, router } from '@inertiajs/react';
+import type { ColumnDef } from '@tanstack/react-table';
 import { Bell, Check, CheckCheck, Clock, User, Calendar, Heart, Scale, MessageSquare } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { ColumnDef } from '@tanstack/react-table';
 import { toast } from 'sonner';
 
+import { DataTable } from '@/components/data-table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { DataTable } from '@/components/data-table';
 import {
     Select,
     SelectContent,

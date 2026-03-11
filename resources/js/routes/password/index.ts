@@ -1,7 +1,7 @@
 import { queryParams, type RouteQueryOptions, type RouteDefinition, applyUrlDefaults } from './../../wayfinder'
-import reset0fffd7 from './reset'
 import confirmD7e05f from './confirm'
 import forgot from './forgot'
+import reset0fffd7 from './reset'
 import verifyOtp from './verify-otp'
 /**
 * @see \Laravel\Fortify\Http\Controllers\PasswordResetLinkController::request

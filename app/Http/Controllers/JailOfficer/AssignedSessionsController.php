@@ -19,7 +19,7 @@ use Inertia\Response;
 class AssignedSessionsController extends Controller
 {
     /**
-     * List visit_sessions assigned to the current monitoring officer.
+     * List visit_sessions assigned to the current jail officer.
      */
     public function index(Request $request): Response
     {
@@ -28,7 +28,10 @@ class AssignedSessionsController extends Controller
 
         $query = VisitSession::with(['visit.user', 'eburol.user', 'visit', 'eburol']);
         if (! $isSuperAdmin) {
-            $query->where('monitor_id', $user->id);
+            // Filter sessions where the jail officer is assigned to the visit
+            $query->whereHas('visit', function ($q) use ($user) {
+                $q->where('jail_officer_id', $user->id);
+            });
         }
 
         $typeFilter = $request->input('type'); // 'visit' | 'eburol' | null = all
@@ -278,38 +281,51 @@ class AssignedSessionsController extends Controller
     public function joinAsObserver(Request $request, VisitSession $session): RedirectResponse|Response
     {
         $user = $request->user();
-        $isMonitor = $session->monitor_id === $user->id;
+        // Load visit relationship to check jail_officer_id
+        $session->load(['visit']);
+
+        // Debug logging
+        \Illuminate\Support\Facades\Log::debug('Jail Officer joinAsObserver check', [
+            'user_id' => $user->id,
+            'session_id' => $session->id,
+            'visit_id' => $session->visit_id,
+            'has_visit' => $session->visit !== null,
+            'visit_jail_officer_id' => $session->visit?->jail_officer_id,
+            'user_role' => $user->role?->slug,
+        ]);
+
+        // Jail officers can join as observers if they are assigned to the visit
+        $isAssignedOfficer = $session->visit && $session->visit->jail_officer_id === $user->id;
         $isSuperAdmin = $user->role?->slug === 'super_admin';
-        if (! $isMonitor && ! $isSuperAdmin) {
-            abort(403);
+        if (! $isAssignedOfficer && ! $isSuperAdmin) {
+            abort(403, 'You are not assigned to this visit. Only the assigned jail officer can join as observer.');
         }
         if ($session->isCompleted()) {
-            return redirect()->route('monitoring-officer.assigned-sessions.index')
+            return redirect()->route('jail-officer.assigned-sessions.index')
                 ->with('error', 'This session has ended.');
         }
         if (! $session->isWithinSchedule() && $session->status !== 'active') {
-            return redirect()->route('monitoring-officer.assigned-sessions.index')
+            return redirect()->route('jail-officer.assigned-sessions.index')
                 ->with('error', 'You can only join during the scheduled window or when the session is active.');
         }
 
         $videoSdk = new VideoSdkService;
         $validation = $videoSdk->validateRoom($session->room_id);
         if (! ($validation['success'] ?? false)) {
-            return redirect()->route('monitoring-officer.assigned-sessions.index')
+            return redirect()->route('jail-officer.assigned-sessions.index')
                 ->with('error', $validation['error'] ?? 'Meeting not found or expired. Please ensure the visit has been approved and the video room is still valid.');
         }
 
-        $participantId = 'monitor-'.$request->user()->id.'-'.$session->id;
+        $participantId = 'jail-officer-'.$request->user()->id.'-'.$session->id;
         $result = $videoSdk->generateJoinTokenForPrebuiltApp($session->room_id, $participantId, ['allow_join'], 120);
 
         if (! ($result['success'] ?? false) || empty($result['token'])) {
-            return redirect()->route('monitoring-officer.assigned-sessions.index')
+            return redirect()->route('jail-officer.assigned-sessions.index')
                 ->with('error', 'Unable to generate join link. Please try again.');
         }
 
-        $url = $videoSdk->isV2Rooms()
-            ? url('/video-room').'?room_id='.rawurlencode($session->room_id).'&token='.rawurlencode($result['token']).'&name='.rawurlencode($request->user()->name ?? 'Monitor').'&participant_id='.rawurlencode($participantId).'&observer=1'
-            : 'https://app.videosdk.live/meetings/'.$session->room_id.'?token='.rawurlencode($result['token']);
+        // Use embedded VideoRoom for both v1 and v2 to ensure proper token handling
+        $url = url('/video-room').'?room_id='.rawurlencode($session->room_id).'&token='.rawurlencode($result['token']).'&name='.rawurlencode($request->user()->name ?? 'Jail Officer').'&participant_id='.rawurlencode($participantId).'&observer=1';
 
         $session->refresh();
         if ($session->visitor_participant_id && $session->recording_status === 'pending') {

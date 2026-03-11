@@ -1,12 +1,12 @@
 import { queryParams, type RouteQueryOptions, type RouteDefinition } from './../../wayfinder'
-import assignedSessions from './assigned-sessions'
-import videoRecordings from './video-recordings'
-import chatRecordings from './chat-recordings'
 import analytics from './analytics'
-import incidents from './incidents'
+import assignedSessions from './assigned-sessions'
+import chatRecordings from './chat-recordings'
 import history from './history'
+import incidents from './incidents'
 import inmateTunnels from './inmate-tunnels'
 import notifications from './notifications'
+import videoRecordings from './video-recordings'
 /**
 * @see \App\Http\Controllers\MonitoringOfficer\VisitMonitoringController::__invoke
  * @see app/Http/Controllers/MonitoringOfficer/VisitMonitoringController.php:16

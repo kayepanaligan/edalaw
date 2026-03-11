@@ -1,12 +1,12 @@
-import schedules from './schedules'
-import schedule from './schedule'
+import appeals from './appeals'
 import callLogs from './call-logs'
 import eburol from './eburol'
-import notifications from './notifications'
-import sessions from './sessions'
-import appeals from './appeals'
-import suggestions from './suggestions'
 import history from './history'
+import notifications from './notifications'
+import schedule from './schedule'
+import schedules from './schedules'
+import sessions from './sessions'
+import suggestions from './suggestions'
 const visitor = {
     schedules: Object.assign(schedules, schedules),
 schedule: Object.assign(schedule, schedule),

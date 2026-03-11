@@ -433,17 +433,17 @@ export function AppSidebar() {
                 items: [
                     {
                         title: 'Cell Management',
-                        href: '/jail-officer/cells',
+                        href: '/bjmp-officer/cells',
                         icon: Building,
                     },
                     {
                         title: 'Inmate Management',
-                        href: '/jail-officer/inmates',
+                        href: '/bjmp-officer/inmates',
                         icon: Users,
                     },
                     {
                         title: 'Cell Schedules',
-                        href: '/jail-officer/cell-schedules',
+                        href: '/bjmp-officer/cell-schedules',
                         icon: Clock,
                     },
                     {

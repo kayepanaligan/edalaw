@@ -6,9 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Models\VisitSession;
 use App\Services\VideoSdkService;
 use App\Services\VisitSessionRecordingService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Http\Response;
 use Inertia\Inertia;
 use Inertia\Response as InertiaResponse;
 
@@ -58,12 +58,10 @@ class VisitSessionController extends Controller
             }
         }
 
-        $useEmbeddedMeeting = $videoSdk->isV2Rooms();
+        // Use embedded VideoRoom for both v1 and v2 to ensure proper token handling
         $joinUrl = null;
         if ($withinSchedule && $token) {
-            $joinUrl = $useEmbeddedMeeting
-                ? route('visit-session.video-room', $session)
-                : 'https://app.videosdk.live/meetings/'.$session->room_id.'?token='.rawurlencode($token);
+            $joinUrl = route('visit-session.video-room', $session);
         }
 
         return Inertia::render('Visitor/VisitSession', [
@@ -109,7 +107,7 @@ class VisitSessionController extends Controller
     /**
      * Mark visitor as joined and store participant_id. If inmate already joined, start recording.
      */
-    public function participantJoined(Request $request, VisitSession $session): Response
+    public function participantJoined(Request $request, VisitSession $session): JsonResponse
     {
         $request->validate(['participant_id' => ['required', 'string', 'max:255']]);
 
@@ -170,10 +168,16 @@ class VisitSessionController extends Controller
                 ->withErrors(['session' => 'Unable to generate join token. Please try again.']);
         }
 
+        $token = preg_replace('/^Bearer\s+/i', '', (string) $result['token']) ?? (string) $result['token'];
+        $token = trim($token);
+
+        // For v1 meetings, don't pass apiKey to avoid SDK trying to use v2 infrastructure
+        $isV1 = $videoSdk->isV2Rooms() === false;
+
         return Inertia::render('Visitor/VideoRoom', [
             'room_id' => $session->room_id,
-            'token' => $result['token'],
-            'api_key' => config('services.videosdk.api_key'),
+            'token' => $token,
+            'api_key' => $isV1 ? null : config('services.videosdk.api_key'), // Only pass apiKey for v2
             'participant_name' => $user->name ?? 'Visitor',
             'participant_id' => $participantId,
             'is_observer' => false,

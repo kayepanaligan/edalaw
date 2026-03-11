@@ -1,6 +1,6 @@
+import { Link, usePage } from '@inertiajs/react';
 import { home } from '@/routes';
 import type { AuthLayoutProps, SharedData } from '@/types';
-import { Link, usePage } from '@inertiajs/react';
 
 export default function AuthSplitLayout({
     children,

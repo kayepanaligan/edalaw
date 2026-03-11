@@ -3,13 +3,11 @@ import type { ColumnDef } from '@tanstack/react-table';
 import { Eye } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
-import { useToast } from '@/hooks/use-toast';
 
-import { formatVisitSchedule, formatSessionSchedule } from '@/lib/formatVisitSchedule';
+import { DataTable } from '@/components/data-table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { DataTable } from '@/components/data-table';
 import {
     Dialog,
     DialogContent,
@@ -31,7 +29,9 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { useToast } from '@/hooks/use-toast';
 import AppLayout from '@/layouts/app-layout';
+import { formatVisitSchedule, formatSessionSchedule } from '@/lib/formatVisitSchedule';
 import type { BreadcrumbItem } from '@/types';
 
 function formatTimeUntil(startIso: string): string {

@@ -1,15 +1,18 @@
-import {
+import type {
     ColumnDef,
     ColumnFiltersState,
+    SortingState} from '@tanstack/react-table';
+import {
     flexRender,
     getCoreRowModel,
     getFilteredRowModel,
     getPaginationRowModel,
     getSortedRowModel,
-    SortingState,
     useReactTable,
 } from '@tanstack/react-table';
-import { ReactNode, useState } from 'react';
+import { ChevronLeft, ChevronRight, Search } from 'lucide-react';
+import type { ReactNode} from 'react';
+import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,7 +24,6 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { ChevronLeft, ChevronRight, Search } from 'lucide-react';
 
 interface DataTableProps<TData, TValue> {
     columns: ColumnDef<TData, TValue>[];

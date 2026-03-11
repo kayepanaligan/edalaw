@@ -1,8 +1,8 @@
+import { Clock, AlertCircle } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
-import { Clock, AlertCircle } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { cn } from '@/lib/utils';
 
 type TimeSlot = {
     value: string; // HH:MM format (start time)
@@ -27,6 +27,8 @@ type TimeSlotPickerProps = {
     durationMinutes?: number;
     /** Interval between visits in minutes (from admin settings) */
     intervalMinutes?: number;
+    /** Selected date to check if time slots are in the past (format: YYYY-MM-DD) */
+    selectedDate?: string;
 };
 
 export function TimeSlotPicker({
@@ -39,6 +41,7 @@ export function TimeSlotPicker({
     visitType,
     durationMinutes = 20,
     intervalMinutes = 5,
+    selectedDate,
 }: TimeSlotPickerProps) {
     const [activeTab, setActiveTab] = useState<'AM' | 'PM'>('AM');
 
@@ -96,13 +99,40 @@ export function TimeSlotPicker({
 
     const isUserBooked = (slot: TimeSlot): boolean => userBookedSlots.includes(slot.value);
 
+    // Check if a time slot is in the past (for today's date)
+    const isPastTimeSlot = (slot: TimeSlot): boolean => {
+        if (!selectedDate) return false;
+        
+        const today = new Date();
+        const selected = new Date(selectedDate);
+        
+        // Check if selected date is today
+        const isToday = today.toDateString() === selected.toDateString();
+        if (!isToday) return false;
+        
+        // Parse slot time (HH:MM format)
+        const [slotHour, slotMinute] = slot.value.split(':').map(Number);
+        const slotTime = slotHour * 60 + slotMinute;
+        
+        // Get current time in minutes
+        const currentHour = today.getHours();
+        const currentMinute = today.getMinutes();
+        const currentTime = currentHour * 60 + currentMinute;
+        
+        // Disable if slot time is in the past
+        return slotTime <= currentTime;
+    };
+
     const isDisabled = (slot: TimeSlot): boolean => {
-        return slot.isFull || isUserBooked(slot);
+        return slot.isFull || isUserBooked(slot) || isPastTimeSlot(slot);
     };
 
     const getDisabledTooltip = (slot: TimeSlot): string => {
         if (isUserBooked(slot)) {
             return 'You already have a visit in this time slot. Please choose another.';
+        }
+        if (isPastTimeSlot(slot)) {
+            return 'This time slot has already passed';
         }
         if (slot.isFull) {
             return 'This time slot is full';
@@ -177,7 +207,9 @@ export function TimeSlotPicker({
                                     </Button>
                                     {disabled && (
                                         <div className="absolute inset-0 flex items-center justify-center bg-destructive/10 rounded-md pointer-events-none">
-                                            <span className="text-[10px] font-medium text-destructive">{isUserBooked(slot) ? 'Your slot' : 'Full'}</span>
+                                            <span className="text-[10px] font-medium text-destructive">
+                                                {isUserBooked(slot) ? 'Your slot' : isPastTimeSlot(slot) ? 'Passed' : 'Full'}
+                                            </span>
                                         </div>
                                     )}
                                 </div>
@@ -222,7 +254,9 @@ export function TimeSlotPicker({
                                     </Button>
                                     {disabled && (
                                         <div className="absolute inset-0 flex items-center justify-center bg-destructive/10 rounded-md pointer-events-none">
-                                            <span className="text-[10px] font-medium text-destructive">{isUserBooked(slot) ? 'Your slot' : 'Full'}</span>
+                                            <span className="text-[10px] font-medium text-destructive">
+                                                {isUserBooked(slot) ? 'Your slot' : isPastTimeSlot(slot) ? 'Passed' : 'Full'}
+                                            </span>
                                         </div>
                                     )}
                                 </div>

@@ -9,6 +9,7 @@ import {
 import { useEffect, useRef, useState } from 'react';
 
 const LOG_PREFIX = '[VideoRoom]';
+const normalizeVideoSdkToken = (raw: string): string => raw.replace(/^Bearer\s+/i, '').trim();
 
 /**
  * VideoRoom: single user-triggered SDK initialization only.
@@ -189,8 +190,9 @@ export default function VideoRoom({
     const hasInitializedRef = useRef(false);
 
     const meetingId = room_id?.trim() ?? '';
-    const tokenTrimmed = token?.trim() ?? '';
-    const hasValidProps = meetingId.length >= 2 && tokenTrimmed.length >= 10 && api_key?.trim().length > 0;
+    const tokenTrimmed = normalizeVideoSdkToken(token ?? '');
+    // For v1 meetings, api_key is optional (not needed). For v2, it's required.
+    const hasValidProps = meetingId.length >= 2 && tokenTrimmed.length >= 10;
 
     const handleEnterCallClick = () => {
         if (hasInitializedRef.current) return;
@@ -204,12 +206,7 @@ export default function VideoRoom({
             return;
         }
 
-        if (!api_key?.trim()) {
-            setError('Missing API key. Please use the join link again.');
-            hasInitializedRef.current = false;
-            return;
-        }
-
+        // api_key is optional (required for v2, not needed for v1)
         setUserRequestedJoin(true);
     };
 
@@ -217,9 +214,36 @@ export default function VideoRoom({
     useEffect(() => {
         if (!userRequestedJoin) return;
         const originalFetch = window.fetch;
+        const OriginalXHR = window.XMLHttpRequest;
+
+        const isVideoSdkInfraUrl = (u: string) => u.includes('api.videosdk.live') && u.includes('/infra/');
+
+        const stripBearer = (value: string) => value.replace(/^Bearer\s+/i, '');
+
         window.fetch = function (...args: Parameters<typeof fetch>) {
             const url = typeof args[0] === 'string' ? args[0] : (args[0] as Request)?.url ?? '';
-            if (url.includes('videosdk.live') && url.includes('infra')) {
+            if (url.includes('api.videosdk.live') && url.includes('/infra/')) {
+                // VideoSDK infra expects raw JWT in Authorization for init-config. If SDK prepends "Bearer ",
+                // strip it to avoid 401 "Token is invalid".
+                try {
+                    const init = (args[1] ?? {}) as RequestInit;
+                    const existingRequest = typeof args[0] !== 'string' ? (args[0] as Request) : null;
+                    const headers = new Headers(init.headers ?? existingRequest?.headers);
+                    const auth = headers.get('Authorization');
+                    if (auth && /^Bearer\s+/i.test(auth)) {
+                        headers.set('Authorization', stripBearer(auth));
+                        if (existingRequest) {
+                            // When fetch is called with a Request object, build a new Request so headers are actually applied.
+                            args[0] = new Request(existingRequest, { headers });
+                            args[1] = init;
+                        } else {
+                            args[1] = { ...init, headers };
+                        }
+                    }
+                } catch {
+                    // ignore
+                }
+
                 return originalFetch.apply(this, args).then((res) => {
                     if (!res.ok) {
                         console.warn(`${LOG_PREFIX} API request failed: ${url} → ${res.status} ${res.statusText}`);
@@ -231,8 +255,31 @@ export default function VideoRoom({
             }
             return originalFetch.apply(this, args);
         };
+
+        // Some VideoSDK builds use XMLHttpRequest internally; intercept it too.
+        class PatchedXMLHttpRequest extends OriginalXHR {
+            private _url: string = '';
+
+            open(method: string, url: string | URL, async?: boolean, username?: string | null, password?: string | null) {
+                this._url = typeof url === 'string' ? url : url.toString();
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                return super.open(method as any, url as any, async as any, username as any, password as any);
+            }
+
+            setRequestHeader(name: string, value: string) {
+                if (name.toLowerCase() === 'authorization' && isVideoSdkInfraUrl(this._url) && /^Bearer\s+/i.test(value)) {
+                    return super.setRequestHeader(name, stripBearer(value));
+                }
+
+                return super.setRequestHeader(name, value);
+            }
+        }
+
+        window.XMLHttpRequest = PatchedXMLHttpRequest as typeof XMLHttpRequest;
+
         return () => {
             window.fetch = originalFetch;
+            window.XMLHttpRequest = OriginalXHR;
         };
     }, [userRequestedJoin]);
 
@@ -281,7 +328,7 @@ export default function VideoRoom({
                 <div className="flex h-full w-full flex-col items-center justify-center gap-4 bg-background p-6">
                     <p className="text-muted-foreground">Preparing…</p>
                     <p className="text-sm text-muted-foreground">
-                        {!meetingId ? 'Missing meeting ID.' : !tokenTrimmed ? 'Missing token.' : 'Missing API key.'}
+                        {!meetingId ? 'Missing meeting ID.' : !tokenTrimmed ? 'Missing token.' : 'Preparing video call...'}
                     </p>
                 </div>
             </>
@@ -340,6 +387,7 @@ export default function VideoRoom({
                 <MeetingProvider
                     config={{
                         meetingId,
+                        ...(api_key?.trim() && { apiKey: api_key.trim() }), // Only include apiKey if provided (v2)
                         micEnabled: false, // Always disable microphone - chat only communication
                         webcamEnabled: !is_observer, // Only visitors/inmates can enable webcam, not observers
                         name: participant_name,

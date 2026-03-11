@@ -32,9 +32,8 @@ export default function JoinObserverRedirect({ join_url }: Props) {
                     {joining ? 'Opening...' : 'Join call'}
                 </Button>
                 <p className="text-center text-xs text-muted-foreground">
-                    If the video call asks you to log in or does not open, the meeting may have expired, the room may be
-                    unavailable, or your VideoSDK setup may need to use the v1 meetings API. A console error from
-                    aplo-evnt.com is from a third-party service and can be ignored.
+                    If the video call asks you to log in or does not open, the meeting may have expired or the room may
+                    be unavailable. A console error from aplo-evnt.com is from a third-party service and can be ignored.
                 </p>
             </div>
         </AppLayout>

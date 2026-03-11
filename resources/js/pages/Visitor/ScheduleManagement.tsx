@@ -1,18 +1,8 @@
 import { Head, router, useForm, usePage } from '@inertiajs/react';
-import { Calendar as CalendarIcon, Clock, Plus, Scale, User, Video, X, CalendarClock, FileText, MoreVertical, FileOutput, VideoIcon, Search, Building, AlertCircle, CheckCircle2 } from 'lucide-react';
+
+import type { ColumnDef } from '@tanstack/react-table';
 import axios from 'axios';
 
-import { formatVisitSchedule } from '@/lib/formatVisitSchedule';
-import { useEffect, useMemo, useState } from 'react';
-import { toast } from 'sonner';
-import { ColumnDef } from '@tanstack/react-table';
-
-import InputError from '@/components/input-error';
-import { useToast } from '@/hooks/use-toast';
-import { TimeSlotPicker } from '@/components/TimeSlotPicker';
-import { DataTable } from '@/components/data-table';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -20,6 +10,14 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
+import { Calendar as CalendarIcon, Clock, Plus, Scale, User, Video, X, CalendarClock, FileText, MoreVertical, FileOutput, VideoIcon, Search, Building, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { toast } from 'sonner';
+import { DataTable } from '@/components/data-table';
+import InputError from '@/components/input-error';
+import { TimeSlotPicker } from '@/components/TimeSlotPicker';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import {
     Dialog,
     DialogContent,
@@ -28,8 +26,6 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -38,6 +34,8 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
     Select,
     SelectContent,
@@ -47,7 +45,9 @@ import {
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
 import { Textarea } from '@/components/ui/textarea';
+import { useToast } from '@/hooks/use-toast';
 import AppLayout from '@/layouts/app-layout';
+import { formatVisitSchedule } from '@/lib/formatVisitSchedule';
 import visitor from '@/routes/visitor/index';
 import type { BreadcrumbItem } from '@/types';
 
@@ -1310,6 +1310,7 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
                                                     visitType={form.data.visit_type as 'physical' | 'virtual'}
                                                     durationMinutes={durationMinutes}
                                                     intervalMinutes={intervalMinutes}
+                                                    selectedDate={form.data.scheduled_date}
                                                     onTimeSelect={(time) => {
                                                         form.setData('scheduled_time', time);
                                                     }}
@@ -1476,6 +1477,7 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
                                                     visitType={selectedVisitForReschedule?.visit_type as 'physical' | 'virtual'}
                                                     durationMinutes={rescheduleDurationMinutes}
                                                     intervalMinutes={rescheduleIntervalMinutes}
+                                                    selectedDate={rescheduleForm.data.scheduled_date}
                                                 />
                                             )}
                                         </>

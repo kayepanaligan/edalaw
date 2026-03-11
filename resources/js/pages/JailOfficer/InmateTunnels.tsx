@@ -3,7 +3,6 @@ import type { ColumnDef } from '@tanstack/react-table';
 import { Copy, Filter, Search } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
-import { useClipboard } from '@/hooks/use-clipboard';
 
 import { DataTable } from '@/components/data-table';
 import { Badge } from '@/components/ui/badge';
@@ -12,6 +11,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useClipboard } from '@/hooks/use-clipboard';
 import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
 
