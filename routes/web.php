@@ -70,7 +70,7 @@ Route::get('/test-token', function () {
     );
 });
 
-Route::get('/meeting-token/{room}', [VideoRoomController::class, 'token']);
+Route::get('/meeting-token/{room}', [\App\Http\Controllers\VideoRoomController::class, 'token']);
 
 // Inmate tunnel entry from login page (no auth)
 Route::get('inmate-tunnel', [\App\Http\Controllers\InmateTunnelController::class, 'showEnterToken'])
@@ -317,6 +317,8 @@ Route::middleware(['auth', 'verified', 'approved'])->group(function () {
             ->name('time-slot-capacities.update-capacity');
         Route::post('time-slot-capacities/update-settings', [\App\Http\Controllers\Admin\TimeSlotConfigurationController::class, 'updateSettings'])
             ->name('time-slot-capacities.update-settings');
+        Route::post('time-slot-capacities/operating-hours', [\App\Http\Controllers\Admin\TimeSlotConfigurationController::class, 'updateOperatingHours'])
+            ->name('time-slot-capacities.update-operating-hours');
     });
 
     Route::middleware(['role:visitor'])->prefix('visitor')->name('visitor.')->group(function () {

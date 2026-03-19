@@ -79,6 +79,7 @@ type Session = {
 type Props = {
     sessions: Session[];
     filters?: { type: string };
+    userRole?: 'monitoring_officer' | 'jail_officer';
 };
 
 function getStatusBadge(status: string) {
@@ -94,7 +95,7 @@ function getStatusBadge(status: string) {
     return <Badge variant="secondary" className={config.className}>{config.label}</Badge>;
 }
 
-export default function AssignedSessions({ sessions, filters: initialFilters }: Props) {
+export default function AssignedSessions({ sessions, filters: initialFilters, userRole = 'monitoring_officer' }: Props) {
     useToast();
     const [typeFilter, setTypeFilter] = useState(initialFilters?.type ?? 'all');
     const [beforeScheduleSession, setBeforeScheduleSession] = useState<Session | null>(null);
@@ -145,7 +146,9 @@ export default function AssignedSessions({ sessions, filters: initialFilters }: 
                         setBeforeScheduleSession(s);
                         return;
                     }
-                    window.location.href = `/monitoring-officer/assigned-sessions/${s.id}/join`;
+                    // Open video call in new tab based on user role
+                    const routePrefix = userRole === 'jail_officer' ? '/jail-officer/assigned-sessions' : '/monitoring-officer/assigned-sessions';
+                    window.open(`${routePrefix}/${s.id}/join`, '_blank');
                 };
                 return (
                     <div className="flex items-center gap-2">

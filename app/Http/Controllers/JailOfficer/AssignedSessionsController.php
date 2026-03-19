@@ -13,6 +13,7 @@ use App\Services\VisitSessionRecordingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\View\View;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -93,6 +94,7 @@ class AssignedSessionsController extends Controller
             'filters' => [
                 'type' => $typeFilter ?? 'all',
             ],
+            'userRole' => 'jail_officer',
         ]);
     }
 
@@ -275,10 +277,10 @@ class AssignedSessionsController extends Controller
     }
 
     /**
-     * Monitoring officer joins the video call as observer (no camera/mic; view-only).
-     * Redirects to VideoSDK with viewer token and params to disable webcam/mic.
+     * Jail officer joins the video call as observer (no camera/mic; view-only).
+     * Renders embedded VideoSDK room for both v1 and v2.
      */
-    public function joinAsObserver(Request $request, VisitSession $session): RedirectResponse|Response
+    public function joinAsObserver(Request $request, VisitSession $session): RedirectResponse|View
     {
         $user = $request->user();
         // Load visit relationship to check jail_officer_id
@@ -317,21 +319,14 @@ class AssignedSessionsController extends Controller
         }
 
         $participantId = 'jail-officer-'.$request->user()->id.'-'.$session->id;
-        $result = $videoSdk->generateJoinTokenForPrebuiltApp($session->room_id, $participantId, ['allow_join'], 120);
-
-        if (! ($result['success'] ?? false) || empty($result['token'])) {
-            return redirect()->route('jail-officer.assigned-sessions.index')
-                ->with('error', 'Unable to generate join link. Please try again.');
-        }
 
         // Use embedded VideoRoom for both v1 and v2 to ensure proper token handling
-        $url = url('/video-room').'?room_id='.rawurlencode($session->room_id).'&token='.rawurlencode($result['token']).'&name='.rawurlencode($request->user()->name ?? 'Jail Officer').'&participant_id='.rawurlencode($participantId).'&observer=1';
-
-        $session->refresh();
-        if ($session->visitor_participant_id && $session->recording_status === 'pending') {
-            app(VisitSessionRecordingService::class)->tryStartRecording($session, $session->visitor_participant_id);
-        }
-
-        return redirect()->away($url);
+        return view('visitor.video-room', [
+            'session'            => $session,
+            'room_id'            => $session->room_id,
+            'participant_name'   => $request->user()->name ?? 'Jail Officer',
+            'participant_id'     => $participantId,
+            'is_observer'        => true,
+        ]);
     }
 }

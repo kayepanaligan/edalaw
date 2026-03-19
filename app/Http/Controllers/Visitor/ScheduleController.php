@@ -165,24 +165,33 @@ class ScheduleController extends Controller
 
         $dateCarbon = \Carbon\Carbon::parse($date)->startOfDay();
         $nowTime = now()->format('H:i');
-        $dayCutoff = '21:50'; // After 9:50 PM, entire day is unavailable
-        $latestSlotEnd = $isPhysical ? '17:00' : '17:50';
-        $isDayUnavailable = $dateCarbon->isToday() && (
-            $nowTime >= $dayCutoff || $nowTime > $latestSlotEnd
-        );
 
         // Get duration and interval settings from database
         $settings = \App\Models\TimeSlotCapacity::where('visit_type', $visitType)->first();
         $durationMinutes = $settings?->duration_minutes ?? ($isPhysical ? 30 : 20);
         $intervalMinutes = $settings?->interval_minutes ?? ($isPhysical ? 10 : 5);
+        $startTime = $settings?->start_time?->format('H:i') ?? '07:00';
+        $endTime = $settings?->end_time?->format('H:i') ?? ($isPhysical ? '18:00' : '22:00');
+        
+        // Calculate cutoff time (when last slot starts)
+        [$endHour, $endMinute] = explode(':', $endTime);
+        $endMinutesTotal = ((int)$endHour) * 60 + (int)$endMinute;
+        $lastSlotStartMinutes = $endMinutesTotal - $durationMinutes;
+        $lastSlotHour = intdiv($lastSlotStartMinutes, 60);
+        $lastSlotMinute = $lastSlotStartMinutes % 60;
+        $dayCutoff = sprintf('%02d:%02d', $lastSlotHour, $lastSlotMinute);
+        
+        $isDayUnavailable = $dateCarbon->isToday() && $nowTime > $dayCutoff;
         $slotInterval = $durationMinutes + $intervalMinutes;
 
-        // Generate time slots based on duration and interval settings
+        // Generate time slots based on dynamic start/end times
         $allTimeSlots = [];
-        $startMinutes = 7 * 60; // 7:00 AM
-        $endMinutes = 18 * 60; // 6:00 PM
+        [$startHour, $startMinute] = explode(':', $startTime);
+        [$endHour, $endMinute] = explode(':', $endTime);
+        
+        $currentMinutes = ((int)$startHour) * 60 + (int)$startMinute;
+        $endMinutes = ((int)$endHour) * 60 + (int)$endMinute;
 
-        $currentMinutes = $startMinutes;
         while ($currentMinutes < $endMinutes) {
             $hour = intdiv($currentMinutes, 60);
             $minute = $currentMinutes % 60;
@@ -241,6 +250,8 @@ class ScheduleController extends Controller
             'userBookedSlots' => $userBookedSlots,
             'durationMinutes' => $durationMinutes,
             'intervalMinutes' => $intervalMinutes,
+            'startTime' => $startTime,
+            'endTime' => $endTime,
         ]);
     }
 
@@ -268,20 +279,42 @@ class ScheduleController extends Controller
         }
 
         $scheduledDate = \Carbon\Carbon::parse($request->scheduled_date)->startOfDay();
-        if ($scheduledDate->isToday() && now()->format('H:i') >= '21:50') {
+        
+        // Get operating hours from database
+        $settings = \App\Models\TimeSlotCapacity::where('visit_type', $request->visit_type)->first();
+        $endTime = $settings?->end_time?->format('H:i') ?? ($request->visit_type === 'physical' ? '18:00' : '22:00');
+        $durationMinutes = $settings?->duration_minutes ?? ($request->visit_type === 'physical' ? 30 : 20);
+        
+        // Calculate cutoff time (when last slot starts)
+        [$endHour, $endMinute] = explode(':', $endTime);
+        $endMinutesTotal = ((int)$endHour) * 60 + (int)$endMinute;
+        $lastSlotStartMinutes = $endMinutesTotal - $durationMinutes;
+        $lastSlotHour = intdiv($lastSlotStartMinutes, 60);
+        $lastSlotMinute = $lastSlotStartMinutes % 60;
+        $dayCutoff = sprintf('%02d:%02d', $lastSlotHour, $lastSlotMinute);
+        
+        if ($scheduledDate->isToday() && now()->format('H:i') > $dayCutoff) {
+            // Format end time for display
+            $displayHour = (int)$endHour;
+            $period = $displayHour >= 12 ? 'PM' : 'AM';
+            $displayHour = $displayHour > 12 ? $displayHour - 12 : ($displayHour === 0 ? 12 : $displayHour);
+            $formattedEndTime = "{$displayHour}:{$endMinute} {$period}";
+            
             return redirect()->back()
-                ->withErrors(['scheduled_date' => 'This day is no longer available for scheduling (cutoff 9:50 PM). Please select another date.'])
+                ->withErrors(['scheduled_date' => "Schedule times for today end at {$formattedEndTime}. Please select another date."])
                 ->withInput();
         }
+        
         $isPhysical = $request->visit_type === 'physical';
-        $cutoff = $isPhysical ? '17:00' : '17:50';
-        if ($scheduledDate->isToday() && $request->scheduled_time > $cutoff) {
-            $message = $isPhysical
-                ? 'Schedule times for today end at 5:00 PM. Please select another date or time.'
-                : 'Schedule times for today end at 5:50 PM. Please select another date or time.';
-
+        if ($scheduledDate->isToday() && $request->scheduled_time > $dayCutoff) {
+            // Format end time for display
+            $displayHour = (int)$endHour;
+            $period = $displayHour >= 12 ? 'PM' : 'AM';
+            $displayHour = $displayHour > 12 ? $displayHour - 12 : ($displayHour === 0 ? 12 : $displayHour);
+            $formattedEndTime = "{$displayHour}:{$endMinute} {$period}";
+            
             return redirect()->back()
-                ->withErrors(['scheduled_time' => $message])
+                ->withErrors(['scheduled_time' => "Schedule times for today end at {$formattedEndTime}. Please select another date or time."])
                 ->withInput();
         }
 

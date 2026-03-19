@@ -16,16 +16,51 @@ class TimeSlotConfigurationController extends Controller
      */
     public function index(): Response
     {
-        // Virtual: 10-minute slots 7:00–17:50. Physical: hourly slots 07:00–17:00
+        // Get operating hours from database for each visit type
+        $virtualCap = TimeSlotCapacity::where('visit_type', 'virtual')->first();
+        $physicalCap = TimeSlotCapacity::where('visit_type', 'physical')->first();
+        
+        $virtualStartTime = $virtualCap?->start_time?->format('H:i') ?? '07:00';
+        $virtualEndTime = $virtualCap?->end_time?->format('H:i') ?? '22:00';
+        $physicalStartTime = $physicalCap?->start_time?->format('H:i') ?? '07:00';
+        $physicalEndTime = $physicalCap?->end_time?->format('H:i') ?? '18:00';
+        
+        // Get duration and interval settings
+        $virtualDuration = $virtualCap?->duration_minutes ?? 20;
+        $virtualInterval = $virtualCap?->interval_minutes ?? 5;
+        $physicalDuration = $physicalCap?->duration_minutes ?? 30;
+        $physicalInterval = $physicalCap?->interval_minutes ?? 10;
+        
+        // Generate virtual time slots based on dynamic operating hours
         $virtualSlots = [];
-        for ($hour = 7; $hour < 18; $hour++) {
-            for ($minute = 0; $minute < 60; $minute += 10) {
-                $virtualSlots[] = sprintf('%02d:%02d', $hour, $minute);
-            }
+        [$startHour, $startMinute] = explode(':', $virtualStartTime);
+        [$endHour, $endMinute] = explode(':', $virtualEndTime);
+        
+        $currentMinutes = ((int)$startHour) * 60 + (int)$startMinute;
+        $endMinutes = ((int)$endHour) * 60 + (int)$endMinute;
+        $slotInterval = $virtualDuration + $virtualInterval;
+        
+        while ($currentMinutes < $endMinutes) {
+            $hour = intdiv($currentMinutes, 60);
+            $minute = $currentMinutes % 60;
+            $virtualSlots[] = sprintf('%02d:%02d', $hour, $minute);
+            $currentMinutes += $slotInterval;
         }
+        
+        // Generate physical time slots based on dynamic operating hours
         $physicalSlots = [];
-        for ($hour = 7; $hour < 18; $hour++) {
-            $physicalSlots[] = sprintf('%02d:00', $hour);
+        [$startHour, $startMinute] = explode(':', $physicalStartTime);
+        [$endHour, $endMinute] = explode(':', $physicalEndTime);
+        
+        $currentMinutes = ((int)$startHour) * 60 + (int)$startMinute;
+        $endMinutes = ((int)$endHour) * 60 + (int)$endMinute;
+        $slotInterval = $physicalDuration + $physicalInterval;
+        
+        while ($currentMinutes < $endMinutes) {
+            $hour = intdiv($currentMinutes, 60);
+            $minute = $currentMinutes % 60;
+            $physicalSlots[] = sprintf('%02d:%02d', $hour, $minute);
+            $currentMinutes += $slotInterval;
         }
 
         $capacities = TimeSlotCapacity::all()->keyBy(function ($capacity) {
@@ -41,8 +76,10 @@ class TimeSlotConfigurationController extends Controller
                 'time_slot' => $timeSlot,
                 'visit_type' => 'virtual',
                 'max_capacity' => $capacity?->max_capacity ?? 4,
-                'duration_minutes' => $capacity?->duration_minutes ?? 20,
-                'interval_minutes' => $capacity?->interval_minutes ?? 5,
+                'duration_minutes' => $virtualDuration,
+                'interval_minutes' => $virtualInterval,
+                'start_time' => $virtualStartTime,
+                'end_time' => $virtualEndTime,
             ];
         }
         foreach ($physicalSlots as $timeSlot) {
@@ -53,8 +90,10 @@ class TimeSlotConfigurationController extends Controller
                 'time_slot' => $timeSlot,
                 'visit_type' => 'physical',
                 'max_capacity' => $capacity?->max_capacity ?? 4,
-                'duration_minutes' => $capacity?->duration_minutes ?? 20,
-                'interval_minutes' => $capacity?->interval_minutes ?? 5,
+                'duration_minutes' => $physicalDuration,
+                'interval_minutes' => $physicalInterval,
+                'start_time' => $physicalStartTime,
+                'end_time' => $physicalEndTime,
             ];
         }
 
@@ -145,5 +184,27 @@ class TimeSlotConfigurationController extends Controller
 
         return redirect()->back()
             ->with('success', ucfirst($visitType).' visit settings updated successfully.');
+    }
+
+    /**
+     * Update operating hours (start_time and end_time) for a visit type.
+     */
+    public function updateOperatingHours(Request $request): RedirectResponse
+    {
+        $request->validate([
+            'visit_type' => ['required', 'string', 'in:physical,virtual'],
+            'start_time' => ['required', 'date_format:H:i'],
+            'end_time' => ['required', 'date_format:H:i', 'after:start_time'],
+        ]);
+
+        // Update all records of this visit type with the new start/end times
+        TimeSlotCapacity::where('visit_type', $request->visit_type)
+            ->update([
+                'start_time' => $request->start_time,
+                'end_time' => $request->end_time,
+            ]);
+
+        return redirect()->back()
+            ->with('success', 'Operating hours updated successfully.');
     }
 }

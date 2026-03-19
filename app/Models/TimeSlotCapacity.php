@@ -17,6 +17,8 @@ class TimeSlotCapacity extends Model
         'max_capacity',
         'duration_minutes',
         'interval_minutes',
+        'start_time',
+        'end_time',
     ];
 
     /**
@@ -30,7 +32,35 @@ class TimeSlotCapacity extends Model
             'max_capacity' => 'integer',
             'duration_minutes' => 'integer',
             'interval_minutes' => 'integer',
+            'start_time' => 'datetime:H:i',
+            'end_time' => 'datetime:H:i',
         ];
+    }
+
+    /**
+     * Get the default start time for a visit type.
+     */
+    public static function getStartTime(string $visitType): string
+    {
+        $capacity = self::where('visit_type', $visitType)
+            ->where('time_slot', '07:00') // Get first slot of the day
+            ->first();
+
+        return $capacity?->start_time?->format('H:i') ?? '07:00';
+    }
+
+    /**
+     * Get the default end time for a visit type.
+     */
+    public static function getEndTime(string $visitType): string
+    {
+        $capacity = self::where('visit_type', $visitType)
+            ->where('time_slot', '07:00') // Get first slot of the day
+            ->first();
+
+        // Default end times: virtual 22:00, physical 18:00
+        $defaultEndTime = $visitType === 'virtual' ? '22:00' : '18:00';
+        return $capacity?->end_time?->format('H:i') ?? $defaultEndTime;
     }
 
     /**

@@ -1,6 +1,6 @@
 import { Head, router, useForm } from '@inertiajs/react';
 import type { ColumnDef } from '@tanstack/react-table';
-import { Clock, Settings, Save } from 'lucide-react';
+import { Clock, Settings, Save, Sunrise, Sunset } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -37,6 +37,8 @@ type TimeSlotCapacity = {
     time_slot: string;
     visit_type: 'physical' | 'virtual';
     max_capacity: number;
+    start_time?: string;
+    end_time?: string;
 };
 
 type Props = {
@@ -69,6 +71,16 @@ export default function TimeSlotConfiguration({ capacities }: Props) {
     const [visitTypeFilter, setVisitTypeFilter] = useState<string>('all');
     const [editingCapacity, setEditingCapacity] = useState<TimeSlotCapacity | null>(null);
     const [capacityValue, setCapacityValue] = useState<string>('');
+    
+    // Get unique visit types from capacities
+    const virtualCap = capacities.find((cap) => cap.visit_type === 'virtual');
+    const physicalCap = capacities.find((cap) => cap.visit_type === 'physical');
+    
+    // State for operating hours by visit type
+    const [virtualStartTime, setVirtualStartTime] = useState<string>(virtualCap?.start_time ?? '07:00');
+    const [virtualEndTime, setVirtualEndTime] = useState<string>(virtualCap?.end_time ?? '22:00');
+    const [physicalStartTime, setPhysicalStartTime] = useState<string>(physicalCap?.start_time ?? '07:00');
+    const [physicalEndTime, setPhysicalEndTime] = useState<string>(physicalCap?.end_time ?? '18:00');
 
     const updateForm = useForm({
         time_slot: '',
@@ -146,6 +158,25 @@ export default function TimeSlotConfiguration({ capacities }: Props) {
     const handleCancel = () => {
         setEditingCapacity(null);
         setCapacityValue('');
+    };
+
+    const handleSaveOperatingHours = (visitType: 'virtual' | 'physical') => {
+        const startTime = visitType === 'virtual' ? virtualStartTime : physicalStartTime;
+        const endTime = visitType === 'virtual' ? virtualEndTime : physicalEndTime;
+        
+        router.put(`/admin/time-slot-capacities/operating-hours`, {
+            visit_type: visitType,
+            start_time: startTime,
+            end_time: endTime,
+        }, {
+            preserveScroll: true,
+            onSuccess: () => {
+                toast.success(`Operating hours updated for ${visitType} visits`);
+            },
+            onError: () => {
+                toast.error(`Failed to update operating hours for ${visitType} visits`);
+            },
+        });
     };
 
     const columns: ColumnDef<TimeSlotCapacity>[] = useMemo(() => [
@@ -236,11 +267,95 @@ export default function TimeSlotConfiguration({ capacities }: Props) {
                     <CardHeader>
                         <CardTitle>Time Slot Capacities</CardTitle>
                         <CardDescription>
-                            Virtual visits: 10-minute slots (7:00–7:10, 7:10–7:20, …). Physical visits: 1-hour slots (7:00–8:00, 8:00–9:00, …). Set max visitors per slot; default is 4.
+                            Configure operating hours and capacity for each visit type
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <div className="space-y-4">
+                        <div className="space-y-6">
+                            {/* Operating Hours Settings */}
+                            <div className="grid gap-4 md:grid-cols-2">
+                                {/* Virtual Visit Hours */}
+                                <Card>
+                                    <CardHeader className="pb-3">
+                                        <CardTitle className="text-base flex items-center gap-2">
+                                            <Sunrise className="h-5 w-5 text-blue-500" />
+                                            Virtual Visit Hours
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="space-y-3">
+                                        <div className="flex items-center gap-2">
+                                            <Label htmlFor="virtual-start" className="text-sm">Start:</Label>
+                                            <Input
+                                                id="virtual-start"
+                                                type="time"
+                                                value={virtualStartTime}
+                                                onChange={(e) => setVirtualStartTime(e.target.value)}
+                                                className="w-32"
+                                            />
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <Label htmlFor="virtual-end" className="text-sm">End:</Label>
+                                            <Input
+                                                id="virtual-end"
+                                                type="time"
+                                                value={virtualEndTime}
+                                                onChange={(e) => setVirtualEndTime(e.target.value)}
+                                                className="w-32"
+                                            />
+                                        </div>
+                                        <Button
+                                            size="sm"
+                                            onClick={() => handleSaveOperatingHours('virtual')}
+                                            className="w-full"
+                                        >
+                                            <Save className="h-4 w-4 mr-2" />
+                                            Save Virtual Hours
+                                        </Button>
+                                    </CardContent>
+                                </Card>
+
+                                {/* Physical Visit Hours */}
+                                <Card>
+                                    <CardHeader className="pb-3">
+                                        <CardTitle className="text-base flex items-center gap-2">
+                                            <Sunset className="h-5 w-5 text-green-500" />
+                                            Physical Visit Hours
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="space-y-3">
+                                        <div className="flex items-center gap-2">
+                                            <Label htmlFor="physical-start" className="text-sm">Start:</Label>
+                                            <Input
+                                                id="physical-start"
+                                                type="time"
+                                                value={physicalStartTime}
+                                                onChange={(e) => setPhysicalStartTime(e.target.value)}
+                                                className="w-32"
+                                            />
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <Label htmlFor="physical-end" className="text-sm">End:</Label>
+                                            <Input
+                                                id="physical-end"
+                                                type="time"
+                                                value={physicalEndTime}
+                                                onChange={(e) => setPhysicalEndTime(e.target.value)}
+                                                className="w-32"
+                                            />
+                                        </div>
+                                        <Button
+                                            size="sm"
+                                            onClick={() => handleSaveOperatingHours('physical')}
+                                            className="w-full"
+                                        >
+                                            <Save className="h-4 w-4 mr-2" />
+                                            Save Physical Hours
+                                        </Button>
+                                    </CardContent>
+                                </Card>
+                            </div>
+
+                            {/* Visit Type Filter */}
                             <div className="flex items-center gap-4">
                                 <Label>Filter by Visit Type:</Label>
                                 <Select value={visitTypeFilter} onValueChange={setVisitTypeFilter}>
@@ -257,8 +372,22 @@ export default function TimeSlotConfiguration({ capacities }: Props) {
 
                             <Tabs defaultValue="AM" className="w-full">
                                 <TabsList className="grid w-full grid-cols-2">
-                                    <TabsTrigger value="AM">AM (7:00 AM - 11:50 AM)</TabsTrigger>
-                                    <TabsTrigger value="PM">PM (12:00 PM - 5:50 PM)</TabsTrigger>
+                                    <TabsTrigger value="AM">
+                                        AM ({virtualCap?.start_time ?? '07:00'} - {(() => {
+                                            const endTime = visitTypeFilter === 'virtual' ? virtualEndTime : physicalEndTime;
+                                            const [hours, minutes] = endTime.split(':').map(Number);
+                                            if (hours < 12) return `${hours.toString().padStart(2, '0')}:${minutes}`;
+                                            return '11:59';
+                                        })()})
+                                    </TabsTrigger>
+                                    <TabsTrigger value="PM">
+                                        PM ({(() => {
+                                            const startTime = visitTypeFilter === 'virtual' ? virtualStartTime : physicalStartTime;
+                                            const [hours, minutes] = startTime.split(':').map(Number);
+                                            if (hours >= 12) return `${hours.toString().padStart(2, '0')}:${minutes}`;
+                                            return '12:00';
+                                        })()} - {visitTypeFilter === 'virtual' ? virtualEndTime : physicalEndTime})
+                                    </TabsTrigger>
                                 </TabsList>
 
                                 <TabsContent value="AM" className="mt-4">

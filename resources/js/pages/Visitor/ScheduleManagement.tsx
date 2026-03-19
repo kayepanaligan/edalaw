@@ -188,6 +188,8 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
     const [rescheduleDayUnavailable, setRescheduleDayUnavailable] = useState(false);
     const [durationMinutes, setDurationMinutes] = useState<number>(20);
     const [intervalMinutes, setIntervalMinutes] = useState<number>(5);
+    const [startTime, setStartTime] = useState<string>('07:00');
+    const [endTime, setEndTime] = useState<string>('18:00');
     const [rescheduleDurationMinutes, setRescheduleDurationMinutes] = useState<number>(20);
     const [rescheduleIntervalMinutes, setRescheduleIntervalMinutes] = useState<number>(5);
     const [loadingSlots, setLoadingSlots] = useState(false);
@@ -275,6 +277,12 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
                 }
                 if (typeof data.intervalMinutes === 'number') {
                     setIntervalMinutes(data.intervalMinutes);
+                }
+                if (typeof data.startTime === 'string') {
+                    setStartTime(data.startTime);
+                }
+                if (typeof data.endTime === 'string') {
+                    setEndTime(data.endTime);
                 }
             } catch (error) {
                 console.error('Error fetching slot capacities:', error);
@@ -1299,7 +1307,13 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
                                             )}
                                             {isDayUnavailable ? (
                                                 <div className="rounded-lg border border-amber-500/50 bg-amber-500/10 p-4 text-center text-sm text-amber-800 dark:text-amber-200">
-                                                    <strong>Unavailable.</strong> Schedule times for this day end at 5:50 PM. Please select another date.
+                                                    <strong>Unavailable.</strong> Schedule times for this day end at {(() => {
+                                                        const [endHour, endMin] = endTime.split(':');
+                                                        const hour = parseInt(endHour);
+                                                        const period = hour >= 12 ? 'PM' : 'AM';
+                                                        const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
+                                                        return `${displayHour}:${endMin} ${period}`;
+                                                    })()}. Please select another date.
                                                 </div>
                                             ) : (
                                                 <TimeSlotPicker
@@ -1311,6 +1325,8 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
                                                     durationMinutes={durationMinutes}
                                                     intervalMinutes={intervalMinutes}
                                                     selectedDate={form.data.scheduled_date}
+                                                    startTime={startTime}
+                                                    endTime={endTime}
                                                     onTimeSelect={(time) => {
                                                         form.setData('scheduled_time', time);
                                                     }}
@@ -1464,7 +1480,13 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
                                             )}
                                             {rescheduleDayUnavailable ? (
                                                 <div className="rounded-lg border border-amber-500/50 bg-amber-500/10 p-4 text-center text-sm text-amber-800 dark:text-amber-200">
-                                                    <strong>Unavailable.</strong> Schedule times for this day end at 5:50 PM. Please select another date.
+                                                    <strong>Unavailable.</strong> Schedule times for this day end at {(() => {
+                                                        const [endHour, endMin] = endTime.split(':');
+                                                        const hour = parseInt(endHour);
+                                                        const period = hour >= 12 ? 'PM' : 'AM';
+                                                        const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
+                                                        return `${displayHour}:${endMin} ${period}`;
+                                                    })()}. Please select another date.
                                                 </div>
                                             ) : (
                                                 <TimeSlotPicker
@@ -1478,6 +1500,8 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
                                                     durationMinutes={rescheduleDurationMinutes}
                                                     intervalMinutes={rescheduleIntervalMinutes}
                                                     selectedDate={rescheduleForm.data.scheduled_date}
+                                                    startTime={startTime}
+                                                    endTime={endTime}
                                                 />
                                             )}
                                         </>

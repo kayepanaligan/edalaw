@@ -145,7 +145,8 @@ export default function AssignedSessions({ sessions, filters: initialFilters }: 
                         setBeforeScheduleSession(s);
                         return;
                     }
-                    window.location.href = `/jail-officer/assigned-sessions/${s.id}/join`;
+                    // Open video call in new tab
+                    window.open(`/jail-officer/assigned-sessions/${s.id}/join`, '_blank');
                 };
                 return (
                     <div className="flex items-center gap-2">

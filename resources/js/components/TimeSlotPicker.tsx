@@ -29,6 +29,10 @@ type TimeSlotPickerProps = {
     intervalMinutes?: number;
     /** Selected date to check if time slots are in the past (format: YYYY-MM-DD) */
     selectedDate?: string;
+    /** Start time for generating slots (format: HH:MM) */
+    startTime?: string;
+    /** End time for generating slots (format: HH:MM) */
+    endTime?: string;
 };
 
 export function TimeSlotPicker({
@@ -42,6 +46,8 @@ export function TimeSlotPicker({
     durationMinutes = 20,
     intervalMinutes = 5,
     selectedDate,
+    startTime = '07:00',
+    endTime = '18:00',
 }: TimeSlotPickerProps) {
     const [activeTab, setActiveTab] = useState<'AM' | 'PM'>('AM');
 
@@ -57,8 +63,12 @@ export function TimeSlotPicker({
         const slots: TimeSlot[] = [];
         const slotInterval = durationMinutes + intervalMinutes;
 
-        let currentMinutes = 7 * 60; // Start at 7:00 AM
-        const endMinutes = 18 * 60; // End at 6:00 PM
+        // Parse start and end times
+        const [startHour, startMinute] = startTime.split(':').map(Number);
+        const [endHour, endMinute] = endTime.split(':').map(Number);
+        
+        let currentMinutes = startHour * 60 + startMinute;
+        const endMinutes = endHour * 60 + endMinute;
 
         while (currentMinutes < endMinutes) {
             const hour = Math.floor(currentMinutes / 60);

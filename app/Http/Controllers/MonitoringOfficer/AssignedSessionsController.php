@@ -90,6 +90,7 @@ class AssignedSessionsController extends Controller
             'filters' => [
                 'type' => $typeFilter ?? 'all',
             ],
+            'userRole' => 'monitoring_officer',
         ]);
     }
 
@@ -308,13 +309,12 @@ class AssignedSessionsController extends Controller
         }
 
         // Use embedded VideoRoom for both v1 and v2 to ensure proper token handling
-        $url = url('/video-room').'?room_id='.rawurlencode($session->room_id).'&token='.rawurlencode($result['token']).'&name='.rawurlencode($request->user()->name ?? 'Monitor').'&participant_id='.rawurlencode($participantId).'&observer=1';
-
-        $session->refresh();
-        if ($session->visitor_participant_id && $session->recording_status === 'pending') {
-            app(VisitSessionRecordingService::class)->tryStartRecording($session, $session->visitor_participant_id);
-        }
-
-        return redirect()->away($url);
+        return view('visitor.video-room', [
+            'session'            => $session,
+            'room_id'            => $session->room_id,
+            'participant_name'   => $request->user()->name ?? 'Monitor',
+            'participant_id'     => $participantId,
+            'is_observer'        => true,
+        ]);
     }
 }
