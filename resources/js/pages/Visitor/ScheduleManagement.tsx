@@ -1,18 +1,8 @@
 import { Head, router, useForm, usePage } from '@inertiajs/react';
-import { Calendar as CalendarIcon, Clock, Plus, Scale, User, Video, X, CalendarClock, FileText, MoreVertical, FileOutput, VideoIcon, Search, Building, AlertCircle, CheckCircle2 } from 'lucide-react';
+
+import type { ColumnDef } from '@tanstack/react-table';
 import axios from 'axios';
 
-import { formatVisitSchedule } from '@/lib/formatVisitSchedule';
-import { useEffect, useMemo, useState } from 'react';
-import { toast } from 'sonner';
-import { ColumnDef } from '@tanstack/react-table';
-
-import InputError from '@/components/input-error';
-import { useToast } from '@/hooks/use-toast';
-import { TimeSlotPicker } from '@/components/TimeSlotPicker';
-import { DataTable } from '@/components/data-table';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -20,6 +10,14 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
+import { Calendar as CalendarIcon, Clock, Plus, Scale, User, Video, X, CalendarClock, FileText, MoreVertical, FileOutput, VideoIcon, Search, Building, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { toast } from 'sonner';
+import { DataTable } from '@/components/data-table';
+import InputError from '@/components/input-error';
+import { TimeSlotPicker } from '@/components/TimeSlotPicker';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import {
     Dialog,
     DialogContent,
@@ -28,8 +26,6 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -38,6 +34,8 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
     Select,
     SelectContent,
@@ -47,7 +45,9 @@ import {
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
 import { Textarea } from '@/components/ui/textarea';
+import { useToast } from '@/hooks/use-toast';
 import AppLayout from '@/layouts/app-layout';
+import { formatVisitSchedule } from '@/lib/formatVisitSchedule';
 import visitor from '@/routes/visitor/index';
 import type { BreadcrumbItem } from '@/types';
 
@@ -88,8 +88,8 @@ type Visit = {
     join_url: string | null;
     access_key: string | null;
     access_key_expires_at: string | null;
-    monitoring_officer_id: number | null;
-    monitoring_officer_name: string | null;
+    jail_officer_id: number | null;
+    jail_officer_name: string | null;
     rejection_reason: string | null;
     created_at: string;
     can_appeal?: boolean;
@@ -186,6 +186,10 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
     const [rescheduleSlotCapacities, setRescheduleSlotCapacities] = useState<Record<string, { current: number; max: number; isFull: boolean }>>({});
     const [isDayUnavailable, setIsDayUnavailable] = useState(false);
     const [rescheduleDayUnavailable, setRescheduleDayUnavailable] = useState(false);
+    const [durationMinutes, setDurationMinutes] = useState<number>(20);
+    const [intervalMinutes, setIntervalMinutes] = useState<number>(5);
+    const [rescheduleDurationMinutes, setRescheduleDurationMinutes] = useState<number>(20);
+    const [rescheduleIntervalMinutes, setRescheduleIntervalMinutes] = useState<number>(5);
     const [loadingSlots, setLoadingSlots] = useState(false);
     const [statusFilter, setStatusFilter] = useState<string>('all');
     const [visitTypeFilter, setVisitTypeFilter] = useState<string>('all');
@@ -264,6 +268,13 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
                 }
                 if (data.isDayUnavailable === true) {
                     setIsDayUnavailable(true);
+                }
+                // Set duration and interval from admin settings
+                if (typeof data.durationMinutes === 'number') {
+                    setDurationMinutes(data.durationMinutes);
+                }
+                if (typeof data.intervalMinutes === 'number') {
+                    setIntervalMinutes(data.intervalMinutes);
                 }
             } catch (error) {
                 console.error('Error fetching slot capacities:', error);
@@ -575,6 +586,13 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
                 if (data.isDayUnavailable === true) {
                     setRescheduleDayUnavailable(true);
                 }
+                // Set duration and interval from admin settings
+                if (typeof data.durationMinutes === 'number') {
+                    setRescheduleDurationMinutes(data.durationMinutes);
+                }
+                if (typeof data.intervalMinutes === 'number') {
+                    setRescheduleIntervalMinutes(data.intervalMinutes);
+                }
             } catch (error) {
                 console.error('Error fetching reschedule slot capacities:', error);
             } finally {
@@ -639,15 +657,15 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
             },
         },
         {
-            id: 'monitoring_officer',
-            header: 'Monitoring Officer',
+            id: 'jail_officer',
+            header: 'Jail Officer',
             cell: ({ row }) => {
                 const visit = row.original;
                 if (visit.visit_type === 'physical') {
                     return <span className="text-sm text-muted-foreground">Not applicable</span>;
                 }
-                if (visit.monitoring_officer_name) {
-                    return <span className="text-sm">{visit.monitoring_officer_name}</span>;
+                if (visit.jail_officer_name) {
+                    return <span className="text-sm">{visit.jail_officer_name}</span>;
                 }
                 return <span className="text-sm text-muted-foreground">Not assigned</span>;
             },
@@ -979,8 +997,8 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
                                             <SelectValue placeholder="Select visit type" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="virtual">Virtual (10-min)</SelectItem>
-                                            <SelectItem value="physical">Physical (1-hour)</SelectItem>
+                                            <SelectItem value="virtual">Virtual ({durationMinutes}-min)</SelectItem>
+                                            <SelectItem value="physical">Physical ({durationMinutes}-min)</SelectItem>
                                         </SelectContent>
                                     </Select>
                                     <input type="hidden" name="visit_type" value={currentVisitType} />
@@ -1290,6 +1308,9 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
                                                     slotCapacities={slotCapacities}
                                                     userBookedSlots={userBookedSlots}
                                                     visitType={form.data.visit_type as 'physical' | 'virtual'}
+                                                    durationMinutes={durationMinutes}
+                                                    intervalMinutes={intervalMinutes}
+                                                    selectedDate={form.data.scheduled_date}
                                                     onTimeSelect={(time) => {
                                                         form.setData('scheduled_time', time);
                                                     }}
@@ -1454,6 +1475,9 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
                                                     bookedSlots={rescheduleBookedSlots}
                                                     slotCapacities={rescheduleSlotCapacities}
                                                     visitType={selectedVisitForReschedule?.visit_type as 'physical' | 'virtual'}
+                                                    durationMinutes={rescheduleDurationMinutes}
+                                                    intervalMinutes={rescheduleIntervalMinutes}
+                                                    selectedDate={rescheduleForm.data.scheduled_date}
                                                 />
                                             )}
                                         </>

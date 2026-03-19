@@ -1,5 +1,6 @@
 import { Head, router, useForm } from '@inertiajs/react';
 
+import { REGEXP_ONLY_DIGITS } from 'input-otp';
 import InputError from '@/components/input-error';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -11,7 +12,6 @@ import {
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import AuthLayout from '@/layouts/auth-layout';
-import { REGEXP_ONLY_DIGITS } from 'input-otp';
 
 type Props = {
     email?: string;

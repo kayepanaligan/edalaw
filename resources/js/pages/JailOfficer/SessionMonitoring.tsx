@@ -4,10 +4,10 @@ import { Eye, Monitor, Video } from 'lucide-react';
 import { useMemo } from 'react';
 import { toast } from 'sonner';
 
+import { DataTable } from '@/components/data-table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { DataTable } from '@/components/data-table';
 import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
 

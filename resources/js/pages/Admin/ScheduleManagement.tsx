@@ -1,15 +1,13 @@
 import { Head, router, useForm, usePage } from '@inertiajs/react';
-import { Calendar, Clock, Plus, User, Video, Check, X, MoreVertical, Eye, Edit, Trash2, Key, RefreshCw, FileOutput, VideoIcon } from 'lucide-react';
 
-import { formatVisitSchedule } from '@/lib/formatVisitSchedule';
+import type { ColumnDef } from '@tanstack/react-table';
+import { Calendar, Clock, Plus, User, Video, Check, X, MoreVertical, Eye, Edit, Trash2, Key, RefreshCw, FileOutput, VideoIcon } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { ColumnDef } from '@tanstack/react-table';
 
-import InputError from '@/components/input-error';
-import { useToast } from '@/hooks/use-toast';
-import { TimeSlotPicker } from '@/components/TimeSlotPicker';
 import { DataTable } from '@/components/data-table';
+import InputError from '@/components/input-error';
+import { TimeSlotPicker } from '@/components/TimeSlotPicker';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -21,6 +19,14 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -30,16 +36,10 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { Textarea } from '@/components/ui/textarea';
+import { useToast } from '@/hooks/use-toast';
 import AppLayout from '@/layouts/app-layout';
+import { formatVisitSchedule } from '@/lib/formatVisitSchedule';
 import type { BreadcrumbItem } from '@/types';
 
 const breadcrumbs: BreadcrumbItem[] = [

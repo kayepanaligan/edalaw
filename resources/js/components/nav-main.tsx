@@ -1,3 +1,5 @@
+import { Link } from '@inertiajs/react';
+import { Badge } from '@/components/ui/badge';
 import {
     SidebarGroup,
     SidebarGroupLabel,
@@ -5,10 +7,8 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
-import { Badge } from '@/components/ui/badge';
 import { useCurrentUrl } from '@/hooks/use-current-url';
 import type { NavItem } from '@/types';
-import { Link } from '@inertiajs/react';
 
 type NavGroup = {
     label: string;

@@ -101,6 +101,14 @@ class ScheduleManagementController extends Controller
      */
     public function approve(Request $request, Visit $visit): RedirectResponse
     {
+        // Debug logging
+        \Illuminate\Support\Facades\Log::debug('Jail Officer approve - request data', [
+            'visit_id' => $visit->id,
+            'visit_type' => $visit->visit_type->value,
+            'request_jail_officer_id' => $request->jail_officer_id,
+            'all_request_data' => $request->all(),
+        ]);
+
         if ($visit->isScheduleInPast()) {
             $visit->update([
                 'status' => VisitStatus::Rejected,
@@ -117,7 +125,11 @@ class ScheduleManagementController extends Controller
         if ($visit->visit_type === VisitType::Virtual) {
             $rules['jail_officer_id'] = ['required', 'exists:users,id'];
         }
-        $request->validate($rules);
+        $validated = $request->validate($rules);
+
+        \Illuminate\Support\Facades\Log::debug('Jail Officer approve - validation passed', [
+            'validated_data' => $validated,
+        ]);
 
         $oldJailOfficerId = $visit->jail_officer_id;
         $updateData = [
@@ -175,6 +187,12 @@ class ScheduleManagementController extends Controller
         }
 
         $visit->update($updateData);
+
+        \Illuminate\Support\Facades\Log::debug('Jail Officer approve - visit updated', [
+            'visit_id' => $visit->id,
+            'update_data' => $updateData,
+            'new_jail_officer_id' => $visit->jail_officer_id,
+        ]);
 
         // Refresh visit to get updated meeting_link
         $visit->refresh();

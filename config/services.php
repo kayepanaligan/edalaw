@@ -35,12 +35,6 @@ return [
         ],
     ],
 
-    'daily_co' => [
-        'api_key' => env('DAILY_CO_API_KEY'),
-        'api_url' => env('DAILY_CO_API_URL', 'https://api.daily.co/v1'),
-        'webhook_secret' => env('DAILY_CO_WEBHOOK_SECRET'),
-    ],
-
     'semaphore' => [
         'api_key' => env('SEMAPHORE_API_KEY'),
         'sender_name' => env('SEMAPHORE_SENDER_NAME'),
@@ -49,10 +43,8 @@ return [
     'videosdk' => [
         'api_key' => env('VIDEOSDK_API_KEY'),
         'secret_key' => env('VIDEOSDK_SECRET_KEY'),
-        // v2 rooms: https://api.videosdk.live/v2/rooms — token and init-config use opaque roomId.
-        'api_endpoint' => env('VIDEOSDK_API_ENDPOINT', 'https://api.videosdk.live/v1/meetings'),
+        'api_endpoint' => env('VIDEOSDK_API_ENDPOINT', 'https://api.videosdk.live/v2/meetings'),
         'token' => env('VIDEOSDK_TOKEN'),
-        // After changing .env run: php artisan config:clear
     ],
-
+ 
 ];

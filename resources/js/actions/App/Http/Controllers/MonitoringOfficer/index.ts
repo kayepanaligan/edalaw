@@ -1,13 +1,13 @@
 import AnalyticsController from './AnalyticsController'
-import VideoRecordingsController from './VideoRecordingsController'
-import ChatRecordingsController from './ChatRecordingsController'
-import VisitMonitoringController from './VisitMonitoringController'
-import EburolMonitoringController from './EburolMonitoringController'
 import AssignedSessionsController from './AssignedSessionsController'
-import IncidentReportingController from './IncidentReportingController'
+import ChatRecordingsController from './ChatRecordingsController'
+import EburolMonitoringController from './EburolMonitoringController'
 import HistoryController from './HistoryController'
+import IncidentReportingController from './IncidentReportingController'
 import InmateTunnelController from './InmateTunnelController'
 import NotificationController from './NotificationController'
+import VideoRecordingsController from './VideoRecordingsController'
+import VisitMonitoringController from './VisitMonitoringController'
 const MonitoringOfficer = {
     AnalyticsController: Object.assign(AnalyticsController, AnalyticsController),
 VideoRecordingsController: Object.assign(VideoRecordingsController, VideoRecordingsController),

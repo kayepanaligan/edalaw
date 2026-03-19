@@ -1,6 +1,6 @@
 /**
  * Single source of truth for displaying visit schedule date and time across all modules.
- * All visits use 1-hour slots. Times are shown in 12-hour format.
+ * Times are shown in 12-hour format with configurable duration.
  */
 export type VisitType = 'virtual' | 'physical';
 
@@ -8,6 +8,12 @@ export interface FormattedSchedule {
     dateLabel: string;
     timeLabel: string;
 }
+
+// Default durations (should match admin settings)
+const DEFAULT_DURATIONS: Record<VisitType, number> = {
+    virtual: 20,  // 20 minutes for virtual visits
+    physical: 30, // 30 minutes for physical visits
+};
 
 const dateOptions: Intl.DateTimeFormatOptions = {
     weekday: 'short',
@@ -26,11 +32,13 @@ function to12hr(hours: number, minutes: number): string {
 
 /**
  * Format scheduled_date + scheduled_time + visit_type into consistent date and time strings (12-hour format).
+ * Duration is based on visit type (virtual: 20 min, physical: 30 min by default).
  */
 export function formatVisitSchedule(
     scheduledDate: string,
     scheduledTime: string | null,
-    _visitType: VisitType
+    visitType: VisitType,
+    durationMinutes?: number
 ): FormattedSchedule {
     const dateLabel = new Date(scheduledDate).toLocaleDateString('en-US', dateOptions);
 
@@ -39,8 +47,16 @@ export function formatVisitSchedule(
     }
 
     const [hours, minutes] = scheduledTime.split(':').map(Number);
-    const endH = hours + 1;
-    const endM = minutes;
+    
+    // Use provided duration or default based on visit type
+    const duration = durationMinutes ?? DEFAULT_DURATIONS[visitType] ?? 20;
+    
+    // Calculate end time
+    const startTotalMinutes = hours * 60 + minutes;
+    const endTotalMinutes = startTotalMinutes + duration;
+    const endH = Math.floor(endTotalMinutes / 60);
+    const endM = endTotalMinutes % 60;
+    
     const timeLabel = `${to12hr(hours, minutes)} – ${to12hr(endH, endM)}`;
 
     return { dateLabel, timeLabel };
@@ -58,12 +74,17 @@ export function formatSessionSchedule(scheduledStart: string, scheduledEnd: stri
 }
 
 /**
- * Whether the visit's scheduled slot has ended (so video link should be disabled). 1-hour slots.
+ * Whether the visit's scheduled slot has ended (so video link should be disabled).
+ * Duration is based on visit type (virtual: 20 min, physical: 30 min by default).
  */
-export function isScheduleEnded(scheduledDate: string, scheduledTime: string | null, _visitType: VisitType): boolean {
+export function isScheduleEnded(scheduledDate: string, scheduledTime: string | null, visitType: VisitType, durationMinutes?: number): boolean {
     if (!scheduledTime) return true;
     const [hours, minutes] = scheduledTime.split(':').map(Number);
+    const duration = durationMinutes ?? DEFAULT_DURATIONS[visitType] ?? 20;
     const end = new Date(scheduledDate);
-    end.setHours(hours + 1, minutes, 0, 0);
+    const endTotalMinutes = hours * 60 + minutes + duration;
+    const endH = Math.floor(endTotalMinutes / 60);
+    const endM = endTotalMinutes % 60;
+    end.setHours(endH, endM, 0, 0);
     return new Date() >= end;
 }

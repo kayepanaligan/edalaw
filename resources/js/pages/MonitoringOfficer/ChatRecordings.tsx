@@ -3,9 +3,9 @@ import type { ColumnDef } from '@tanstack/react-table';
 import { Download, Eye } from 'lucide-react';
 import { useMemo } from 'react';
 
+import { DataTable } from '@/components/data-table';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { DataTable } from '@/components/data-table';
 import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
 

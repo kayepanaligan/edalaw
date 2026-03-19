@@ -4,9 +4,9 @@ import { Calendar, Video, MoreVertical, Eye, Check, X, RefreshCw, CalendarClock,
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
-import { formatVisitSchedule } from '@/lib/formatVisitSchedule';
 import { DataTable } from '@/components/data-table';
 import InputError from '@/components/input-error';
+import { TimeSlotPicker } from '@/components/TimeSlotPicker';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -26,7 +26,6 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { TimeSlotPicker } from '@/components/TimeSlotPicker';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -39,6 +38,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import AppLayout from '@/layouts/app-layout';
+import { formatVisitSchedule } from '@/lib/formatVisitSchedule';
 import type { BreadcrumbItem } from '@/types';
 
 const breadcrumbs: BreadcrumbItem[] = [

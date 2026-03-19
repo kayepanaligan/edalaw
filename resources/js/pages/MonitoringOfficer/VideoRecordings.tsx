@@ -3,8 +3,8 @@ import type { ColumnDef } from '@tanstack/react-table';
 import { Download, ExternalLink } from 'lucide-react';
 import { useMemo } from 'react';
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { DataTable } from '@/components/data-table';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
 

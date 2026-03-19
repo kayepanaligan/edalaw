@@ -1,14 +1,14 @@
 import { Head, router, useForm } from '@inertiajs/react';
+import type { ColumnDef } from '@tanstack/react-table';
 import { MessageSquare, MoreVertical, Eye, CheckCircle, Clock, XCircle, FileX } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
-import { ColumnDef } from '@tanstack/react-table';
 import { toast } from 'sonner';
 
+import { DataTable } from '@/components/data-table';
 import InputError from '@/components/input-error';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { DataTable } from '@/components/data-table';
 import {
     Dialog,
     DialogContent,
