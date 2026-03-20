@@ -132,6 +132,14 @@ Route::middleware('guest')->group(function () {
         ->name('password.reset.submit');
 });
 
+Route::post('/video/chat', [App\Http\Controllers\VideoChatController::class, 'store'])->name('video.chat.store');
+Route::post('/video/session/update', [App\Http\Controllers\VideoChatController::class, 'updateSession'])->name('video.session.update');
+Route::post('/video/chat/send', [App\Http\Controllers\VideoChatController::class, 'sendMessage'])->name('video.chat.send');
+Route::get('/video/chat/history/{roomId}', [App\Http\Controllers\VideoChatController::class, 'getChatHistory'])->name('video.chat.history');
+Route::get('/video/chat/sync/{sessionId}', [App\Http\Controllers\VideoChatController::class, 'syncFromCloud']);
+Route::get('/video/chat/export/{sessionId}', [App\Http\Controllers\VideoChatController::class, 'exportChat'])->name('video.chat.export');
+Route::post('/visit-session/save-session-id', [App\Http\Controllers\Visitor\VisitSessionController::class, 'saveSessionId'])->name('visit-session.save-session-id');
+
 Route::middleware('auth')->group(function () {
     Route::get('account-pending', [\App\Http\Controllers\Auth\AccountStatusController::class, 'showPending'])
         ->name('account-pending');
@@ -508,6 +516,16 @@ Route::middleware(['auth', 'verified', 'approved'])->group(function () {
         Route::get('visit-session/{session}/join', [\App\Http\Controllers\StaffVisitSessionJoinController::class, 'join'])
             ->name('visit-session.join');
 
+        // Visit Monitored Management
+        Route::get('visits-monitored', [\App\Http\Controllers\JailOfficer\VisitMonitoredManagementController::class, 'index'])
+            ->name('visits-monitored.index');
+        Route::get('visits-monitored/{meetingId}', [\App\Http\Controllers\JailOfficer\VisitMonitoredManagementController::class, 'show'])
+            ->name('visits-monitored.show');
+        Route::get('visits-monitored/{meetingId}/download-chat', [\App\Http\Controllers\JailOfficer\VisitMonitoredManagementController::class, 'downloadChat'])
+            ->name('visits-monitored.download-chat');
+        Route::post('visits-monitored/{meetingId}/share-analytics', [\App\Http\Controllers\JailOfficer\VisitMonitoredManagementController::class, 'shareAnalytics'])
+            ->name('visits-monitored.share-analytics');
+
         // Eburol Management
         Route::get('eburols', [\App\Http\Controllers\JailOfficer\EburolManagementController::class, 'index'])
             ->name('eburols.index');
@@ -551,9 +569,9 @@ Route::middleware(['auth', 'verified', 'approved'])->group(function () {
             ->name('video-recordings.index');
         Route::get('chat-recordings', [\App\Http\Controllers\JailOfficer\ChatRecordingsController::class, 'index'])
             ->name('chat-recordings.index');
-        Route::get('chat-recordings/session/{session}', [\App\Http\Controllers\JailOfficer\ChatRecordingsController::class, 'viewSession'])
+        Route::get('chat-recordings/session/{roomId}', [\App\Http\Controllers\JailOfficer\ChatRecordingsController::class, 'viewSession'])
             ->name('chat-recordings.view-session');
-        Route::get('chat-recordings/session/{session}/export', [\App\Http\Controllers\JailOfficer\ChatRecordingsController::class, 'exportSession'])
+        Route::get('chat-recordings/session/{roomId}/export', [\App\Http\Controllers\JailOfficer\ChatRecordingsController::class, 'exportSession'])
             ->name('chat-recordings.export-session');
 
         // Incident Reporting
@@ -638,11 +656,15 @@ Route::middleware(['auth', 'verified', 'approved'])->group(function () {
         // Chat Recordings Management
         Route::get('chat-recordings', [\App\Http\Controllers\JailOfficer\ChatRecordingsController::class, 'index'])
             ->name('chat-recordings.index');
-        Route::get('chat-recordings/session/{session}', [\App\Http\Controllers\JailOfficer\ChatRecordingsController::class, 'viewSession'])
+        Route::get('chat-recordings/session/{roomId}', [\App\Http\Controllers\JailOfficer\ChatRecordingsController::class, 'viewSession'])
             ->name('chat-recordings.view-session');
-        Route::get('chat-recordings/session/{session}/export', [\App\Http\Controllers\JailOfficer\ChatRecordingsController::class, 'exportSession'])
+        Route::get('chat-recordings/session/{roomId}/export', [\App\Http\Controllers\JailOfficer\ChatRecordingsController::class, 'exportSession'])
             ->name('chat-recordings.export-session');
     });
 });
+
+// API route for fetching chat session data (used by modal)
+Route::middleware(['auth', 'role:jail_officer'])->get('api/chat-recordings/session/{roomId}', [\App\Http\Controllers\JailOfficer\ChatRecordingsController::class, 'viewSessionApi'])
+    ->name('jail-officer.chat-recordings.api');
 
 require __DIR__.'/settings.php';

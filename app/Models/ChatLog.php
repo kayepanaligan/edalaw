@@ -30,6 +30,18 @@ class ChatLog extends Model
         ];
     }
 
+    // Set sent_at to created_at if not provided
+    public static function boot()
+    {
+        parent::boot();
+        
+        static::creating(function ($chatLog) {
+            if (!$chatLog->sent_at) {
+                $chatLog->sent_at = now();
+            }
+        });
+    }
+
     public function visitSession(): BelongsTo
     {
         return $this->belongsTo(VisitSession::class);

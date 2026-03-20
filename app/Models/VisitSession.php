@@ -17,6 +17,7 @@ class VisitSession extends Model
         'visit_id',
         'eburol_id',
         'room_id',
+        'session_id',
         'monitor_id',
         'scheduled_start',
         'scheduled_end',
@@ -52,6 +53,7 @@ class VisitSession extends Model
             'chat_locked' => 'boolean',
             'visitor_joined_at' => 'datetime',
             'inmate_joined_at' => 'datetime',
+            'session_id' => 'string',
         ];
     }
 

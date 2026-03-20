@@ -22,8 +22,9 @@ class ChatRecordingsController extends Controller
         $user = $request->user();
         $isSuperAdmin = $user->role?->slug === 'super_admin';
 
-        $query = VisitSession::with(['visit.user', 'eburol.user', 'visit', 'eburol', 'chatLogs', 'chatExports.generatedByUser'])
-            ->whereIn('status', ['active', 'completed', 'terminated', 'locked']);
+        // Query all completed sessions with chat logs
+        $query = VisitSession::with(['visit.user', 'eburol.user', 'chatLogs', 'videoRecordings'])
+            ->whereHas('chatLogs'); // Only show sessions that have chat logs
 
         if (! $isSuperAdmin) {
             $query->where('monitor_id', $user->id);
@@ -36,38 +37,39 @@ class ChatRecordingsController extends Controller
                 $query->whereNotNull('eburol_id');
             }
         }
+        
         if ($request->filled('has_flagged')) {
             $query->whereHas('chatLogs', fn ($q) => $q->where('flagged', true));
         }
 
-        $sessions = $query->orderByDesc('scheduled_start')->get()->map(function (VisitSession $session) {
+        $sessions = $query->orderByDesc('started_at')->get()->map(function (VisitSession $session) {
             $visitor = $session->visit?->user ?? $session->eburol?->user;
-            $visitorName = $visitor ? trim("{$visitor->first_name} {$visitor->middle_name} {$visitor->last_name}") : null;
-            $inmateName = $session->visit
-                ? trim("{$session->visit->inmate_first_name} {$session->visit->inmate_middle_name} {$session->visit->inmate_last_name}")
-                : trim("{$session->eburol->inmate_first_name} {$session->eburol->inmate_middle_name} {$session->eburol->inmate_last_name}");
+            $visitorName = $visitor ? trim("{$visitor->first_name} {$visitor->last_name}") : null;
+            
+            // Get inmate name from visit or eburol relationship
+            $inmateName = 'N/A';
+            if ($session->visit) {
+                $inmateName = trim("{$session->visit->inmate_first_name} {$session->visit->inmate_last_name}");
+            } elseif ($session->eburol) {
+                $inmateName = trim("{$session->eburol->inmate_first_name} {$session->eburol->inmate_last_name}");
+            }
 
             $totalMessages = $session->chatLogs->count();
             $flaggedCount = $session->chatLogs->where('flagged', true)->count();
-            $exports = $session->chatExports->map(fn ($e) => [
-                'id' => $e->id,
-                'format' => $e->format,
-                'generated_at' => $e->created_at->toIso8601String(),
-                'generated_by_name' => $e->generatedByUser ? trim("{$e->generatedByUser->first_name} {$e->generatedByUser->last_name}") : null,
-                'download_url' => route('chat-exports.download', $e),
-            ]);
 
             return [
                 'id' => $session->id,
-                'session_type' => $session->session_type,
+                'room_id' => $session->room_id,
+                'session_type' => $session->visit_id ? 'visit' : 'eburol',
                 'visitor_name' => $visitorName,
                 'inmate_name' => $inmateName,
-                'scheduled_start' => $session->scheduled_start->toIso8601String(),
-                'scheduled_end' => $session->scheduled_end->toIso8601String(),
+                'scheduled_start' => $session->scheduled_start?->toIso8601String(),
+                'scheduled_end' => $session->scheduled_end?->toIso8601String(),
+                'duration_seconds' => $session->duration_seconds ?? 0,
                 'status' => $session->status,
                 'total_messages' => $totalMessages,
                 'flagged_count' => $flaggedCount,
-                'exports' => $exports,
+                'csv_download_url' => route('jail-officer.chat-recordings.export-session', ['roomId' => $session->room_id]),
             ];
         });
 
@@ -83,12 +85,80 @@ class ChatRecordingsController extends Controller
     }
 
     /**
-     * View chat logs for a specific session.
+     * View chat logs for a specific session by room_id (API response).
      */
-    public function viewSession(Request $request, VisitSession $session): Response
+    public function viewSessionApi(string $roomId)
+    {
+        $session = VisitSession::with(['visit.user', 'eburol.user', 'chatLogs.senderUser'])
+            ->where('room_id', $roomId)
+            ->firstOrFail();
+
+        $chatLogs = ChatLog::with('senderUser')
+            ->where('visit_session_id', $session->id)
+            ->orderBy('sent_at', 'asc')
+            ->get()
+            ->map(fn ($log) => [
+                'id' => $log->id,
+                'sender' => $log->sender,
+                'sender_label' => match(strtolower($log->sender)) {
+                    'visitor', 'guest' => 'Visitor',
+                    'inmate' => 'Inmate',
+                    'monitor', 'officer', 'jail officer' => 'Officer',
+                    default => ucfirst($log->sender),
+                },
+                'sender_name' => $log->senderUser ? trim("{$log->senderUser->first_name} {$log->senderUser->last_name}") : ($log->sender === 'inmate' ? 'Inmate' : 'Unknown'),
+                'message' => $log->message,
+                'sent_at' => ($log->sent_at ?? $log->created_at ?? now())->toIso8601String(),
+                'flagged' => $log->flagged,
+                'flag_reason' => $log->flag_reason,
+            ]);
+
+        $visitor = $session->visit?->user ?? $session->eburol?->user;
+        $visitorName = $visitor ? trim("{$visitor->first_name} {$visitor->last_name}") : null;
+        
+        // Get inmate name from visit or eburol
+        $inmateName = 'N/A';
+        if ($session->visit) {
+            $inmateName = trim("{$session->visit->inmate_first_name} {$session->visit->inmate_last_name}");
+        } elseif ($session->eburol) {
+            $inmateName = trim("{$session->eburol->inmate_first_name} {$session->eburol->inmate_last_name}");
+        }
+
+        // Use started_at if available, otherwise use scheduled_start
+        $startedAt = $session->started_at ?? $session->scheduled_start ?? now();
+        $endedAt = $session->ended_at ?? $session->scheduled_end;
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'session' => [
+                    'id' => $session->id,
+                    'room_id' => $session->room_id,
+                    'session_type' => $session->visit_id ? 'visit' : 'eburol',
+                    'visitor_name' => $visitorName,
+                    'inmate_name' => $inmateName,
+                    'started_at' => $startedAt->toIso8601String(),
+                    'ended_at' => $endedAt?->toIso8601String(),
+                    'duration_seconds' => $session->duration_seconds ?? 0,
+                    'status' => $session->status,
+                ],
+                'chatLogs' => $chatLogs,
+            ]
+        ]);
+    }
+
+    /**
+     * View chat logs for a specific session by room_id.
+     */
+    public function viewSession(Request $request, string $roomId): Response
     {
         $user = $request->user();
         $isSuperAdmin = $user->role?->slug === 'super_admin';
+
+        // Find session by room_id
+        $session = VisitSession::with(['visit.user', 'eburol.user', 'chatLogs.senderUser'])
+            ->where('room_id', $roomId)
+            ->firstOrFail();
 
         // Check permission
         if (! $isSuperAdmin && $session->monitor_id !== $user->id) {
@@ -110,21 +180,28 @@ class ChatRecordingsController extends Controller
             ]);
 
         $visitor = $session->visit?->user ?? $session->eburol?->user;
-        $visitorName = $visitor ? trim("{$visitor->first_name} {$visitor->middle_name} {$visitor->last_name}") : null;
-        $inmateName = $session->visit
-            ? trim("{$session->visit->inmate_first_name} {$session->visit->inmate_middle_name} {$session->visit->inmate_last_name}")
-            : trim("{$session->eburol->inmate_first_name} {$session->eburol->inmate_middle_name} {$session->eburol->inmate_last_name}");
+        $visitorName = $visitor ? trim("{$visitor->first_name} {$visitor->last_name}") : null;
+        
+        // Get inmate name from visit or eburol
+        $inmateName = 'N/A';
+        if ($session->visit) {
+            $inmateName = trim("{$session->visit->inmate_first_name} {$session->visit->inmate_last_name}");
+        } elseif ($session->eburol) {
+            $inmateName = trim("{$session->eburol->inmate_first_name} {$session->eburol->inmate_last_name}");
+        }
 
         $viewPrefix = $isSuperAdmin ? 'Admin' : 'JailOfficer';
 
         return Inertia::render("{$viewPrefix}/ChatSessionView", [
             'session' => [
                 'id' => $session->id,
-                'session_type' => $session->session_type,
+                'room_id' => $session->room_id,
+                'session_type' => $session->visit_id ? 'visit' : 'eburol',
                 'visitor_name' => $visitorName,
                 'inmate_name' => $inmateName,
-                'scheduled_start' => $session->scheduled_start->toIso8601String(),
-                'scheduled_end' => $session->scheduled_end->toIso8601String(),
+                'started_at' => $session->started_at?->toIso8601String() ?? $session->scheduled_start?->toIso8601String() ?? now()->toIso8601String(),
+                'ended_at' => $session->ended_at?->toIso8601String() ?? $session->scheduled_end?->toIso8601String(),
+                'duration_seconds' => $session->duration_seconds ?? 0,
                 'status' => $session->status,
             ],
             'chatLogs' => $chatLogs,
@@ -132,12 +209,17 @@ class ChatRecordingsController extends Controller
     }
 
     /**
-     * Generate and download CSV export for a session.
+     * Generate and download CSV export for a session by room_id.
      */
-    public function exportSession(Request $request, VisitSession $session): StreamedResponse
+    public function exportSession(Request $request, string $roomId): StreamedResponse
     {
         $user = $request->user();
         $isSuperAdmin = $user->role?->slug === 'super_admin';
+
+        // Find session by room_id
+        $session = VisitSession::with(['visit.user', 'eburol.user', 'chatLogs.senderUser'])
+            ->where('room_id', $roomId)
+            ->firstOrFail();
 
         // Check permission
         if (! $isSuperAdmin && $session->monitor_id !== $user->id) {
@@ -151,11 +233,16 @@ class ChatRecordingsController extends Controller
 
         $visitor = $session->visit?->user ?? $session->eburol?->user;
         $visitorName = $visitor ? trim("{$visitor->first_name} {$visitor->last_name}") : 'Unknown';
-        $inmateName = $session->visit
-            ? trim("{$session->visit->inmate_first_name} {$session->visit->inmate_last_name}")
-            : trim("{$session->eburol->inmate_first_name} {$session->eburol->inmate_last_name}");
+        
+        // Get inmate name from visit or eburol
+        $inmateName = 'N/A';
+        if ($session->visit) {
+            $inmateName = trim("{$session->visit->inmate_first_name} {$session->visit->inmate_last_name}");
+        } elseif ($session->eburol) {
+            $inmateName = trim("{$session->eburol->inmate_first_name} {$session->eburol->inmate_last_name}");
+        }
 
-        $filename = "chat-session-{$session->id}-" . now()->format('Y-m-d-His') . '.csv';
+        $filename = "chat-session-{$roomId}-" . now()->format('Y-m-d-His') . '.csv';
 
         // Create export record
         ChatExport::create([
@@ -170,21 +257,27 @@ class ChatRecordingsController extends Controller
 
             // Headers
             fputcsv($handle, ['Chat Export']);
-            fputcsv($handle, ['Session ID', $session->id]);
-            fputcsv($handle, ['Session Type', $session->session_type]);
+            fputcsv($handle, ['Session ID', $session->room_id]);
+            fputcsv($handle, ['Session Type', $session->visit_id ? 'Visit' : 'E-Burol']);
             fputcsv($handle, ['Visitor', $visitorName]);
             fputcsv($handle, ['Inmate', $inmateName]);
-            fputcsv($handle, ['Scheduled', $session->scheduled_start->format('Y-m-d H:i:s')]);
+            fputcsv($handle, ['Started At', $session->started_at?->format('Y-m-d H:i:s') ?? 'N/A']);
+            fputcsv($handle, ['Ended At', $session->ended_at?->format('Y-m-d H:i:s') ?? 'N/A']);
+            $duration = $session->duration_seconds ?? 0;
+            $hours = floor($duration / 3600);
+            $minutes = floor(($duration % 3600) / 60);
+            $secs = $duration % 60;
+            fputcsv($handle, ['Duration', sprintf('%dh %dm %ds', $hours, $minutes, $secs)]);
             fputcsv($handle, ['Status', $session->status]);
             fputcsv($handle, []);
-            fputcsv($handle, ['Sender', 'Sender Name', 'Message', 'Sent At', 'Flagged']);
+            fputcsv($handle, ['Timestamp', 'Sender', 'Sender Name', 'Message', 'Flagged']);
 
             foreach ($chatLogs as $log) {
                 fputcsv($handle, [
+                    $log->sent_at?->format('Y-m-d H:i:s') ?? '',
                     $log->sender,
                     $log->senderUser ? trim("{$log->senderUser->first_name} {$log->senderUser->last_name}") : ($log->sender === 'inmate' ? 'Inmate' : 'Unknown'),
                     $log->message,
-                    $log->sent_at->format('Y-m-d H:i:s'),
                     $log->flagged ? 'Yes' : 'No',
                 ]);
             }

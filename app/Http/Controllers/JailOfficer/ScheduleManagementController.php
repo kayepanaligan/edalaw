@@ -194,15 +194,15 @@ class ScheduleManagementController extends Controller
             'new_jail_officer_id' => $visit->jail_officer_id,
         ]);
 
-        // Refresh visit to get updated meeting_link
-        $visit->refresh();
+        // Refresh visit to get updated meeting_link and jail officer data
+        $visit = $visit->fresh();
 
         if ($roomId && $visit->visit_type === VisitType::Virtual) {
             app(\App\Services\VisitSessionService::class)->createForVisit($visit, $roomId);
         }
 
         // Notify jail officer if assigned and it's a new assignment
-        if ($request->jail_officer_id && $oldJailOfficerId !== $request->jail_officer_id) {
+        if ($visit->jail_officer_id && $oldJailOfficerId !== $visit->jail_officer_id) {
             NotificationService::notifyMonitoringOfficerAboutVisit($visit);
         }
 
@@ -325,12 +325,12 @@ class ScheduleManagementController extends Controller
         $oldStatus = $visit->status->value;
         $visit->update($updateData);
 
-        $visit->refresh();
+        $visit = $visit->fresh();
         if ($request->status === 'approved' && $visit->visit_type === VisitType::Virtual && $visit->daily_co_room_id && ! $visit->visitSessions()->exists()) {
             app(\App\Services\VisitSessionService::class)->createForVisit($visit, $visit->daily_co_room_id);
         }
 
-        if ($request->jail_officer_id && $oldJailOfficerId !== $request->jail_officer_id && in_array($request->status, ['approved', 'pending'])) {
+        if ($visit->jail_officer_id && $oldJailOfficerId !== $visit->jail_officer_id && in_array($request->status, ['approved', 'pending'])) {
             NotificationService::notifyMonitoringOfficerAboutVisit($visit);
         }
 

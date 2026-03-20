@@ -86,40 +86,40 @@ export function AppSidebar() {
                         icon: Users,
                     },
                     {
-                        title: 'Sessions',
+                        title: 'User Sessions',
                         href: '/admin/sessions',
                         icon: Monitor,
                     },
-                    {
-                        title: 'Monitor Calls',
-                        href: '/monitoring-officer/assigned-sessions',
-                        icon: Video,
-                    },
-                    {
-                        title: 'Video Recordings',
-                        href: '/monitoring/video-recordings',
-                        icon: Film,
-                    },
-                    {
-                        title: 'Chat Recordings',
-                        href: '/monitoring/chat-recordings',
-                        icon: MessageCircle,
-                    },
-                    {
-                        title: 'Incident Reporting',
-                        href: '/admin/incident-reporting',
-                        icon: Flag,
-                    },
-                    {
-                        title: 'Inmate Tunnels',
-                        href: '/admin/inmate-tunnels',
-                        icon: Link2,
-                    },
-                    {
-                        title: 'Chat Logs',
-                        href: '/admin/chat-logs',
-                        icon: MessageCircle,
-                    },
+                    // {
+                    //     title: 'Call Session',
+                    //     href: '/monitoring-officer/assigned-sessions',
+                    //     icon: Video,
+                    // },
+                    // {
+                    //     title: 'Video Recordings',
+                    //     href: '/monitoring/video-recordings',
+                    //     icon: Film,
+                    // },
+                    // {
+                    //     title: 'Chat Archive',
+                    //     href: '/monitoring/chat-recordings',
+                    //     icon: MessageCircle,
+                    // },
+                    // {
+                    //     title: 'Incident Reporting',
+                    //     href: '/admin/incident-reporting',
+                    //     icon: Flag,
+                    // },
+                    // {
+                    //     title: 'Inmate Tunnels',
+                    //     href: '/admin/inmate-tunnels',
+                    //     icon: Link2,
+                    // },
+                    // {
+                    //     title: 'Chat Logs',
+                    //     href: '/admin/chat-logs',
+                    //     icon: MessageCircle,
+                    // },
                 ],
             },
             {
@@ -367,7 +367,7 @@ export function AppSidebar() {
                 label: 'Services',
                 items: [
                     {
-                        title: 'Visit Schedules',
+                        title: 'Visit',
                         href: '/jail-officer/schedules',
                         icon: Calendar,
                     },
@@ -391,34 +391,44 @@ export function AppSidebar() {
                         href: '/jail-officer/assigned-sessions',
                         icon: Video,
                     },
-                    {
-                        title: 'Visit Monitoring',
-                        href: '/jail-officer/visit-monitoring',
-                        icon: Camera,
-                    },
+                    // {
+                    //     title: 'Visit Monitoring',
+                    //     href: '/jail-officer/visit-monitoring',
+                    //     icon: Camera,
+                    // },
                     {
                         title: 'Eburol Monitoring',
                         href: '/jail-officer/eburol-monitoring',
                         icon: Monitor,
                     },
+                    // {
+                    //     title: 'Session Monitoring',
+                    //     href: '/jail-officer/session-monitoring',
+                    //     icon: Shield,
+                    // },
                     {
-                        title: 'Session Monitoring',
-                        href: '/jail-officer/session-monitoring',
-                        icon: Shield,
+                        title: 'Visit Monitored',
+                        href: '/jail-officer/visits-monitored',
+                        icon: BarChart3,
                     },
                 ],
             },
             {
                 label: 'Recordings',
                 items: [
+                    // {
+                    //     title: 'Video Recordings',
+                    //     href: '/jail-officer/video-recordings',
+                    //     icon: Film,
+                    // },
                     {
-                        title: 'Video Recordings',
-                        href: '/jail-officer/video-recordings',
-                        icon: Film,
-                    },
-                    {
-                        title: 'Chat Recordings',
+                        title: 'Chat Archive',
                         href: '/jail-officer/chat-recordings',
+                        icon: MessageCircle,
+                    }, 
+                    {
+                        title: 'Chat Logs',
+                        href: '/jail-officer/chat-logs',
                         icon: MessageCircle,
                     },
                     {
@@ -457,15 +467,11 @@ export function AppSidebar() {
                 label: 'Security & Reports',
                 items: [
                     {
-                        title: 'Incident Reporting',
+                        title: 'Incident',
                         href: '/jail-officer/incidents',
                         icon: Flag,
                     },
-                    {
-                        title: 'Chat Logs',
-                        href: '/jail-officer/chat-logs',
-                        icon: MessageCircle,
-                    },
+                    
                     {
                         title: 'Audit Logs',
                         href: '/jail-officer/audit-logs',

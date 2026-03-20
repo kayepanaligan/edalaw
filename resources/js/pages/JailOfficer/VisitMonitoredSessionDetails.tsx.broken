@@ -1,0 +1,436 @@
+import { useState } from 'react';
+import { Head, router } from '@inertiajs/react';
+import AppLayout from '@/layouts/app-layout';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Download, Share2, Clock, Users, Calendar, Activity, AlertCircle, CheckCircle, FileText, BarChart3 } from 'lucide-react';
+import { toast } from 'sonner';
+import { useToast } from '@/hooks/use-toast';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Progress } from '@/components/ui/progress';
+
+type Participant = {
+    participant_id: string | null;
+    participant_name: string;
+    role: string;
+    joined_at: string | null;
+    left_at: string | null;
+    duration_seconds: number;
+};
+
+type SessionData = {
+    id: number;
+    meeting_id: string;
+    room_id: string | null;
+    session_id: string;
+    visit_type: 'virtual' | 'physical';
+    status: 'completed' | 'interrupted' | 'failed';
+    session_started_at: string;
+    session_ended_at: string | null;
+    duration: string;
+    duration_seconds: number;
+    unique_participants_count: number;
+    visitor_name: string;
+    visitor_email: string | null;
+    inmate_name: string;
+    jail_officer_name: string | null;
+    jail_officer_email: string | null;
+    notes: string | null;
+    participants: any[];
+    session_stats: any;
+    traces: any[];
+    errors: any[];
+    timeline: Participant[];
+};
+
+type Props = {
+    session: SessionData;
+};
+
+export default function VisitMonitoredSessionDetails({ session }: Props) {
+    useToast(); // Auto-display flash messages
+    const [activeTab, setActiveTab] = useState('overview');
+
+    const handleDownloadChat = async () => {
+        try {
+            // Use the video chat export endpoint
+            const response = await fetch(`/video/chat/export/${session.session_id || session.meeting_id}`);
+            if (response.ok) {
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `chat_log_${session.meeting_id}.csv`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+                toast.success('Chat downloaded successfully');
+            } else {
+                const errorData = await response.json().catch(() => ({ message: 'Failed to download' }));
+                toast.error(errorData.message || 'Failed to download chat');
+            }
+        } catch (error) {
+            console.error('Download error:', error);
+            toast.error('Error downloading chat');
+        }
+    };
+
+    const handleShareAnalytics = async () => {
+        try {
+            const response = await fetch(`/jail-officer/visits-monitored/${session.meeting_id}/share-analytics`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                },
+            });
+            
+            if (response.ok) {
+                toast.success('Analytics shared successfully');
+            } else {
+                toast.error('Failed to share analytics');
+            }
+        } catch (error) {
+            toast.error('Error sharing analytics');
+        }
+    };
+
+    const getStatusBadge = (status: string) => {
+        const config: Record<string, { variant: 'default' | 'secondary' | 'destructive'; label: string; icon: any }> = {
+            completed: { variant: 'default', label: 'Completed', icon: CheckCircle },
+            interrupted: { variant: 'secondary', label: 'Interrupted', icon: AlertCircle },
+            failed: { variant: 'destructive', label: 'Failed', icon: AlertCircle },
+        };
+
+        const badge = config[status] || config.completed;
+        const Icon = badge.icon;
+        
+        return (
+            <Badge variant={badge.variant} className="flex items-center gap-1">
+                <Icon className="h-3 w-3" />
+                {badge.label}
+            </Badge>
+        );
+    };
+
+    const formatDuration = (seconds: number): string => {
+        const h = Math.floor(seconds / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        const s = seconds % 60;
+        
+        if (h > 0) return `${h}h ${m}m ${s}s`;
+        if (m > 0) return `${m}m ${s}s`;
+        return `${s}s`;
+    };
+
+    const calculateTimelinePercentage = (participant: Participant): number => {
+        if (!participant.joined_at || !participant.left_at) return 0;
+        const totalDuration = session.duration_seconds;
+        return Math.min((participant.duration_seconds / totalDuration) * 100, 100);
+    };
+
+    return (
+        <AppLayout breadcrumbs={[
+            { title: 'Visit Monitored Management', href: '/jail-officer/visits-monitored' },
+            { title: `Session ${session.meeting_id}`, href: `/jail-officer/visits-monitored/${session.meeting_id}` }
+        ]}>
+            <Head title={`Session Details - ${session.meeting_id}`} />
+            
+            <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-6">
+                {/* Header */}
+                <div className="space-y-4">
+                    <div className="flex items-start justify-between">
+                        <div className="space-y-1">
+                            <div className="flex items-center gap-3">
+                                <h1 className="text-2xl font-semibold">Meeting ID: {session.meeting_id}</h1>
+                                {getStatusBadge(session.status)}
+                                <Badge variant="outline">{session.visit_type === 'virtual' ? 'Virtual' : 'Physical'}</Badge>
+                            </div>
+                            <p className="text-muted-foreground">
+                                Deep-dive dashboard for this specific session
+                            </p>
+                        </div>
+                        
+                        <div className="flex gap-2">
+                            <Button onClick={handleDownloadChat} variant="outline">
+                                <Download className="mr-2 h-4 w-4" />
+                                Download Chat
+                            </Button>
+                            <Button onClick={handleShareAnalytics} variant="default">
+                                <Share2 className="mr-2 h-4 w-4" />
+                                Share Analytics
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Tabbed Navigation */}
+                <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                    <TabsList className="grid w-full grid-cols-4">
+                        <TabsTrigger value="overview">
+                            <FileText className="h-4 w-4 mr-2" />
+                            Session Overview
+                        </TabsTrigger>
+                        <TabsTrigger value="stats">
+                            <BarChart3 className="h-4 w-4 mr-2" />
+                            Session Stats
+                        </TabsTrigger>
+                        <TabsTrigger value="traces">
+                            <Activity className="h-4 w-4 mr-2" />
+                            Traces
+                        </TabsTrigger>
+                        <TabsTrigger value="errors">
+                            <AlertCircle className="h-4 w-4 mr-2" />
+                            Errors
+                        </TabsTrigger>
+                    </TabsList>
+
+                    {/* Session Overview Tab */}
+                    <TabsContent value="overview" className="space-y-4">
+                        <div className="grid gap-4 md:grid-cols-2">
+                            {/* Metadata Grid */}
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>Session Metadata</CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <p className="text-sm text-muted-foreground">Session ID</p>
+                                            <p className="font-mono text-sm">{session.session_id}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-sm text-muted-foreground">Room ID</p>
+                                            <p className="font-mono text-sm">{session.room_id || 'N/A'}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-sm text-muted-foreground">Start Time</p>
+                                            <div className="flex items-center gap-2">
+                                                <Calendar className="h-4 w-4 text-muted-foreground" />
+                                                <span className="text-sm">{new Date(session.session_started_at).toLocaleDateString()}</span>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <Clock className="h-4 w-4 text-muted-foreground" />
+                                                <span className="text-sm">{new Date(session.session_started_at).toLocaleTimeString()}</span>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <p className="text-sm text-muted-foreground">End Time</p>
+                                            {session.session_ended_at ? (
+                                                <>
+                                                    <div className="flex items-center gap-2">
+                                                        <Calendar className="h-4 w-4 text-muted-foreground" />
+                                                        <span className="text-sm">{new Date(session.session_ended_at).toLocaleDateString()}</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <Clock className="h-4 w-4 text-muted-foreground" />
+                                                        <span className="text-sm">{new Date(session.session_ended_at).toLocaleTimeString()}</span>
+                                                    </div>
+                                                </>
+                                            ) : (
+                                                <span className="text-sm text-muted-foreground">N/A</span>
+                                            )}
+                                        </div>
+                                        <div>
+                                            <p className="text-sm text-muted-foreground">Total Duration</p>
+                                            <p className="font-medium">{session.duration}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-sm text-muted-foreground">Status</p>
+                                            {getStatusBadge(session.status)}
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </Card>
+
+                            {/* Participants Timeline */}
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle className="flex items-center gap-2">
+                                        <Users className="h-5 w-5" />
+                                        Participants-wise Session Timeline
+                                    <CardTitle>
+                                    <CardDescription>
+                                        Visual representation of participant presence during the session
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                    {session.timeline.length === 0 ? (
+                                        <p className="text-center text-muted-foreground py-4">No participant data available</p>
+                                    ) : (
+                                        session.timeline.map((participant, index) => (
+                                            <div key={index} className="space-y-2">
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+                                                            <span className="text-xs font-medium">{participant.participant_name.charAt(0).toUpperCase()}</span>
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-sm font-medium">{participant.participant_name}</p>
+                                                            <p className="text-xs text-muted-foreground capitalize">{participant.role}</p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <p className="text-sm font-medium">{formatDuration(participant.duration_seconds)}</p>
+                                                        <p className="text-xs text-muted-foreground">
+                                                            {participant.joined_at ? new Date(participant.joined_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'N/A'} - 
+                                                            {participant.left_at ? new Date(participant.left_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'N/A'}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <Progress 
+                                                    value={calculateTimelinePercentage(participant)} 
+                                                    className="h-2"
+                                                    indicatorClassName={participant.role === 'jail_officer' ? 'bg-green-500' : 'bg-blue-500'}
+                                                />
+                                            </div>
+                                        ))
+                                    )}
+                                </CardContent>
+                            </Card>
+                        </div>
+
+                        {/* Additional Info */}
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Session Information</CardTitle>
+                            </CardHeader>
+                            <CardContent className="grid gap-4 md:grid-cols-2">
+                                <div>
+                                    <p className="text-sm text-muted-foreground">Visitor</p>
+                                    <p className="font-medium">{session.visitor_name}</p>
+                                    {session.visitor_email && (
+                                        <p className="text-sm text-muted-foreground">{session.visitor_email}</p>
+                                    )}
+                                </div>
+                                <div>
+                                    <p className="text-sm text-muted-foreground">Inmate</p>
+                                    <p className="font-medium">{session.inmate_name}</p>
+                                </div>
+                                <div>
+                                    <p className="text-sm text-muted-foreground">Jail Officer</p>
+                                    <p className="font-medium">{session.jail_officer_name || 'N/A'}</p>
+                                    {session.jail_officer_email && (
+                                        <p className="text-sm text-muted-foreground">{session.jail_officer_email}</p>
+                                    )}
+                                </div>
+                                <div>
+                                    <p className="text-sm text-muted-foreground">Unique Participants</p>
+                                    <p className="font-medium">{session.unique_participants_count}</p>
+                                </div>
+                                {session.notes && (
+                                    <div className="md:col-span-2">
+                                        <p className="text-sm text-muted-foreground">Notes</p>
+                                        <p className="text-sm">{session.notes}</p>
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+
+                    {/* Session Stats Tab */}
+                    <TabsContent value="stats" className="space-y-4">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Session Statistics</CardTitle>
+                                <CardDescription>Detailed analytics and metrics for this session</CardDescription>
+                            </CardHeader>
+                            <Card.Content>
+                                {Object.keys(session.session_stats || {}).length === 0 ? (
+                                    <p className="text-center text-muted-foreground py-8">No statistics available for this session</p>
+                                ) : (
+                                    <div className="space-y-4">
+                                        {Object.entries(session.session_stats || {}).map(([key, value]) => (
+                                            <div key={key} className="border-b pb-4 last:border-0">
+                                                <p className="text-sm font-medium capitalize mb-2">{key.replace(/_/g, ' ')}</p>
+                                                <pre className="bg-muted p-3 rounded-md text-xs overflow-auto">
+                                                    {JSON.stringify(value, null, 2)}
+                                                </pre>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+
+                    {/* Traces Tab */}
+                    <TabsContent value="traces" className="space-y-4">
+                        <Card>
+                            <CardHeader>
+                                <Card.Title className="flex items-center gap-2">
+                                    <Activity className="h-5 w-5" />
+                                    Session Traces
+                                <CardTitle>
+                                <Card.Description>Technical trace logs for debugging and monitoring</Card.Description>
+                            </CardHeader>
+                            <Card.Content>
+                                {session.traces.length === 0 ? (
+                                    <p className="text-center text-muted-foreground py-8">No trace logs available</p>
+                                ) : (
+                                    <div className="space-y-2 max-h-[600px] overflow-y-auto">
+                                        {session.traces.map((trace: any, index: number) => (
+                                            <div key={index} className="bg-muted p-3 rounded-md font-mono text-xs">
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <Activity className="h-3 w-3 text-blue-500" />
+                                                    <span className="text-muted-foreground">
+                                                        {trace.timestamp ? new Date(trace.timestamp).toLocaleString() : `Trace #${index + 1}`}
+                                                    </span>
+                                                </div>
+                                                <pre className="whitespace-pre-wrap">{JSON.stringify(trace, null, 2)}</pre>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+
+                    {/* Errors Tab */}
+                    <TabsContent value="errors" className="space-y-4">
+                        <Card>
+                            <CardHeader>
+                                <Card.Title className="flex items-center gap-2">
+                                    <AlertCircle className="h-5 w-5" />
+                                    Session Errors
+                                <CardTitle>
+                                <Card.Description>Error logs and exceptions that occurred during the session</Card.Description>
+                            </CardHeader>
+                            <Card.Content>
+                                {session.errors.length === 0 ? (
+                                    <div className="text-center py-8">
+                                        <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-2" />
+                                        <p className="text-muted-foreground">No errors recorded for this session</p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-2 max-h-[600px] overflow-y-auto">
+                                        {session.errors.map((error: any, index: number) => (
+                                            <div key={index} className="bg-destructive/10 border border-destructive/20 p-3 rounded-md">
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <AlertCircle className="h-4 w-4 text-destructive" />
+                                                    <span className="font-medium text-destructive">
+                                                        Error #{index + 1}
+                                                    </span>
+                                                    {error.timestamp && (
+                                                        <span className="text-xs text-muted-foreground ml-auto">
+                                                            {new Date(error.timestamp).toLocaleString()}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <pre className="whitespace-pre-wrap text-xs bg-destructive/5 p-2 rounded">
+                                                    {typeof error === 'object' ? JSON.stringify(error, null, 2) : error}
+                                                </pre>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+                </Tabs>
+            </div>
+        </AppLayout>
+    );
+}

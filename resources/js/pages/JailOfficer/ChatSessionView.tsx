@@ -21,11 +21,13 @@ interface ChatLog {
 
 interface Session {
     id: number;
+    room_id: string;
     session_type: string;
     visitor_name: string | null;
     inmate_name: string;
-    scheduled_start: string;
-    scheduled_end: string;
+    started_at: string;
+    ended_at: string;
+    duration_seconds: number;
     status: string;
 }
 
@@ -88,7 +90,7 @@ export default function ChatSessionView({ session, chatLogs }: Props) {
                         </div>
                     </div>
                     <Button asChild>
-                        <Link href={`/jail-officer/chat-recordings/session/${session.id}/export`}>
+                        <Link href={`/jail-officer/chat-recordings/session/${session.room_id}/export`}>
                             <Download className="mr-2 h-4 w-4" />
                             Export CSV
                         </Link>
@@ -111,8 +113,8 @@ export default function ChatSessionView({ session, chatLogs }: Props) {
                                 <p className="font-medium">{session.inmate_name}</p>
                             </div>
                             <div>
-                                <p className="text-muted-foreground">Scheduled</p>
-                                <p className="font-medium">{new Date(session.scheduled_start).toLocaleString()}</p>
+                                <p className="text-muted-foreground">Started</p>
+                                <p className="font-medium">{new Date(session.started_at).toLocaleString()}</p>
                             </div>
                             <div>
                                 <p className="text-muted-foreground">Status</p>

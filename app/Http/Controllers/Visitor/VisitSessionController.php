@@ -137,4 +137,39 @@ class VisitSessionController extends Controller
 
         return response()->json(['success' => true]);
     }
+
+    /**
+     * Save VideoSDK session_id to visit_sessions table.
+     */
+    public function saveSessionId(Request $request)
+    {
+        $validated = $request->validate([
+            'session_id' => ['required', 'string'],
+            'room_id' => ['required', 'string'],
+        ]);
+
+        // Find the visit_session by room_id
+        $visitSession = \App\Models\VisitSession::where('room_id', $validated['room_id'])
+            ->latest('id')
+            ->first();
+
+        if ($visitSession) {
+            $visitSession->update([
+                'session_id' => $validated['session_id'],
+            ]);
+
+            \Log::info('✅ Session ID saved', [
+                'visit_session_id' => $visitSession->id,
+                'session_id' => $validated['session_id'],
+            ]);
+
+            return response()->json(['success' => true]);
+        }
+
+        \Log::warning('❌ VisitSession not found for room_id', [
+            'room_id' => $validated['room_id'],
+        ]);
+
+        return response()->json(['success' => false, 'message' => 'VisitSession not found'], 404);
+    }
 }
