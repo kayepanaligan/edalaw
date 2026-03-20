@@ -1,4 +1,4 @@
-import { Head } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import { Phone } from 'lucide-react';
 import { useState } from 'react';
 
@@ -28,13 +28,21 @@ export default function JoinSession({ tunnel_token, session }: Props) {
                 setJoining(false);
                 return;
             }
-            setToken({ token: data.token, room_id: data.room_id, participant_id: data.participant_id });
-            setJoined(true);
-            const url =
-                data.join_url ??
-                `https://app.videosdk.live/meetings/${data.room_id}?token=${encodeURIComponent(data.token)}`;
-            window.location.href = url;
-        } catch {
+            
+            // Use Inertia router to visit the VideoRoom page (same as visitors)
+            router.visit('/video-room', {
+                method: 'get',
+                data: {
+                    room_id: data.room_id,
+                    token: data.token,
+                    participant_id: data.participant_id,
+                    name: data.participant_name,
+                    observer: data.is_observer ? '1' : '0',
+                },
+                preserveState: false,
+                preserveScroll: false,
+            });
+        } catch (err) {
             setError('Failed to connect');
         }
         setJoining(false);

@@ -13,6 +13,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\View\View;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -91,7 +92,7 @@ class InmateTunnelController extends Controller
     /**
      * Public page: inmate joins via tunnel token (no auth). Validate token and show Join/End UI.
      */
-    public function join(Request $request, string $token): Response|RedirectResponse
+    public function join(Request $request, string $token): View|RedirectResponse
     {
         $tunnel = InmateTunnel::where('tunnel_token', $token)->first();
         if (! $tunnel) {
@@ -138,13 +139,13 @@ class InmateTunnelController extends Controller
             ]);
         }
 
-        return Inertia::render('Inmate/JoinSession', [
-            'tunnel_token' => $token,
-            'session' => [
-                'id' => $session->id,
-                'room_id' => $session->room_id,
-                'session_type' => $session->session_type,
-            ],
+        // Use the same Blade video-room view as visitors (no Inertia)
+        return view('visitor.video-room', [
+            'session' => $session,
+            'room_id' => $session->room_id,
+            'participant_name' => 'Inmate',
+            'participant_id' => 'inmate-'.$session->id.'-'.uniqid(),
+            'is_observer' => false,
         ]);
     }
 
@@ -177,16 +178,18 @@ class InmateTunnelController extends Controller
             return response()->json(['error' => 'Unable to generate join token.'], 500);
         }
 
-        $payload = [
-            'token' => $result['token'],
+        $token = preg_replace('/^Bearer\s+/i', '', (string) $result['token']);
+        $token = trim($token);
+
+        // Return data for Inertia render (same as VideoRoomController)
+        return response()->json([
+            'token' => $token,
             'room_id' => $session->room_id,
             'participant_id' => $participantId,
-        ];
-        if ($videoSdk->isV2Rooms()) {
-            $payload['join_url'] = url('/video-room').'?room_id='.rawurlencode($session->room_id).'&token='.rawurlencode($result['token']).'&participant_id='.rawurlencode($participantId);
-        }
-
-        return response()->json($payload);
+            'api_key' => config('services.videosdk.api_key'),
+            'participant_name' => 'Inmate',
+            'is_observer' => false,
+        ]);
     }
 
     /**
