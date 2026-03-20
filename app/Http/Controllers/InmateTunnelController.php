@@ -90,25 +90,28 @@ class InmateTunnelController extends Controller
     }
 
     /**
-     * Public page: inmate joins via tunnel token (no auth). Validate token and show Join/End UI.
+     * Public page: inmate joins via tunnel token (no auth). Validate and show video room.
      */
     public function join(Request $request, string $token): View|RedirectResponse
     {
         $tunnel = InmateTunnel::where('tunnel_token', $token)->first();
-        if (! $tunnel) {
+        if (!$tunnel) {
             abort(404, 'Invalid or expired link.');
         }
-        if (! $tunnel->isValid()) {
+        if (!$tunnel->isValid()) {
             abort(404, 'This link has expired or has already been used.');
         }
 
         $session = $tunnel->visitSession;
-        if (! $session->isWithinSchedule()) {
+        
+        // Check if session is within schedule
+        if (!$session->isWithinSchedule()) {
             $tz = config('app.timezone');
             $now = now($tz);
             $start = $session->scheduled_start->copy()->setTimezone($tz);
             $end = $session->scheduled_end->copy()->setTimezone($tz);
             $scheduleWindow = $start->format('M j, Y').', '.$start->format('g:i A').' – '.$end->format('g:i A');
+            
             $timeUntilActive = null;
             if ($now->isBefore($start)) {
                 $diff = $now->diff($start);
@@ -125,27 +128,30 @@ class InmateTunnelController extends Controller
                 $timeUntilActive = count($parts) > 0 ? implode(' ', $parts) : 'less than a minute';
             }
 
-            return Inertia::render('Inmate/SessionUnavailable', [
-                'message' => 'This link is only valid during the scheduled visit window.',
-                'title' => 'Link not available',
+            return view('visitor.video-room-not-started', [
+                'title' => 'Session not started yet',
                 'schedule_window' => $scheduleWindow,
                 'time_until_active' => $timeUntilActive,
+                'session_id' => $session->id,
             ]);
         }
+        
         if ($session->isCompleted()) {
-            return Inertia::render('Inmate/SessionUnavailable', [
-                'message' => 'This session has ended.',
+            return view('visitor.video-room-ended', [
                 'title' => 'Session ended',
+                'message' => 'This session has ended.',
+                'session_id' => $session->id,
             ]);
         }
 
-        // Use the same Blade video-room view as visitors (no Inertia)
+        // Use the same Blade video-room view as visitors and jail officers
         return view('visitor.video-room', [
             'session' => $session,
             'room_id' => $session->room_id,
             'participant_name' => 'Inmate',
             'participant_id' => 'inmate-'.$session->id.'-'.uniqid(),
             'is_observer' => false,
+            'scheduled_end' => $session->scheduled_end?->format('Y-m-d H:i:s'),
         ]);
     }
 

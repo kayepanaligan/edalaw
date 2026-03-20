@@ -62,6 +62,7 @@ class ScheduleManagementController extends Controller
                     'schedule_started' => $scheduleStarted,
                     'schedule_ended' => $scheduleEnded,
                     'visit_session_id' => $latestSession?->id,
+                    'scheduled_start' => $latestSession?->scheduled_start?->toIso8601String(),
                 ];
             });
 

@@ -142,6 +142,24 @@ function getVisitTypeBadge(type: string) {
     );
 }
 
+function formatTimeUntil(scheduledStart: string): string {
+    const now = Date.now();
+    const start = new Date(scheduledStart).getTime();
+    const diff = start - now;
+    
+    if (diff <= 0) return '';
+    
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(minutes / 60);
+    
+    if (hours >= 1) {
+        const remainingMinutes = minutes % 60;
+        return `${hours}h ${remainingMinutes}m`;
+    }
+    return `${minutes}m`;
+}
+
+
 export default function ScheduleManagement({ visits, stats, monitoringOfficers }: Props) {
     const [isViewModalOpen, setIsViewModalOpen] = useState(false);
     const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
@@ -149,12 +167,37 @@ export default function ScheduleManagement({ visits, stats, monitoringOfficers }
     const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
     const [isRescheduleModalOpen, setIsRescheduleModalOpen] = useState(false);
     const [selectedVisit, setSelectedVisit] = useState<Visit | null>(null);
+    const [beforeScheduleVisit, setBeforeScheduleVisit] = useState<Visit | null>(null);
     const [statusFilter, setStatusFilter] = useState<string>('all');
     const [visitTypeFilter, setVisitTypeFilter] = useState<string>('all');
     useToast();
     const page = usePage();
     const flash = (page.props as { flash?: { success?: string; warning?: string; error?: string } }).flash;
     const flashShownRef = useRef<{ w?: string; e?: string; s?: string }>({});
+    
+    // Listen for video room close events (from localStorage)
+    useEffect(() => {
+        const handleStorageChange = (e: StorageEvent) => {
+            if (!e.key || !e.key.startsWith('session_refresh_')) return;
+            
+            const sessionId = e.key.replace('session_refresh_', '');
+            const value = e.newValue;
+            
+            if (value === 'ended') {
+                console.log(`Session ${sessionId} ended - refreshing page...`);
+                // Refresh the page to update session status
+                window.location.reload();
+            }
+        };
+
+        window.addEventListener('storage', handleStorageChange);
+        
+        // Cleanup listener on unmount
+        return () => {
+            window.removeEventListener('storage', handleStorageChange);
+        };
+    }, []);
+    
     useEffect(() => {
         if (flash?.warning && flashShownRef.current.w !== flash.warning) {
             flashShownRef.current.w = flash.warning;
@@ -453,6 +496,14 @@ export default function ScheduleManagement({ visits, stats, monitoringOfficers }
                             variant="outline" 
                             className="bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
                             onClick={() => {
+                                if (!visit.visit_session_id) return;
+                                
+                                // Check if session has started using backend-calculated flag
+                                if (!visit.schedule_started) {
+                                    setBeforeScheduleVisit(visit);
+                                    return;
+                                }
+                                
                                 // Open video call in new tab
                                 window.open(`/jail-officer/assigned-sessions/${visit.visit_session_id}/join`, '_blank');
                             }}
@@ -1037,6 +1088,28 @@ export default function ScheduleManagement({ visits, stats, monitoringOfficers }
                             </Button>
                             <Button onClick={handleReschedule} disabled={rescheduleForm.processing}>
                                 {rescheduleForm.processing ? 'Rescheduling...' : 'Reschedule'}
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+
+                {/* Session Not Started Yet Modal */}
+                <Dialog open={!!beforeScheduleVisit} onOpenChange={(open) => !open && setBeforeScheduleVisit(null)}>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Session not started yet</DialogTitle>
+                            <DialogDescription>
+                                {beforeScheduleVisit?.scheduled_start
+                                    ? `This session starts in ${formatTimeUntil(beforeScheduleVisit.scheduled_start)}. You can wait and try again when it's time, or cancel.`
+                                    : 'This session has not started yet.'}
+                            </DialogDescription>
+                        </DialogHeader>
+                        <DialogFooter>
+                            <Button variant="outline" onClick={() => setBeforeScheduleVisit(null)}>
+                                Wait
+                            </Button>
+                            <Button variant="secondary" onClick={() => setBeforeScheduleVisit(null)}>
+                                Cancel
                             </Button>
                         </DialogFooter>
                     </DialogContent>

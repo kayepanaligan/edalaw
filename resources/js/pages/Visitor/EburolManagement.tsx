@@ -1118,7 +1118,8 @@ export default function EburolManagement({ eburols }: Props) {
                                             setVideoTermsModalOpen(false);
                                             setSelectedSessionIdForVideo(null);
                                             setAcceptingTerms(false);
-                                            router.visit(`/visit/session/${sessionId}`);
+                                            // Open video room in NEW tab
+                                            window.open(`/visit/session/${sessionId}/video-room`, '_blank');
                                         },
                                         onError: () => setAcceptingTerms(false),
                                     });
