@@ -454,7 +454,7 @@ export default function ScheduleManagement({ visits, stats, monitoringOfficers }
                             className="bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
                             onClick={() => {
                                 // Open video call in new tab
-                                window.open(`/visit-session/${visit.visit_session_id}/join`, '_blank');
+                                window.open(`/jail-officer/assigned-sessions/${visit.visit_session_id}/join`, '_blank');
                             }}
                             title="Join video call in new tab"
                         >
