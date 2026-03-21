@@ -7,7 +7,7 @@
     
     <!-- Floating Action Button for Chat -->
     <button id="chat-fab" type="button" onclick="toggleChatModal()" 
-        style="position:fixed;bottom:30px;right:30px;width:60px;height:60px;border-radius:50%;background:#2563eb;color:white;border:none;box-shadow:0 4px 12px rgba(37,99,235,0.4);cursor:pointer;z-index:9998;font-size:24px;display:flex;align-items:center;justify-content:center;">
+        style="position:fixed;bottom:30px;right:30px;width:60px;height:60px;border-radius:50%;background:#ea580c;color:white;border:none;box-shadow:0 4px 12px rgba(234,88,12,0.4);cursor:pointer;z-index:9998;font-size:24px;display:flex;align-items:center;justify-content:center;">
         💬
     </button>
     
@@ -27,18 +27,18 @@
             <div style="padding:16px;border-top:1px solid #e5e7eb;">
                 <form id="chat-form">
                     <textarea id="chat-message-input" placeholder="Type your message..." rows="3" style="width:100%;padding:12px;border:1px solid #d1d5db;border-radius:8px;resize:none;font-family:inherit;font-size:14px;" maxlength="1000"></textarea>
-                    <button type="button" id="send-button" style="width:100%;margin-top:8px;padding:12px;background:#2563eb;color:white;border:none;border-radius:8px;font-weight:600;cursor:pointer;font-size:14px;">📤 Send Message</button>
+                    <button type="button" id="send-button" style="width:100%;margin-top:8px;padding:12px;background:#ea580c;color:white;border:none;border-radius:8px;font-weight:600;cursor:pointer;font-size:14px;">📤 Send Message</button>
                 </form>
             </div>
         </div>
-        
-        <!-- Session Timer Display (Bottom Left - Always Visible) -->
-        <div id="session-timer" style="position: fixed; bottom: 30px; left: 30px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 16px 24px; border-radius: 12px; font-weight: bold; font-size: 18px; box-shadow: 0 8px 16px rgba(0,0,0,0.2); z-index: 10000; display: flex; align-items: center; gap: 10px;">
-            <span style="font-size: 20px;">⏰</span>
-            <div style="display: flex; flex-direction: column;">
-                <span id="timer-display" style="line-height: 1.2;">--:--</span>
-                <span id="timer-label" style="font-size: 11px; font-weight: normal; opacity: 0.9; text-align: center;">remaining</span>
-            </div>
+    </div>
+    
+    <!-- Session Timer Display (Bottom Left - Always Visible Outside Modal) -->
+    <div id="session-timer" style="position: fixed; bottom: 30px; left: 30px; background: linear-gradient(135deg, #ea580c 0%, #c2410c 100%); color: white; padding: 16px 24px; border-radius: 12px; font-weight: bold; font-size: 18px; box-shadow: 0 8px 16px rgba(0,0,0,0.2); z-index: 10000; display: flex; align-items: center; gap: 10px;">
+        <span style="font-size: 20px;">⏰</span>
+        <div style="display: flex; flex-direction: column;">
+            <span id="timer-display" style="line-height: 1.2;">--:--</span>
+            <span id="timer-label" style="font-size: 11px; font-weight: normal; opacity: 0.9; text-align: center;">remaining</span>
         </div>
     </div>
 </div>
@@ -50,7 +50,14 @@
 let chatModalOpen = false;
 const CURRENT_USER_ID = @json(auth()->id());
 const CURRENT_USER_NAME = @json($participant_name ?? 'Guest');
+const CURRENT_USER_ROLE = @json(auth()->user()->role->slug ?? 'visitor');
+const IS_OBSERVER = {{ $is_observer ? 'true' : 'false' }};
 const ROOM_ID = @json($room_id);
+
+// Helper function to check if current user is a jail officer
+function isJailOfficer() {
+    return CURRENT_USER_ROLE === 'jail_officer' || IS_OBSERVER === true;
+}
 
 // Video SDK variables
 const meetingId = '{{ $room_id }}';
@@ -126,9 +133,19 @@ function appendMessage(message) {
     if (!container) return;
     
     const isOwn = message.sender_id == CURRENT_USER_ID;
+    const isJailOfficerSender = message.sender === 'monitor'; // Check if sender is jail officer
+    
+    console.log('📬 Appending message:', message);
+    console.log('👤 Current user role:', CURRENT_USER_ROLE);
+    console.log('👁️ Is observer?', IS_OBSERVER);
+    console.log('🔐 Is jail officer (helper)?', isJailOfficer());
     
     const div = document.createElement('div');
+    div.setAttribute('data-message-id', message.id);
+    div.className = 'message-container';
     div.style.cssText = `margin-bottom:12px;padding:10px 14px;border-radius:8px;${isOwn?'background:#dbeafe;margin-left:20%;':'background:#f3f4f6;margin-right:20%;'}`;
+    div.style.position = 'relative';
+    div.style.cursor = isJailOfficer() ? 'pointer' : 'default';
     
     const name = document.createElement('div');
     name.style.cssText = 'font-size:11px;font-weight:600;color:#6b7280;margin-bottom:4px;';
@@ -145,7 +162,245 @@ function appendMessage(message) {
     div.appendChild(name);
     div.appendChild(text);
     div.appendChild(time);
+    
+    // Add click handler for jail officers to show actions menu
+    if (isJailOfficer()) {
+        console.log('✅ Attaching click handler to message (user is jail officer)');
+        div.onclick = (e) => {
+            e.stopPropagation();
+            console.log('🖱️ Message clicked!');
+            showMessageActionsMenu(message, div, e);
+        };
+    } else {
+        console.log('⚠️ Not a jail officer, skipping click handler');
+    }
+    
+    // Show flagged indicator
+    if (message.flagged) {
+        const flaggedBadge = document.createElement('div');
+        flaggedBadge.textContent = '🚩 Flagged: ' + (message.flag_reason || 'Inappropriate content');
+        flaggedBadge.style.cssText = 'font-size:10px;color:#dc2626;background:#fee2e2;margin-top:6px;padding:4px 8px;border-radius:4px;border-left:3px solid #dc2626;';
+        div.appendChild(flaggedBadge);
+    }
+    
     container.appendChild(div);
+}
+
+// Show actions menu on message click
+function showMessageActionsMenu(message, messageDiv, event) {
+    console.log('🖱️ Message clicked - Is Jail Officer:', isJailOfficer());
+    console.log('📦 Message data:', message);
+    
+    // Remove any existing menus first
+    const existingMenus = document.querySelectorAll('.message-actions-menu');
+    existingMenus.forEach(menu => menu.remove());
+    
+    // Don't show menu if already flagged
+    if (message.flagged) {
+        console.log('⚠️ Message already flagged, skipping menu');
+        return;
+    }
+    
+    const menu = document.createElement('div');
+    menu.className = 'message-actions-menu';
+    
+    // Calculate position relative to the clicked message
+    const rect = messageDiv.getBoundingClientRect();
+    const menuWidth = 180;
+    const menuHeight = 50;
+    
+    // Position menu above and to the right of the message bubble
+    let top = rect.top - menuHeight - 10;
+    let left = rect.right - menuWidth;
+    
+    // Ensure menu doesn't go off screen
+    if (top < 10) top = rect.bottom + 10;
+    if (left < 10) left = rect.left;
+    
+    menu.style.cssText = `
+        position: fixed;
+        top: ${top}px;
+        left: ${left}px;
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+        z-index: 100000;
+        min-width: ${menuWidth}px;
+        overflow: hidden;
+    `;
+    
+    menu.innerHTML = `
+        <button onclick="showFlagModal('${message.id}', event.target.closest('.message-container'))" 
+                style="width: 100%; padding: 12px 16px; text-align: left; background: none; border: none; cursor: pointer; font-size: 14px; color: #dc2626; display: flex; align-items: center; gap: 8px; transition: background 0.2s;"
+                onmouseover="this.style.background='#fef2f2'"
+                onmouseout="this.style.background='none'">
+            <span style="font-size: 16px;">⚑</span>
+            <span>Flag Message</span>
+        </button>
+    `;
+    
+    console.log('📋 Creating menu, appending to body');
+    document.body.appendChild(menu);
+    
+    // Close menu when clicking elsewhere
+    setTimeout(() => {
+        document.addEventListener('click', function closeMenu() {
+            menu.remove();
+            document.removeEventListener('click', closeMenu);
+        }, { once: true });
+    }, 100);
+}
+
+// Show flag modal
+function showFlagModal(messageId, messageDiv) {
+    // Close any open menus
+    const existingMenus = document.querySelectorAll('.message-actions-menu');
+    existingMenus.forEach(menu => menu.remove());
+    
+    const reasons = [
+        'Inappropriate language',
+        'Threatening behavior',
+        'Sharing prohibited information',
+        'Harassment',
+        'Other security violation'
+    ];
+    
+    const overlay = document.createElement('div');
+    overlay.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 99999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    `;
+    
+    const modal = document.createElement('div');
+    modal.style.cssText = `
+        background: white;
+        padding: 32px;
+        border-radius: 12px;
+        max-width: 500px;
+        width: 90%;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    `;
+    
+    modal.innerHTML = `
+        <h3 style="font-size: 18px; font-weight: bold; margin-bottom: 16px; color: #1f2937;">Flag Message</h3>
+        <p style="font-size: 14px; color: #6b7280; margin-bottom: 20px;">Select a reason for flagging this message:</p>
+        <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 24px;">
+            ${reasons.map(reason => `
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px; border-radius: 6px; transition: background 0.2s;" 
+                       onmouseover="this.style.background='#f3f4f6'" 
+                       onmouseout="this.style.background='transparent'">
+                    <input type="radio" name="flag_reason" value="${reason}" style="width: 16px; height: 16px;">
+                    <span style="font-size: 14px;">${reason}</span>
+                </label>
+            `).join('')}
+        </div>
+        <textarea id="custom_flag_reason" placeholder="Or enter custom reason..." 
+                  style="width: 100%; padding: 12px; border: 1px solid #d1d5db; border-radius: 8px; resize: vertical; font-family: inherit; font-size: 14px; margin-bottom: 20px;" 
+                  rows="3"></textarea>
+        <div style="display: flex; gap: 12px; justify-content: flex-end;">
+            <button onclick="this.closest('div[style*=fixed]').remove()" 
+                    style="padding: 10px 20px; background: #f3f4f6; color: #374151; border: none; border-radius: 8px; font-weight: 600; cursor: pointer;">
+                Cancel
+            </button>
+            <button id="confirm_flag_btn" 
+                    style="padding: 10px 20px; background: #dc2626; color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer;">
+                Flag Message
+            </button>
+        </div>
+    `;
+    
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+    
+    document.getElementById('confirm_flag_btn').onclick = () => {
+        const selectedReason = document.querySelector('input[name="flag_reason"]:checked')?.value;
+        const customReason = document.getElementById('custom_flag_reason').value.trim();
+        const reason = selectedReason || customReason;
+        
+        if (!reason) {
+            alert('Please select or enter a reason for flagging.');
+            return;
+        }
+        
+        flagMessage(messageId, reason, messageDiv);
+        overlay.remove();
+    };
+}
+
+// Flag message function
+async function flagMessage(messageId, reason, messageDiv) {
+    console.log('🚩 Attempting to flag message:', messageId);
+    console.log('📝 Reason:', reason);
+    console.log('🔑 SESSION_ID:', SESSION_ID);
+    
+    if (!SESSION_ID) {
+        console.error('❌ SESSION_ID is not defined!');
+        alert('Error: Session ID not available. Please refresh the page.');
+        return;
+    }
+    
+    try {
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+        console.log('🎫 CSRF Token present?', !!csrfToken);
+        
+        const url = `/video/chat/${SESSION_ID}/messages/${messageId}/flag`;
+        console.log('📍 Request URL:', url);
+        
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrfToken,
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({ reason })
+        });
+        
+        console.log('📥 Response status:', response.status);
+        
+        // Try to parse response
+        let result;
+        try {
+            result = await response.json();
+        } catch (parseError) {
+            console.error('Failed to parse response:', parseError);
+            console.error('Response text:', await response.text());
+            throw new Error('Server returned invalid response');
+        }
+        
+        console.log('📥 Response data:', result);
+        
+        if (result.success) {
+            console.log('✅ Message flagged successfully');
+            // Update UI to show flagged status
+            const flaggedBadge = document.createElement('div');
+            flaggedBadge.textContent = '🚩 Flagged: ' + reason;
+            flaggedBadge.style.cssText = 'font-size:10px;color:#dc2626;background:#fee2e2;margin-top:6px;padding:4px 8px;border-radius:4px;border-left:3px solid #dc2626;';
+            messageDiv.appendChild(flaggedBadge);
+            
+            // Remove or disable the flag button
+            const flagBtn = messageDiv.querySelector('button');
+            if (flagBtn) {
+                flagBtn.remove();
+            }
+        } else {
+            console.error('❌ Failed to flag:', result.error);
+            alert('Failed to flag message: ' + (result.error || 'Unknown error'));
+        }
+    } catch (err) {
+        console.error('💥 Error flagging message:', err);
+        console.error('Stack trace:', err.stack);
+        alert('Failed to flag message. Error: ' + err.message + '. Check console for details.');
+    }
 }
 
 // Scroll to bottom
@@ -272,6 +527,41 @@ function updateTimer() {
         // Time's up!
         timerDisplay.textContent = '00:00';
         timerLabel.textContent = 'ended';
+        
+        // Prevent multiple executions
+        if (window.sessionAlreadyEnded) {
+            return;
+        }
+        window.sessionAlreadyEnded = true;
+        
+        console.log('⏰ Session time ended - exiting call');
+        
+        // Try to exit video call if instance exists
+        if (typeof window.videoMeetingInstance !== 'undefined' && window.videoMeetingInstance) {
+            try {
+                window.videoMeetingInstance.leave();
+                console.log('✅ Left video meeting');
+            } catch (err) {
+                console.error('❌ Error leaving meeting:', err);
+            }
+        }
+        
+        // Notify server that session ended due to time
+        const sessionId = @json($session->id ?? null);
+        if (sessionId) {
+            fetch(`/visit/session/${sessionId}/time-ended`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                    'Accept': 'application/json'
+                }
+            }).catch(err => console.error('Failed to notify server:', err));
+        }
+        
+        // Show non-blocking message instead of alert
+        showSessionEndedMessage();
+        
         return;
     }
     
@@ -283,6 +573,78 @@ function updateTimer() {
     
     timerDisplay.textContent = `${minsStr}:${secsStr}`;
     timerLabel.textContent = 'remaining';
+}
+
+// Show session ended message with auto-redirect
+function showSessionEndedMessage() {
+    // Create overlay
+    const overlay = document.createElement('div');
+    overlay.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.85);
+        z-index: 99999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    `;
+    
+    // Create message box
+    const messageBox = document.createElement('div');
+    messageBox.style.cssText = `
+        background: linear-gradient(135deg, #ea580c 0%, #c2410c 100%);
+        color: white;
+        padding: 40px;
+        border-radius: 16px;
+        text-align: center;
+        max-width: 500px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    `;
+    
+    messageBox.innerHTML = `
+        <div style="font-size: 64px; margin-bottom: 20px;">⏰</div>
+        <h2 style="font-size: 24px; font-weight: bold; margin-bottom: 16px;">Session Time Ended</h2>
+        <p style="font-size: 16px; margin-bottom: 24px; opacity: 0.9;">Your allocated time for this video call has expired.</p>
+        <p style="font-size: 14px; opacity: 0.8;">Redirecting you in <span id="countdown">5</span> seconds...</p>
+    `;
+    
+    overlay.appendChild(messageBox);
+    document.body.appendChild(overlay);
+    
+    // Countdown and redirect
+    let secondsLeft = 5;
+    const countdownEl = document.getElementById('countdown');
+    
+    const countdownInterval = setInterval(() => {
+        secondsLeft--;
+        if (secondsLeft > 0 && countdownEl) {
+            countdownEl.textContent = secondsLeft;
+        } else {
+            clearInterval(countdownInterval);
+            // Close window or redirect
+            attemptCloseOrRedirect();
+        }
+    }, 1000);
+}
+
+// Attempt to close window or redirect
+function attemptCloseOrRedirect() {
+    // Try to close the window
+    window.close();
+    
+    // If still open, redirect to dashboard
+    setTimeout(() => {
+        // For visitor role
+        window.location.href = '/dashboard/visitor';
+    }, 100);
+    
+    // Final fallback - replace entire history
+    setTimeout(() => {
+        window.location.replace('/dashboard/visitor');
+    }, 500);
 }
 
 // Update timer every second and show it immediately
@@ -303,6 +665,9 @@ setInterval(function() {
 const MEETING_ID = @json($room_id);
 const API_KEY = @json(env('VIDEOSDK_API_KEY'));
 const USER_NAME = @json($participant_name ?? 'Guest');
+const SESSION_ID = @json($session->id ?? null);
+const PARTICIPANT_ID = @json($participant_id ?? null);
+const TUNNEL_TOKEN = @json($tunnel?->tunnel_token ?? null); // For inmate tunnels
 
 function initVideoCall() {
     if (typeof VideoSDKMeeting !== 'function') {
@@ -317,14 +682,59 @@ function initVideoCall() {
         apiKey: API_KEY,
         containerId: "video-container",
         chatEnabled: false, // Disabled - using custom chat
-        micEnabled: false,
-        webcamEnabled: false,
+        micEnabled: false,  // Disable microphone by default
+        webcamEnabled: true, // Enable camera by default
     };
     
     try {
         const instance = new VideoSDKMeeting();
+        window.videoMeetingInstance = instance; // Store globally for access
+        
+        // Initialize and store reference
         instance.init(config);
         console.log("✅ VideoSDK initialized");
+        
+        // Notify server that participant joined
+        if (SESSION_ID && PARTICIPANT_ID) {
+            fetch(`/visit/session/${SESSION_ID}/participant-joined`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({ participant_id: PARTICIPANT_ID })
+            }).catch(err => console.error('Failed to notify participant joined:', err));
+        }
+        
+        // For inmate tunnels - mark tunnel as used when actually joining
+        if (TUNNEL_TOKEN) {
+            fetch(`/inmate/tunnel/${TUNNEL_TOKEN}/token`, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json'
+                }
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.token) {
+                    console.log('✅ Inmate tunnel marked as used and token received');
+                }
+            })
+            .catch(err => console.error('Failed to get inmate token:', err));
+        }
+        
+        // Listen for meeting left event
+        window.addEventListener('beforeunload', function() {
+            // Notify server that participant is leaving
+            if (SESSION_ID) {
+                navigator.sendBeacon(`/visit/session/${SESSION_ID}/participant-left`, JSON.stringify({
+                    participant_id: PARTICIPANT_ID,
+                    left_at: new Date().toISOString()
+                }));
+            }
+        });
+        
     } catch (err) {
         console.error("❌ VideoSDK init failed:", err);
     }

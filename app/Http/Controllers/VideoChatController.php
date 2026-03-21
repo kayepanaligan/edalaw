@@ -58,14 +58,14 @@ class VideoChatController extends Controller
     {
         $validated = $request->validate([
             'room_id' => 'required|string|max:255',
-            'sender_id' => 'required|integer|exists:users,id',
+            'sender_id' => 'nullable|integer',
             'sender_name' => 'required|string|max:255',
             'message' => 'required|string|max:1000',
         ]);
 
         Log::info('💬 Sending chat message', [
             'room_id' => $validated['room_id'],
-            'sender_id' => $validated['sender_id'],
+            'sender_id' => $validated['sender_id'] ?? 'null',
             'sender_name' => $validated['sender_name'],
         ]);
 
@@ -93,7 +93,7 @@ class VideoChatController extends Controller
             $chatLog = ChatLog::create([
                 'visit_session_id' => $visitSession->id,
                 'sender' => $validated['sender_name'],
-                'sender_id' => $validated['sender_id'],
+                'sender_id' => $validated['sender_id'] ?? null,
                 'message' => $validated['message'],
                 'flagged' => false,
             ]);

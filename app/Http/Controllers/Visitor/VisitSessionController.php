@@ -141,7 +141,104 @@ class VisitSessionController extends Controller
             'visitor_participant_id' => $request->participant_id,
         ]);
 
+        // Log participant entrance
+        \App\Models\SystemLog::create([
+            'visit_session_id' => $session->id,
+            'action' => 'participant_joined',
+            'performed_by' => auth()->id(),
+            'metadata' => [
+                'participant_id' => $request->participant_id,
+                'joined_at' => now()->toIso8601String(),
+                'user_name' => auth()->user()?->name,
+            ],
+        ]);
+
         return response()->json(['success' => true]);
+    }
+
+    /**
+     * Mark participant as left (called from frontend).
+     */
+    public function participantLeft(Request $request, VisitSession $session)
+    {
+        $request->validate([
+            'participant_id' => ['required', 'string'],
+            'left_at' => ['nullable', 'string'],
+        ]);
+
+        // Log participant exit
+        \App\Models\SystemLog::create([
+            'visit_session_id' => $session->id,
+            'action' => 'participant_left',
+            'performed_by' => auth()->id(),
+            'metadata' => [
+                'participant_id' => $request->participant_id,
+                'left_at' => $request->left_at ?? now()->toIso8601String(),
+                'user_name' => auth()->user()?->name,
+            ],
+        ]);
+
+        // Calculate and save duration if this is the last participant
+        $this->calculateAndSaveDuration($session);
+
+        return response()->json(['success' => true]);
+    }
+
+    /**
+     * Handle session ended due to time limit.
+     */
+    public function timeEnded(Request $request, VisitSession $session)
+    {
+        // Update session status
+        $session->update([
+            'status' => 'completed',
+            'ended_at' => now(),
+            'end_reason' => 'time_limit_reached',
+        ]);
+
+        // Calculate and save duration
+        $this->calculateAndSaveDuration($session);
+
+        // Log session end
+        \App\Models\SystemLog::create([
+            'visit_session_id' => $session->id,
+            'action' => 'session_time_ended',
+            'performed_by' => null,
+            'metadata' => [
+                'ended_at' => now()->toIso8601String(),
+                'reason' => 'Scheduled time limit reached',
+            ],
+        ]);
+
+        return response()->json(['success' => true]);
+    }
+
+    /**
+     * Calculate and save session duration.
+     */
+    private function calculateAndSaveDuration(VisitSession $session)
+    {
+        $startedAt = $session->visitor_joined_at ?? $session->started_at;
+        $endedAt = $session->ended_at ?? now();
+
+        if ($startedAt) {
+            $durationSeconds = $startedAt->diffInSeconds($endedAt);
+            
+            $session->update([
+                'duration_seconds' => $durationSeconds,
+                'ended_at' => $endedAt,
+                'status' => $session->status !== 'terminated' ? 'completed' : $session->status,
+            ]);
+
+            // Also update video recording if exists
+            $recording = \App\Models\VideoRecording::where('visit_session_id', $session->id)->first();
+            if ($recording && !$recording->duration_seconds) {
+                $recording->update([
+                    'duration_seconds' => $durationSeconds,
+                    'ended_at' => $endedAt,
+                ]);
+            }
+        }
     }
 
     /**
@@ -177,5 +274,29 @@ class VisitSessionController extends Controller
         ]);
 
         return response()->json(['success' => false, 'message' => 'VisitSession not found'], 404);
+    }
+
+    /**
+     * Check if session is ready to join.
+     */
+    public function checkStatus(VisitSession $session)
+    {
+        $now = now();
+        $scheduledStart = $session->scheduled_start;
+        
+        // Session is ready if:
+        // 1. Current time is at or after scheduled start time
+        // 2. Session status is not terminated/failed
+        // 3. Session hasn't ended yet
+        
+        $isReady = $now->gte($scheduledStart) && 
+                   !in_array($session->status, ['terminated', 'failed', 'cancelled']);
+        
+        return response()->json([
+            'ready' => $isReady,
+            'status' => $session->status,
+            'scheduled_start' => $scheduledStart->toIso8601String(),
+            'current_time' => $now->toIso8601String(),
+        ]);
     }
 }

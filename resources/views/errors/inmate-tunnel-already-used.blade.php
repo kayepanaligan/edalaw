@@ -13,7 +13,7 @@
         
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #ea580c 0%, #c2410c 100%);
             min-height: 100vh;
             display: flex;
             align-items: center;
@@ -22,53 +22,74 @@
         }
         
         .container {
-            max-width: 500px;
+            max-width: 600px;
             width: 100%;
         }
         
         .card {
             background: white;
-            border-radius: 16px;
-            padding: 40px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+            padding: 48px 40px;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25);
             text-align: center;
-        }
-        
-        .icon {
-            font-size: 64px;
-            margin-bottom: 24px;
         }
         
         h1 {
             color: #1f2937;
-            font-size: 24px;
+            font-size: 28px;
             font-weight: 700;
             margin-bottom: 16px;
             line-height: 1.3;
         }
         
-        p {
+        .subtitle {
             color: #6b7280;
             font-size: 16px;
             line-height: 1.6;
             margin-bottom: 32px;
         }
         
-        .highlight {
-            background: #fef3c7;
-            color: #92400e;
-            padding: 16px 20px;
+        .info-box {
+            background: #fff7ed;
+            color: #7c2d12;
+            padding: 20px 24px;
             border-radius: 8px;
-            border-left: 4px solid #f59e0b;
+            border-left: 4px solid #ea580c;
             text-align: left;
             margin-bottom: 32px;
-            font-size: 14px;
         }
         
-        .highlight strong {
-            display: block;
+        .info-box-title {
+            font-weight: 600;
+            font-size: 15px;
             margin-bottom: 8px;
-            color: #78350f;
+            color: #9a3412;
+        }
+        
+        .info-box-text {
+            font-size: 14px;
+            line-height: 1.6;
+            color: #7c2d12;
+        }
+        
+        .security-note {
+            background: #f3f4f6;
+            padding: 20px 24px;
+            border-radius: 8px;
+            margin-bottom: 32px;
+        }
+        
+        .security-note-title {
+            font-weight: 600;
+            font-size: 14px;
+            color: #374151;
+            margin-bottom: 8px;
+        }
+        
+        .security-note-text {
+            font-size: 14px;
+            color: #6b7280;
+            line-height: 1.6;
         }
         
         .actions {
@@ -82,7 +103,7 @@
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            padding: 12px 24px;
+            padding: 14px 28px;
             border-radius: 8px;
             font-weight: 600;
             font-size: 14px;
@@ -90,41 +111,55 @@
             transition: all 0.2s;
             cursor: pointer;
             border: none;
+            min-width: 160px;
         }
         
         .btn-primary {
-            background: #2563eb;
+            background: #ea580c;
             color: white;
         }
         
         .btn-primary:hover {
-            background: #1d4ed8;
+            background: #c2410c;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(234, 88, 12, 0.3);
         }
         
         .btn-secondary {
             background: #f3f4f6;
             color: #374151;
+            border: 1px solid #d1d5db;
         }
         
         .btn-secondary:hover {
             background: #e5e7eb;
+            transform: translateY(-1px);
         }
         
         @media (max-width: 480px) {
             .card {
-                padding: 32px 24px;
+                padding: 36px 24px;
             }
             
             h1 {
-                font-size: 20px;
+                font-size: 22px;
             }
             
-            p {
+            .subtitle {
                 font-size: 14px;
             }
             
-            .icon {
-                font-size: 48px;
+            .info-box,
+            .security-note {
+                padding: 16px 18px;
+            }
+            
+            .actions {
+                flex-direction: column;
+            }
+            
+            .btn {
+                width: 100%;
             }
         }
     </style>
@@ -132,27 +167,36 @@
 <body>
     <div class="container">
         <div class="card">
-            <div class="icon">🚫</div>
-            
             <h1>Tunnel Code Already Used</h1>
             
-            <p>
+            <p class="subtitle">
                 This PDL tunnel code has already been used to join the session. 
                 Each tunnel code can only be used once for security purposes.
             </p>
             
-            <div class="highlight">
-                <strong>What happened?</strong>
-                The tunnel link you're trying to access has already been used by another inmate. 
-                This is a security measure to prevent unauthorized access to video call sessions.
+            <div class="info-box">
+                <div class="info-box-title">What happened?</div>
+                <div class="info-box-text">
+                    The tunnel link you're trying to access has already been used by another inmate. 
+                    This is a security measure to prevent unauthorized access to video call sessions.
+                </div>
+            </div>
+            
+            <div class="security-note">
+                <div class="security-note-title">Security Notice</div>
+                <div class="security-note-text">
+                    Tunnel codes are single-use to ensure that only authorized individuals can access 
+                    their scheduled video call sessions. This prevents sharing of links and maintains 
+                    the integrity of the visitation system.
+                </div>
             </div>
             
             <div class="actions">
                 <a href="/" class="btn btn-secondary">
-                    ← Go Home
+                    Go to Homepage
                 </a>
                 <button onclick="contactAdmin()" class="btn btn-primary">
-                    📧 Contact Administrator
+                    Contact Administrator
                 </button>
             </div>
         </div>
@@ -160,7 +204,6 @@
     
     <script>
         function contactAdmin() {
-            // You can customize this with your actual admin contact
             const adminEmail = 'admin@edalaw.gov.ph';
             const subject = encodeURIComponent('PDL Tunnel Code Issue - Already Used');
             const body = encodeURIComponent(

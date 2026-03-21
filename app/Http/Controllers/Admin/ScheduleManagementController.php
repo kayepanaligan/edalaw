@@ -97,7 +97,7 @@ class ScheduleManagementController extends Controller
         return Inertia::render('Admin/ScheduleManagement', [
             'visits' => $visits,
             'visitors' => $visitors,
-            'jailOfficers' => $jailOfficers,
+            'monitoringOfficers' => $jailOfficers,
             'today_unavailable' => now()->format('H:i') >= '21:50',
         ]);
     }
@@ -265,7 +265,7 @@ class ScheduleManagementController extends Controller
 
         // Notify jail officer if assigned and it's a new assignment
         if ($visit->jail_officer_id && $oldJailOfficerId !== $visit->jail_officer_id) {
-            \App\Services\NotificationService::notifyJailOfficerAboutVisit($visit);
+            \App\Services\NotificationService::notifyMonitoringOfficerAboutVisit($visit);
         }
 
         // Send notification with meeting link
@@ -408,7 +408,7 @@ class ScheduleManagementController extends Controller
 
         // Notify jail officer if assigned and it's a new assignment
         if ($visit->jail_officer_id && $oldJailOfficerId !== $visit->jail_officer_id && in_array($request->status, ['approved', 'pending'])) {
-            \App\Services\NotificationService::notifyJailOfficerAboutVisit($visit);
+            \App\Services\NotificationService::notifyMonitoringOfficerAboutVisit($visit);
         }
 
         AuditLogService::logAction(
@@ -564,7 +564,7 @@ class ScheduleManagementController extends Controller
         }
 
         if ($request->visit_type === 'virtual' && $request->jail_officer_id) {
-            \App\Services\NotificationService::notifyJailOfficerAboutVisit($visit->fresh());
+            \App\Services\NotificationService::notifyMonitoringOfficerAboutVisit($visit->fresh());
         }
 
         NotificationService::createVisitNotification($visit->fresh(), 'approved');

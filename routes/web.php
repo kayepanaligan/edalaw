@@ -120,6 +120,14 @@ Route::middleware('guest')->group(function () {
     Route::post('registration/otp/resend', [\App\Http\Controllers\Auth\RegistrationOtpController::class, 'resend'])
         ->name('registration-otp.resend');
 
+    // Inmate Tunnel OTP Verification
+    Route::get('inmate/tunnel/{token}/otp', [\App\Http\Controllers\InmateTunnelController::class, 'showOtpVerification'])
+        ->name('inmate.tunnel-otp-verify.show');
+    Route::post('inmate/tunnel/{token}/otp/verify', [\App\Http\Controllers\InmateTunnelController::class, 'verifyOtp'])
+        ->name('inmate.tunnel-otp-verify');
+    Route::post('inmate/tunnel/{token}/otp/resend', [\App\Http\Controllers\InmateTunnelController::class, 'resendOtp'])
+        ->name('inmate.tunnel-otp-resend');
+
     // Password reset via OTP (send OTP to contact number, verify, then reset and logout other sessions)
     Route::get('password/forgot', [\App\Http\Controllers\Auth\PasswordResetOtpController::class, 'showForgotForm'])
         ->name('password.forgot.show');
@@ -141,7 +149,13 @@ Route::post('/video/chat/send', [App\Http\Controllers\VideoChatController::class
 Route::get('/video/chat/history/{roomId}', [App\Http\Controllers\VideoChatController::class, 'getChatHistory'])->name('video.chat.history');
 Route::get('/video/chat/sync/{sessionId}', [App\Http\Controllers\VideoChatController::class, 'syncFromCloud']);
 Route::get('/video/chat/export/{sessionId}', [App\Http\Controllers\VideoChatController::class, 'exportChat'])->name('video.chat.export');
+
+// Chat Message Flagging (jail officer only)
+Route::post('/video/chat/{session}/messages/{message}/flag', [App\Http\Controllers\ChatMessageFlagController::class, 'flag'])
+    ->name('video.chat.messages.flag');
+
 Route::post('/visit-session/save-session-id', [App\Http\Controllers\Visitor\VisitSessionController::class, 'saveSessionId'])->name('visit-session.save-session-id');
+Route::get('/visit-session/{session}/status', [App\Http\Controllers\Visitor\VisitSessionController::class, 'checkStatus'])->name('visit-session.status');
 
 Route::middleware('auth')->group(function () {
     Route::get('account-pending', [\App\Http\Controllers\Auth\AccountStatusController::class, 'showPending'])
@@ -404,6 +418,10 @@ Route::middleware(['auth', 'verified', 'approved'])->group(function () {
             ->name('visit-session.accept-terms');
         Route::post('visit/session/{session}/participant-joined', [\App\Http\Controllers\Visitor\VisitSessionController::class, 'participantJoined'])
             ->name('visit-session.participant-joined');
+        Route::post('visit/session/{session}/participant-left', [\App\Http\Controllers\Visitor\VisitSessionController::class, 'participantLeft'])
+            ->name('visit-session.participant-left');
+        Route::post('visit/session/{session}/time-ended', [\App\Http\Controllers\Visitor\VisitSessionController::class, 'timeEnded'])
+            ->name('visit-session.time-ended');
     });
 
     // Cell, Inmate, and Cell Schedule Management (accessible by both BJMP Officer and Jail Officer)

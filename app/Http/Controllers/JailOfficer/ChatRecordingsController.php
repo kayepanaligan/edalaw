@@ -56,6 +56,14 @@ class ChatRecordingsController extends Controller
 
             $totalMessages = $session->chatLogs->count();
             $flaggedCount = $session->chatLogs->where('flagged', true)->count();
+            
+            // Calculate duration from scheduled times, fallback to stored duration or 0
+            $durationSeconds = 0;
+            if ($session->scheduled_start && $session->scheduled_end) {
+                $durationSeconds = $session->scheduled_start->diffInSeconds($session->scheduled_end);
+            } elseif ($session->duration_seconds) {
+                $durationSeconds = $session->duration_seconds;
+            }
 
             return [
                 'id' => $session->id,
@@ -65,7 +73,7 @@ class ChatRecordingsController extends Controller
                 'inmate_name' => $inmateName,
                 'scheduled_start' => $session->scheduled_start?->toIso8601String(),
                 'scheduled_end' => $session->scheduled_end?->toIso8601String(),
-                'duration_seconds' => $session->duration_seconds ?? 0,
+                'duration_seconds' => $durationSeconds,
                 'status' => $session->status,
                 'total_messages' => $totalMessages,
                 'flagged_count' => $flaggedCount,
@@ -127,6 +135,14 @@ class ChatRecordingsController extends Controller
         // Use started_at if available, otherwise use scheduled_start
         $startedAt = $session->started_at ?? $session->scheduled_start ?? now();
         $endedAt = $session->ended_at ?? $session->scheduled_end;
+        
+        // Calculate duration from scheduled times, fallback to stored duration or 0
+        $durationSeconds = 0;
+        if ($session->scheduled_start && $session->scheduled_end) {
+            $durationSeconds = $session->scheduled_start->diffInSeconds($session->scheduled_end);
+        } elseif ($session->duration_seconds) {
+            $durationSeconds = $session->duration_seconds;
+        }
 
         return response()->json([
             'success' => true,
@@ -139,7 +155,7 @@ class ChatRecordingsController extends Controller
                     'inmate_name' => $inmateName,
                     'started_at' => $startedAt->toIso8601String(),
                     'ended_at' => $endedAt?->toIso8601String(),
-                    'duration_seconds' => $session->duration_seconds ?? 0,
+                    'duration_seconds' => $durationSeconds,
                     'status' => $session->status,
                 ],
                 'chatLogs' => $chatLogs,
@@ -191,6 +207,14 @@ class ChatRecordingsController extends Controller
         }
 
         $viewPrefix = $isSuperAdmin ? 'Admin' : 'JailOfficer';
+        
+        // Calculate duration from scheduled times, fallback to stored duration or 0
+        $durationSeconds = 0;
+        if ($session->scheduled_start && $session->scheduled_end) {
+            $durationSeconds = $session->scheduled_start->diffInSeconds($session->scheduled_end);
+        } elseif ($session->duration_seconds) {
+            $durationSeconds = $session->duration_seconds;
+        }
 
         return Inertia::render("{$viewPrefix}/ChatSessionView", [
             'session' => [
@@ -201,7 +225,7 @@ class ChatRecordingsController extends Controller
                 'inmate_name' => $inmateName,
                 'started_at' => $session->started_at?->toIso8601String() ?? $session->scheduled_start?->toIso8601String() ?? now()->toIso8601String(),
                 'ended_at' => $session->ended_at?->toIso8601String() ?? $session->scheduled_end?->toIso8601String(),
-                'duration_seconds' => $session->duration_seconds ?? 0,
+                'duration_seconds' => $durationSeconds,
                 'status' => $session->status,
             ],
             'chatLogs' => $chatLogs,
