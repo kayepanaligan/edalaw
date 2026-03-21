@@ -288,7 +288,14 @@ class AssignedSessionsController extends Controller
             return redirect()->route('monitoring-officer.assigned-sessions.index')
                 ->with('error', 'This session has ended.');
         }
-        if (! $session->isWithinSchedule() && $session->status !== 'active') {
+        
+        // Check if session time has expired (even if status is still "active")
+        if (! $session->isWithinSchedule()) {
+            return redirect()->route('monitoring-officer.assigned-sessions.index')
+                ->with('error', 'This session has ended. You can only join during the scheduled time.');
+        }
+        
+        if ($session->status !== 'active' && ! $session->isWithinScheduleForTunnel()) {
             return redirect()->route('monitoring-officer.assigned-sessions.index')
                 ->with('error', 'You can only join during the scheduled window or when the session is active.');
         }

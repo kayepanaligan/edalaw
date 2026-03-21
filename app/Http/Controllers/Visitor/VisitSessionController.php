@@ -79,9 +79,14 @@ class VisitSessionController extends Controller
         $session->terms_accepted_at = now();
         $session->save();
 
-        // respond for Inertia / React
-        return redirect()->route('visit-session.show', $session)
-                        ->with('success', 'You have accepted the terms.');
+        // Return URL for opening in new tab
+        $videoRoomUrl = route('visit-session.video-room', $session);
+        
+        // Always return JSON so frontend can open in new tab
+        return response()->json([
+            'success' => true,
+            'video_room_url' => $videoRoomUrl,
+        ]);
     }
 
     public function videoRoom(Request $request, VisitSession $session)
@@ -117,6 +122,7 @@ class VisitSessionController extends Controller
             'participant_name'   => $user->name,
             'participant_id'     => $participantId,
             'is_observer'        => false,
+            'scheduled_end'      => $session->scheduled_end?->format('Y-m-d H:i:s'),
         ]);
     }
 

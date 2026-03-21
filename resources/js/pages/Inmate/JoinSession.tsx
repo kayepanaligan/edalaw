@@ -1,4 +1,4 @@
-import { Head } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import { Phone } from 'lucide-react';
 import { useState } from 'react';
 
@@ -8,6 +8,8 @@ type Props = {
         id: number;
         room_id: string;
         session_type: string;
+        scheduled_start?: string;
+        scheduled_end?: string;
     };
 };
 
@@ -16,8 +18,39 @@ export default function JoinSession({ tunnel_token, session }: Props) {
     const [joined, setJoined] = useState(false);
     const [token, setToken] = useState<{ token: string; room_id: string; participant_id: string } | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [showNotStartedModal, setShowNotStartedModal] = useState(false);
+    const [timeUntilStart, setTimeUntilStart] = useState<string>('');
+
+    const formatTimeUntil = (scheduledStart: string): string => {
+        const now = Date.now();
+        const start = new Date(scheduledStart).getTime();
+        const diff = start - now;
+        
+        if (diff <= 0) return '';
+        
+        const minutes = Math.floor(diff / 60000);
+        const hours = Math.floor(minutes / 60);
+        
+        if (hours >= 1) {
+            const remainingMinutes = minutes % 60;
+            return `${hours}h ${remainingMinutes}m`;
+        }
+        return `${minutes}m`;
+    };
 
     const handleJoin = async () => {
+        // Check if session has started
+        if (session.scheduled_start) {
+            const now = Date.now();
+            const scheduledStart = new Date(session.scheduled_start).getTime();
+            
+            if (scheduledStart > now) {
+                setTimeUntilStart(formatTimeUntil(session.scheduled_start));
+                setShowNotStartedModal(true);
+                return;
+            }
+        }
+        
         setError(null);
         setJoining(true);
         try {
@@ -28,13 +61,21 @@ export default function JoinSession({ tunnel_token, session }: Props) {
                 setJoining(false);
                 return;
             }
-            setToken({ token: data.token, room_id: data.room_id, participant_id: data.participant_id });
-            setJoined(true);
-            const url =
-                data.join_url ??
-                `https://app.videosdk.live/meetings/${data.room_id}?token=${encodeURIComponent(data.token)}`;
-            window.location.href = url;
-        } catch {
+            
+            // Use Inertia router to visit the VideoRoom page (same as visitors)
+            router.visit('/video-room', {
+                method: 'get',
+                data: {
+                    room_id: data.room_id,
+                    token: data.token,
+                    participant_id: data.participant_id,
+                    name: data.participant_name,
+                    observer: data.is_observer ? '1' : '0',
+                },
+                preserveState: false,
+                preserveScroll: false,
+            });
+        } catch (err) {
             setError('Failed to connect');
         }
         setJoining(false);
@@ -68,6 +109,39 @@ export default function JoinSession({ tunnel_token, session }: Props) {
                     </div>
                 </div>
             </div>
+
+            {/* Session Not Started Yet Modal */}
+            {showNotStartedModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+                    <div className="w-full max-w-md rounded-lg border bg-card p-6 shadow-lg">
+                        <h2 className="text-lg font-semibold">Session not started yet</h2>
+                        <p className="mt-2 text-sm text-muted-foreground">
+                            {timeUntilStart
+                                ? `This session starts in ${timeUntilStart}. You can wait and try again when it's time.`
+                                : 'This session has not started yet.'}
+                        </p>
+                        <div className="mt-6 flex justify-end gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setShowNotStartedModal(false)}
+                                className="rounded-md border bg-background px-4 py-2 text-sm font-medium hover:bg-accent"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setShowNotStartedModal(false);
+                                    handleJoin();
+                                }}
+                                className="rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
+                            >
+                                Wait
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </>
     );
 }

@@ -168,6 +168,24 @@ function getVisitTypeBadge(type: string) {
     );
 }
 
+function formatTimeUntil(scheduledStart: string): string {
+    const now = Date.now();
+    const start = new Date(scheduledStart).getTime();
+    const diff = start - now;
+    
+    if (diff <= 0) return '';
+    
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(minutes / 60);
+    
+    if (hours >= 1) {
+        const remainingMinutes = minutes % 60;
+        return `${hours}h ${remainingMinutes}m`;
+    }
+    return `${minutes}m`;
+}
+
+
 export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Props) {
     const { props } = usePage<{ bookedTimeSlots?: string[] }>();
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -199,11 +217,35 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
     const [selectedSessionForVideo, setSelectedSessionForVideo] = useState<{ sessionId: number; visit: Visit } | null>(null);
     const [videoTermsAccepted, setVideoTermsAccepted] = useState(false);
     const [acceptingTerms, setAcceptingTerms] = useState(false);
+    const [beforeScheduleSession, setBeforeScheduleSession] = useState<{ sessionId: number; visit: Visit } | null>(null);
     const todayDate = new Date();
     const today = todayDate.toISOString().split('T')[0];
     const tomorrow = new Date(todayDate);
     tomorrow.setDate(tomorrow.getDate() + 1);
     const minScheduleDate = (usePage().props as Props).today_unavailable ? tomorrow.toISOString().split('T')[0] : today;
+
+    // Listen for video room close events (from localStorage)
+    useEffect(() => {
+        const handleStorageChange = (e: StorageEvent) => {
+            if (!e.key || !e.key.startsWith('session_refresh_')) return;
+            
+            const sessionId = e.key.replace('session_refresh_', '');
+            const value = e.newValue;
+            
+            if (value === 'ended') {
+                console.log(`Session ${sessionId} ended - refreshing page...`);
+                // Refresh the page to update session status
+                window.location.reload();
+            }
+        };
+
+        window.addEventListener('storage', handleStorageChange);
+        
+        // Cleanup listener on unmount
+        return () => {
+            window.removeEventListener('storage', handleStorageChange);
+        };
+    }, []);
 
     // Inmate search states
     const [isSearchingInmate, setIsSearchingInmate] = useState(false);
@@ -733,6 +775,17 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
                                 className="bg-green-600 hover:bg-green-700 inline-flex gap-2"
                                 title="Join video call"
                                 onClick={() => {
+                                    if (!session) return;
+                                    
+                                    // Check if session has started
+                                    const now = Date.now();
+                                    const scheduledStart = session.scheduled_start ? new Date(session.scheduled_start).getTime() : now;
+                                    
+                                    if (scheduledStart > now) {
+                                        setBeforeScheduleSession({ sessionId: session.id, visit });
+                                        return;
+                                    }
+                                    
                                     setSelectedSessionForVideo({ sessionId: session.id, visit });
                                     setVideoTermsAccepted(false);
                                     setVideoTermsModalOpen(true);
@@ -756,6 +809,17 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
                                     className="bg-green-600 hover:bg-green-700 inline-flex gap-2"
                                     title="Join video call (a reminder will show if it's not yet time)"
                                     onClick={() => {
+                                        if (!session) return;
+                                        
+                                        // Check if session has started
+                                        const now = Date.now();
+                                        const scheduledStart = session.scheduled_start ? new Date(session.scheduled_start).getTime() : now;
+                                        
+                                        if (scheduledStart > now) {
+                                            setBeforeScheduleSession({ sessionId: session.id, visit });
+                                            return;
+                                        }
+                                        
                                         setSelectedSessionForVideo({ sessionId: session.id, visit });
                                         setVideoTermsAccepted(false);
                                         setVideoTermsModalOpen(true);
@@ -955,18 +1019,50 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
                                     if (!selectedSessionForVideo) return;
                                     const sessionId = selectedSessionForVideo.sessionId;
                                     setAcceptingTerms(true);
-                                    router.post(`/visit/session/${sessionId}/accept-terms`, {}, {
-                                        onSuccess: () => {
+                                    
+                                    // Use axios for better CSRF handling
+                                    axios.post(`/visit/session/${sessionId}/accept-terms`, {})
+                                        .then(response => {
+                                            console.log('Terms accepted, opening video room:', response.data);
                                             setVideoTermsModalOpen(false);
                                             setSelectedSessionForVideo(null);
                                             setAcceptingTerms(false);
-                                            router.visit(`/visit/session/${sessionId}`);
-                                        },
-                                        onError: () => setAcceptingTerms(false),
-                                    });
+                                            // Open video room in NEW tab
+                                            if (response.data.video_room_url) {
+                                                window.open(response.data.video_room_url, '_blank');
+                                            } else {
+                                                console.error('No video_room_url in response');
+                                            }
+                                        })
+                                        .catch(error => {
+                                            console.error('Error accepting terms:', error);
+                                            setAcceptingTerms(false);
+                                        });
                                 }}
                             >
                                 {acceptingTerms ? 'Accepting...' : 'Accept and Join'}
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+
+                {/* Session Not Started Yet Modal */}
+                <Dialog open={!!beforeScheduleSession} onOpenChange={(open) => !open && setBeforeScheduleSession(null)}>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Session not started yet</DialogTitle>
+                            <DialogDescription>
+                                {beforeScheduleSession?.visit.visit_session?.scheduled_start
+                                    ? `This session starts in ${formatTimeUntil(beforeScheduleSession.visit.visit_session.scheduled_start)}. You can wait and try again when it's time, or cancel.`
+                                    : 'This session has not started yet.'}
+                            </DialogDescription>
+                        </DialogHeader>
+                        <DialogFooter>
+                            <Button variant="outline" onClick={() => setBeforeScheduleSession(null)}>
+                                Wait
+                            </Button>
+                            <Button variant="secondary" onClick={() => setBeforeScheduleSession(null)}>
+                                Cancel
                             </Button>
                         </DialogFooter>
                     </DialogContent>

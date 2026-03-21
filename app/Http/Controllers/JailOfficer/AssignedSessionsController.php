@@ -306,7 +306,14 @@ class AssignedSessionsController extends Controller
             return redirect()->route('jail-officer.assigned-sessions.index')
                 ->with('error', 'This session has ended.');
         }
-        if (! $session->isWithinSchedule() && $session->status !== 'active') {
+        
+        // Check if session time has expired (even if status is still "active")
+        if (! $session->isWithinSchedule()) {
+            return redirect()->route('jail-officer.assigned-sessions.index')
+                ->with('error', 'This session has ended. You can only join during the scheduled time.');
+        }
+        
+        if ($session->status !== 'active' && ! $session->isWithinScheduleForTunnel()) {
             return redirect()->route('jail-officer.assigned-sessions.index')
                 ->with('error', 'You can only join during the scheduled window or when the session is active.');
         }
@@ -320,13 +327,25 @@ class AssignedSessionsController extends Controller
 
         $participantId = 'jail-officer-'.$request->user()->id.'-'.$session->id;
 
-        // Use embedded VideoRoom for both v1 and v2 to ensure proper token handling
+        // Generate token like VideoRoomController does
+        $videoSdk = new VideoSdkService;
+        $result = $videoSdk->generateJoinTokenForPrebuiltApp($session->room_id, $participantId, ['allow_join'], 120);
+        
+        if (! ($result['success'] ?? false) || empty($result['token'])) {
+            return redirect()->route('jail-officer.assigned-sessions.index')
+                ->with('error', 'Failed to generate video room token.');
+        }
+        
+        $token = preg_replace('/^Bearer\s+/i', '', (string) $result['token']);
+        $token = trim($token);
+
         return view('visitor.video-room', [
             'session'            => $session,
             'room_id'            => $session->room_id,
             'participant_name'   => $request->user()->name ?? 'Jail Officer',
             'participant_id'     => $participantId,
             'is_observer'        => true,
+            'scheduled_end'      => $session->scheduled_end?->format('Y-m-d H:i:s'),
         ]);
     }
 }

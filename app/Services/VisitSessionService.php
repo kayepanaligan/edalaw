@@ -28,7 +28,10 @@ class VisitSessionService
         }
 
         $scheduledStart = $this->parseSlotStart($visit->scheduled_date, $visit->scheduled_time);
-        $scheduledEnd = $scheduledStart->copy()->addHour();
+        
+        // Get duration from TimeSlotCapacity based on scheduled time
+        $durationMinutes = $this->getDurationForTime($scheduledStart, $visit->visit_type->value);
+        $scheduledEnd = $scheduledStart->copy()->addMinutes($durationMinutes);
 
         $session = VisitSession::create([
             'visit_id' => $visit->id,
@@ -61,7 +64,10 @@ class VisitSessionService
         $dateStr = $eburol->wake_start_date->format('Y-m-d');
         $timeStr = $eburol->preferred_time ?: '08:00';
         $scheduledStart = Carbon::parse($dateStr.' '.$timeStr, $tz);
-        $scheduledEnd = $scheduledStart->copy()->addHour();
+        
+        // Get duration from TimeSlotCapacity based on scheduled time
+        $durationMinutes = $this->getDurationForTime($scheduledStart, 'virtual');
+        $scheduledEnd = $scheduledStart->copy()->addMinutes($durationMinutes);
 
         $session = VisitSession::create([
             'visit_id' => null,
@@ -94,6 +100,27 @@ class VisitSessionService
         $timeNormalized = sprintf('%02d:%02d', $h, $m);
 
         return Carbon::parse($dateStr.' '.$timeNormalized, config('app.timezone'));
+    }
+
+    /**
+     * Get duration minutes for a given time based on TimeSlotCapacity settings.
+     */
+    private function getDurationForTime(Carbon $scheduledStart, string $visitType): int
+    {
+        // Find the TimeSlotCapacity record that matches this time
+        $timeSlot = $scheduledStart->format('H:i');
+        
+        $capacity = \App\Models\TimeSlotCapacity::where('visit_type', $visitType)
+            ->where('time_slot', '<=', $timeSlot)
+            ->orderBy('time_slot', 'desc')
+            ->first();
+        
+        // If no specific capacity found, get default from first record or use fallback
+        if (! $capacity) {
+            $capacity = \App\Models\TimeSlotCapacity::where('visit_type', $visitType)->first();
+        }
+        
+        return $capacity?->duration_minutes ?? ($visitType === 'virtual' ? 20 : 30);
     }
 
     /**
