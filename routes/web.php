@@ -83,6 +83,9 @@ Route::get('inmate/join/{token}', [\App\Http\Controllers\InmateTunnelController:
     ->name('inmate.join');
 Route::get('inmate/join/{token}/token', [\App\Http\Controllers\InmateTunnelController::class, 'getInmateToken'])
     ->name('inmate.token');
+Route::get('inmate/tunnel-already-used', [\App\Http\Controllers\InmateTunnelController::class, 'tunnelAlreadyUsed'])
+    ->name('inmate.tunnel-already-used');
+
 Route::get('inmate/chat', [\App\Http\Controllers\InmateTunnelController::class, 'listChat'])
     ->name('inmate.chat.list');
 Route::post('inmate/chat', [\App\Http\Controllers\InmateTunnelController::class, 'sendChat'])

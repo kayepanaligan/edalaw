@@ -98,12 +98,21 @@ class InmateTunnelController extends Controller
         if (!$tunnel) {
             abort(404, 'Invalid or expired link.');
         }
+        
+        // Check if tunnel has already been used
+        if ($tunnel->is_used) {
+            return redirect()->route('inmate.tunnel-already-used');
+        }
+        
         if (!$tunnel->isValid()) {
             abort(404, 'This link has expired or has already been used.');
         }
 
         $session = $tunnel->visitSession;
         
+        // Mark tunnel as used immediately to prevent reuse
+        $tunnel->update(['is_used' => true]);
+
         // Check if session is within schedule
         if (!$session->isWithinSchedule()) {
             $tz = config('app.timezone');
@@ -308,5 +317,13 @@ class InmateTunnelController extends Controller
             ]);
 
         return response()->json(['messages' => $messages, 'chat_locked' => (bool) $session->chat_locked]);
+    }
+
+    /**
+     * Show tunnel already used error page.
+     */
+    public function tunnelAlreadyUsed(): View
+    {
+        return view('errors.inmate-tunnel-already-used');
     }
 }
