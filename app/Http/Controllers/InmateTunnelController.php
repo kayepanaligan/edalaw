@@ -220,6 +220,7 @@ class InmateTunnelController extends Controller
                     'title' => 'Session not started yet',
                     'schedule_window' => $scheduleWindow,
                     'time_until_active' => $timeUntilActive,
+                    'tunnel_token' => $tunnel->tunnel_token, // Pass the tunnel token for redirect
                     'session_id' => $session->id,
                     'session' => $session, // Pass the session object for the countdown timer
                 ]);

@@ -131,7 +131,10 @@ class TunnelBypassController extends Controller
         }
 
         // OTP verified - proceed with bypass
-        return DB::transaction(function () use ($token, $tunnel, $session) {
+        $ipAddress = $request->ip();
+        $userAgent = $request->userAgent();
+        
+        return DB::transaction(function () use ($token, $tunnel, $session, $ipAddress, $userAgent) {
             // Reset the tunnel to unused state
             $tunnel->update([
                 'is_used' => false,
@@ -154,8 +157,8 @@ class TunnelBypassController extends Controller
                     'previous_state' => 'used',
                     'new_state' => 'unused',
                     'verification_method' => 'sms_otp',
-                    'ip_address' => $request->ip(),
-                    'user_agent' => $request->userAgent(),
+                    'ip_address' => $ipAddress,
+                    'user_agent' => $userAgent,
                 ],
             ]);
 

@@ -142,10 +142,25 @@ class ScheduleController extends Controller
                 ->toArray();
         }
 
+        // Check if today is unavailable based on virtual visit operating hours
+        $virtualSettings = \App\Models\TimeSlotCapacity::where('visit_type', 'virtual')->first();
+        $virtualEndTime = $virtualSettings?->end_time?->format('H:i') ?? '22:00';
+        
+        // Calculate cutoff time (when last slot starts for virtual visits)
+        [$endHour, $endMinute] = explode(':', $virtualEndTime);
+        $durationMinutes = $virtualSettings?->duration_minutes ?? 20;
+        $endMinutesTotal = ((int)$endHour) * 60 + (int)$endMinute;
+        $lastSlotStartMinutes = $endMinutesTotal - $durationMinutes;
+        $lastSlotHour = intdiv($lastSlotStartMinutes, 60);
+        $lastSlotMinute = $lastSlotStartMinutes % 60;
+        $dayCutoff = sprintf('%02d:%02d', $lastSlotHour, $lastSlotMinute);
+        
+        $todayUnavailable = now()->format('H:i') > $dayCutoff;
+        
         return Inertia::render('Visitor/ScheduleManagement', [
             'visits' => $visits,
             'bookedTimeSlots' => $bookedTimeSlots,
-            'today_unavailable' => now()->format('H:i') >= '21:50',
+            'today_unavailable' => $todayUnavailable,
         ]);
     }
 

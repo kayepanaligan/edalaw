@@ -208,7 +208,9 @@
                     Go to Homepage
                 </a>
                 @if(request('token'))
-                    <a href="/inmate/join/{{ request('token') }}" class="btn btn-primary">
+                    <a href="/inmate/join/{{ request('token') }}" 
+                       class="btn btn-primary" 
+                       onclick="handleJoinClick(event)">
                         Try Joining Again
                     </a>
                 @endif
@@ -244,6 +246,27 @@
             );
             
             window.location.href = `mailto:${adminEmail}?subject=${subject}&body=${body}`;
+        }
+        
+        // Prevent rapid clicking on join button to avoid rate limiting
+        let joinClickCount = 0;
+        let lastClickTime = 0;
+        
+        function handleJoinClick(event) {
+            const now = Date.now();
+            const timeSinceLastClick = now - lastClickTime;
+            
+            // Allow first click, or clicks more than 2 seconds apart
+            if (joinClickCount === 0 || timeSinceLastClick > 2000) {
+                joinClickCount++;
+                lastClickTime = now;
+                return true; // Allow the click
+            } else {
+                // Too many rapid clicks
+                event.preventDefault();
+                alert('Please wait a moment before clicking again. Too many rapid requests may temporarily block access.');
+                return false;
+            }
         }
     </script>
 </body>

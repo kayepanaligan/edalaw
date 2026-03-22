@@ -162,7 +162,8 @@ Route::get('/video/chat/history/{roomId}', [App\Http\Controllers\VideoChatContro
 Route::get('/video/chat/sync/{sessionId}', [App\Http\Controllers\VideoChatController::class, 'syncFromCloud']);
 Route::get('/video/chat/export/{sessionId}', [App\Http\Controllers\VideoChatController::class, 'exportChat'])->name('video.chat.export');
 
-// Chat Message Flagging (jail officer only)
+// Chat Message Flagging (jail officer only) - FOR MONITORING SESSIONS ONLY
+// Note: For visit session chat flagging, use: /visit/session/{session}/chat/{chatLog}/flag
 Route::post('/video/chat/{session}/messages/{message}/flag', [App\Http\Controllers\ChatMessageFlagController::class, 'flag'])
     ->name('video.chat.messages.flag');
 

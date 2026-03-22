@@ -55,6 +55,7 @@
     
     <script>
         const sessionId = '{{ $session_id ?? "" }}';
+        const tunnelToken = '{{ $tunnel_token ?? "" }}'; // Get the tunnel token from the view data
         const checkInterval = 30000; // Check every 30 seconds
         let countdownInterval;
         
@@ -65,13 +66,13 @@
                 const data = await response.json();
                 
                 if (data.ready) {
-                    // Session is ready - redirect to video room
+                    // Session is ready - redirect to video room using tunnel token
                     document.getElementById('loading-spinner').classList.remove('hidden');
                     document.getElementById('waiting-message').classList.add('hidden');
                     document.getElementById('countdown-container').classList.add('hidden');
                     
                     setTimeout(() => {
-                        window.location.href = `/inmate/join/${sessionId}`;
+                        window.location.href = `/inmate/join/${tunnelToken}`;
                     }, 1000);
                 }
             } catch (error) {
