@@ -2,10 +2,12 @@
 
 namespace App\Services;
 
+use App\Exceptions\InsufficientSmsBalanceException;
 use App\Models\OtpVerification;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -61,6 +63,23 @@ class OtpService
             ]);
 
             return ['success' => false, 'error' => 'Unable to send OTP. Please try again or contact support.'];
+        } catch (RequestException $e) {
+            // Handle HTTP errors (4xx/5xx responses)
+            $response = $e->response;
+            Log::error('Semaphore SMS failed', [
+                'status' => $response->status(),
+                'body' => $response->body(),
+            ]);
+
+            // Check for insufficient balance error
+            $responseData = $response->json();
+            $errorMessage = is_array($responseData) ? json_encode($responseData) : $response->body();
+            
+            if (str_contains($errorMessage, 'balance') && str_contains($errorMessage, 'not sufficient')) {
+                throw new InsufficientSmsBalanceException('Insufficient SMS balance. Please add credits to your Semaphore account.');
+            }
+
+            return ['success' => false, 'error' => 'Failed to send OTP via SMS. Please try again.'];
         }
 
         if (! $response->successful()) {
@@ -68,6 +87,14 @@ class OtpService
                 'status' => $response->status(),
                 'body' => $response->body(),
             ]);
+
+            // Check for insufficient balance error
+            $responseData = $response->json();
+            $errorMessage = is_array($responseData) ? json_encode($responseData) : $response->body();
+            
+            if (str_contains($errorMessage, 'balance') && str_contains($errorMessage, 'not sufficient')) {
+                throw new InsufficientSmsBalanceException('Insufficient SMS balance. Please add credits to your Semaphore account.');
+            }
 
             return ['success' => false, 'error' => 'Failed to send OTP via SMS. Please try again.'];
         }

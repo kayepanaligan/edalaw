@@ -1,6 +1,7 @@
 <?php
 
 use App\Exceptions\ConcurrentLoginAttemptException;
+use App\Exceptions\InsufficientSmsBalanceException;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
 use Illuminate\Foundation\Application;
@@ -53,5 +54,15 @@ return Application::configure(basePath: dirname(__DIR__))
             }
 
             return null;
+        });
+
+        $exceptions->render(function (InsufficientSmsBalanceException $e, $request) {
+            Log::error('SMS Insufficient Balance', [
+                'message' => $e->getMessage(),
+            ]);
+
+            return response()->view('errors.sms-insufficient-balance', [
+                'message' => 'Insufficient SMS balance. Please add funds to your Semaphore account to enable messaging.',
+            ], 503);
         });
     })->create();
