@@ -15,27 +15,24 @@ class VisitSessionCompletionService
      * Call this when a session is ended (by monitor or by scheduled_end).
      *
      * Rules:
-     * - completed: both visitor and inmate joined, and a video recording was saved.
-     * - no_show: at least one party did not join.
-     * - unsuccessful: both joined but recording was not saved.
+     * - completed: ALL participants (visitor AND inmate) joined at least once
+     * - missed: ANY participant never joined (even for a second)
      */
     public function endSessionWithOutcome(
         VisitSession $session,
         string $endReason = 'monitor_ended'
     ): void {
-        $bothJoined = $session->visitor_joined_at && $session->inmate_joined_at;
-        $recordingSaved = $session->recording_status === 'saved'
-            || $session->videoRecordings()->exists();
+        // Check if BOTH visitor and inmate joined at least once
+        $allParticipantsJoined = $session->visitor_joined_at && $session->inmate_joined_at;
 
-        if ($bothJoined && $recordingSaved) {
+        if ($allParticipantsJoined) {
+            // Everyone joined at least once → COMPLETED
             $status = 'completed';
             $sessionEndReason = $endReason;
-        } elseif (! $bothJoined) {
-            $status = 'no_show';
-            $sessionEndReason = 'no_show';
         } else {
-            $status = 'unsuccessful';
-            $sessionEndReason = 'recording_not_saved';
+            // At least one participant never joined → MISSED
+            $status = 'missed';
+            $sessionEndReason = 'participant_no_show';
         }
 
         $session->update([
@@ -46,8 +43,8 @@ class VisitSessionCompletionService
         $this->syncVisitOrEburolStatus($session, $status);
         $this->createVideoCallLogForVisitor($session, $status);
 
-        $actuallyUsed = $bothJoined || $session->chatLogs()->exists();
-        if ($actuallyUsed) {
+        // Mark tunnel as used only if session was actually used (both joined)
+        if ($allParticipantsJoined) {
             InmateTunnel::where('visit_session_id', $session->id)->update(['is_used' => true]);
         }
     }
@@ -79,10 +76,10 @@ class VisitSessionCompletionService
             return;
         }
 
+        // Map session status to call log status
         $callLogStatus = match ($sessionStatus) {
             'completed' => 'completed',
-            'no_show' => 'missed',
-            'unsuccessful' => 'failed',
+            'missed' => 'missed',
             default => 'failed',
         };
 
@@ -93,7 +90,9 @@ class VisitSessionCompletionService
             'call_type' => 'video',
             'call_date' => $session->ended_at ?? now(),
             'duration' => $sessionStatus === 'completed' ? $session->duration_seconds : null,
-            'notes' => $sessionStatus === 'completed' ? 'Virtual visit' : ($sessionStatus === 'no_show' ? 'No show' : 'Unsuccessful (recording not saved)'),
+            'notes' => $sessionStatus === 'completed' 
+                ? 'Virtual visit completed' 
+                : 'Visit missed - participant did not join',
             'status' => $callLogStatus,
         ]);
     }

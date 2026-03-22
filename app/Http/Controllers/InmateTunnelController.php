@@ -104,7 +104,7 @@ class InmateTunnelController extends Controller
             
             // Check if tunnel has already been used
             if ($tunnel->is_used) {
-                return redirect()->route('inmate.tunnel-already-used');
+                return redirect()->route('inmate.tunnel-already-used', ['token' => $tunnel->tunnel_token]);
             }
             
             if (!$tunnel->isValid()) {
@@ -124,7 +124,7 @@ class InmateTunnelController extends Controller
                 // Someone else is trying to join this session right now
                 // Mark tunnel as used to be safe
                 $tunnel->update(['is_used' => true]);
-                return redirect()->route('inmate.tunnel-already-used');
+                return redirect()->route('inmate.tunnel-already-used', ['token' => $tunnel->tunnel_token]);
             }
             
             // Check if inmate has already joined this session (prevent duplicate entries)
@@ -132,7 +132,7 @@ class InmateTunnelController extends Controller
             if ($session->inmate_joined_at) {
                 // Mark tunnel as used to prevent further attempts
                 $tunnel->update(['is_used' => true]);
-                return redirect()->route('inmate.tunnel-already-used');
+                return redirect()->route('inmate.tunnel-already-used', ['token' => $tunnel->tunnel_token]);
             }
             
             // Additional check: verify if visitor is already in the room
@@ -140,7 +140,7 @@ class InmateTunnelController extends Controller
             // If both visitor and inmate have joined, block this attempt
             if ($session->visitor_joined_at && $session->inmate_joined_at) {
                 $tunnel->update(['is_used' => true]);
-                return redirect()->route('inmate.tunnel-already-used');
+                return redirect()->route('inmate.tunnel-already-used', ['token' => $tunnel->tunnel_token]);
             }
             
             // Don't mark as used yet - only mark when inmate actually joins the call
@@ -519,8 +519,10 @@ class InmateTunnelController extends Controller
     /**
      * Show tunnel already used error page.
      */
-    public function tunnelAlreadyUsed(): View
+    public function tunnelAlreadyUsed(Request $request): View
     {
-        return view('errors.inmate-tunnel-already-used');
+        return view('errors.inmate-tunnel-already-used', [
+            'token' => $request->input('token'),
+        ]);
     }
 }

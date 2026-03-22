@@ -177,7 +177,7 @@ export default function Login({
                     </div>
 
                     <div className="text-center text-sm text-muted-foreground">
-                        <TextLink href="/inmate-tunnel">Join as PDL</TextLink>
+                        <TextLink href="/inmate-tunnel">Join Secure Tunnel</TextLink>
                     </div>
                 </form>
             </div>

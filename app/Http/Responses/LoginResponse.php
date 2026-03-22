@@ -39,6 +39,7 @@ class LoginResponse implements LoginResponseContract
             }
         }
 
+        // For jail officers and other roles, use intended URL or default dashboard
         $url = Redirect::intended(route('dashboard'))->getTargetUrl();
 
         return $this->redirectResponse($request, $url);

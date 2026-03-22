@@ -191,18 +191,48 @@
                 </div>
             </div>
             
+            @if(session('error'))
+                <div style="background: #fee2e2; color: #dc2626; padding: 12px 16px; border-radius: 8px; border-left: 4px solid #dc2626; margin-bottom: 24px; font-size: 14px;">
+                    {{ session('error') }}
+                </div>
+            @endif
+            
+            @if(session('success'))
+                <div style="background: #dcfce7; color: #166534; padding: 12px 16px; border-radius: 8px; border-left: 4px solid #16a34a; margin-bottom: 24px; font-size: 14px;">
+                    {{ session('success') }}
+                </div>
+            @endif
+            
             <div class="actions">
                 <a href="/" class="btn btn-secondary">
                     Go to Homepage
                 </a>
-                <button onclick="contactAdmin()" class="btn btn-primary">
-                    Contact Administrator
+                @if(request('token'))
+                    <a href="/inmate/join/{{ request('token') }}" class="btn btn-primary">
+                        Try Joining Again
+                    </a>
+                @endif
+                <button onclick="showBypassForm()" class="btn btn-primary">
+                    Jail Officer Bypass
                 </button>
             </div>
         </div>
     </div>
     
     <script>
+        function showBypassForm() {
+            // Get the tunnel token from URL or session
+            const urlParams = new URLSearchParams(window.location.search);
+            const token = urlParams.get('token') || '';
+            
+            if (token) {
+                // Direct redirect to bypass OTP verification page (no login required)
+                window.location.href = `/jail-officer/tunnel-bypass?token=${encodeURIComponent(token)}`;
+            } else {
+                alert('Tunnel code not available. Please go back and try again.');
+            }
+        }
+        
         function contactAdmin() {
             const adminEmail = 'admin@edalaw.gov.ph';
             const subject = encodeURIComponent('PDL Tunnel Code Issue - Already Used');

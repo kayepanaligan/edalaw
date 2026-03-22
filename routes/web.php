@@ -78,13 +78,25 @@ Route::get('inmate-tunnel', [\App\Http\Controllers\InmateTunnelController::class
 Route::post('inmate-tunnel', [\App\Http\Controllers\InmateTunnelController::class, 'verifyToken'])
     ->name('inmate.verify-token');
 
-// Inmate join (no auth - tunnel token validates access)
-Route::get('inmate/join/{token}', [\App\Http\Controllers\InmateTunnelController::class, 'join'])
-    ->name('inmate.join');
-Route::get('inmate/join/{token}/token', [\App\Http\Controllers\InmateTunnelController::class, 'getInmateToken'])
-    ->name('inmate.token');
+// Inmate join (no auth - tunnel token validates access) - with rate limiting
+Route::middleware('throttle:10,1')->group(function () {
+    Route::get('inmate/join/{token}', [\App\Http\Controllers\InmateTunnelController::class, 'join'])
+        ->name('inmate.join');
+    Route::get('inmate/join/{token}/token', [\App\Http\Controllers\InmateTunnelController::class, 'getInmateToken'])
+        ->name('inmate.token');
+});
 Route::get('inmate/tunnel-already-used', [\App\Http\Controllers\InmateTunnelController::class, 'tunnelAlreadyUsed'])
-    ->name('inmate.tunnel-already-used');
+    ->name('inmate.tunnel-already-used')->middleware('guest');
+
+// Jail officer tunnel bypass (NO auth required - OTP verification is the authentication) - with rate limiting
+Route::middleware('throttle:5,1')->group(function () {
+    Route::get('jail-officer/tunnel-bypass', [\App\Http\Controllers\JailOfficer\TunnelBypassController::class, 'showBypassForm'])
+        ->name('jail-officer.tunnel-bypass.show');
+    Route::post('jail-officer/tunnel-bypass/verify-otp', [\App\Http\Controllers\JailOfficer\TunnelBypassController::class, 'verifyOtp'])
+        ->name('jail-officer.tunnel-bypass.verify-otp');
+    Route::post('jail-officer/tunnel-bypass/resend-otp', [\App\Http\Controllers\JailOfficer\TunnelBypassController::class, 'resendOtp'])
+        ->name('jail-officer.tunnel-bypass.resend-otp');
+});
 
 Route::get('inmate/chat', [\App\Http\Controllers\InmateTunnelController::class, 'listChat'])
     ->name('inmate.chat.list');

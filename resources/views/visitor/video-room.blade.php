@@ -252,9 +252,7 @@ function showMessageActionsMenu(message, messageDiv, event) {
     }, 100);
 }
 
-// Show flag modal
 function showFlagModal(messageId, messageDiv) {
-    // Close any open menus
     const existingMenus = document.querySelectorAll('.message-actions-menu');
     existingMenus.forEach(menu => menu.remove());
     
@@ -281,6 +279,7 @@ function showFlagModal(messageId, messageDiv) {
     `;
     
     const modal = document.createElement('div');
+    
     modal.style.cssText = `
         background: white;
         padding: 32px;
@@ -403,7 +402,6 @@ async function flagMessage(messageId, reason, messageDiv) {
     }
 }
 
-// Scroll to bottom
 function scrollToBottom() {
     const container = document.getElementById('chat-messages');
     if (container) {
@@ -411,7 +409,6 @@ function scrollToBottom() {
     }
 }
 
-// Send message function
 async function sendMessage() {
     console.log("🔵 Sending message...");
     
@@ -667,7 +664,7 @@ const API_KEY = @json(env('VIDEOSDK_API_KEY'));
 const USER_NAME = @json($participant_name ?? 'Guest');
 const SESSION_ID = @json($session->id ?? null);
 const PARTICIPANT_ID = @json($participant_id ?? null);
-const TUNNEL_TOKEN = @json($tunnel?->tunnel_token ?? null); // For inmate tunnels
+const TUNNEL_TOKEN = @json($tunnel?->tunnel_token ?? null); 
 
 function initVideoCall() {
     if (typeof VideoSDKMeeting !== 'function') {
@@ -688,13 +685,11 @@ function initVideoCall() {
     
     try {
         const instance = new VideoSDKMeeting();
-        window.videoMeetingInstance = instance; // Store globally for access
-        
-        // Initialize and store reference
+        window.videoMeetingInstance = instance; 
+   
         instance.init(config);
         console.log("✅ VideoSDK initialized");
-        
-        // Notify server that participant joined
+
         if (SESSION_ID && PARTICIPANT_ID) {
             fetch(`/visit/session/${SESSION_ID}/participant-joined`, {
                 method: 'POST',
@@ -706,8 +701,7 @@ function initVideoCall() {
                 body: JSON.stringify({ participant_id: PARTICIPANT_ID })
             }).catch(err => console.error('Failed to notify participant joined:', err));
         }
-        
-        // For inmate tunnels - mark tunnel as used when actually joining
+       
         if (TUNNEL_TOKEN) {
             fetch(`/inmate/tunnel/${TUNNEL_TOKEN}/token`, {
                 method: 'GET',
@@ -724,9 +718,7 @@ function initVideoCall() {
             .catch(err => console.error('Failed to get inmate token:', err));
         }
         
-        // Listen for meeting left event
         window.addEventListener('beforeunload', function() {
-            // Notify server that participant is leaving
             if (SESSION_ID) {
                 navigator.sendBeacon(`/visit/session/${SESSION_ID}/participant-left`, JSON.stringify({
                     participant_id: PARTICIPANT_ID,
@@ -736,7 +728,7 @@ function initVideoCall() {
         });
         
     } catch (err) {
-        console.error("❌ VideoSDK init failed:", err);
+        console.error("VideoSDK init failed:", err);
     }
 }
 
