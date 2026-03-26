@@ -27,10 +27,10 @@ export default function EnterTunnelToken({ verifyUrl, csrfToken }: Props) {
 
     return (
         <AuthLayout
-            title="Join as inmate"
+            title="Join Secure Tunnel"
             description="Enter the 8-character code you received to join your scheduled visit"
         >
-            <Head title="Join as inmate" />
+            <Head title="Join Secure Tunnel" />
 
             <div className="mx-auto w-full max-w-md">
                 <form
@@ -42,7 +42,7 @@ export default function EnterTunnelToken({ verifyUrl, csrfToken }: Props) {
                     <input type="hidden" name="_token" value={csrfToken} />
                     <div className="grid gap-6 rounded-lg border p-6">
                         <div className="grid gap-2">
-                            <Label htmlFor="token_or_url">Inmate tunnel code</Label>
+                            <Label htmlFor="token_or_url">Secure tunnel code</Label>
                             <Input
                                 id="token_or_url"
                                 name="token_or_url"

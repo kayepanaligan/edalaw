@@ -82,8 +82,10 @@ type Props = {
         total_calls: number;
         incoming_calls: number;
         outgoing_calls: number;
+        video_calls: number;
         completed_calls: number;
         missed_calls: number;
+        failed_calls: number;
     };
     recent_call_logs: RecentCallLog[];
     eburol_stats: {
@@ -526,7 +528,7 @@ export default function VisitorDashboard({
                             </CardDescription>
                         </CardHeader>
                         <CardContent>
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                 <div className="space-y-1">
                                     <p className="text-sm text-muted-foreground">Total Calls</p>
                                     <p className="text-2xl font-bold">{call_logs_stats.total_calls}</p>
@@ -544,9 +546,27 @@ export default function VisitorDashboard({
                                     </p>
                                 </div>
                                 <div className="space-y-1">
+                                    <p className="text-sm text-muted-foreground">Video</p>
+                                    <p className="text-2xl font-bold text-purple-600">
+                                        {call_logs_stats.video_calls}
+                                    </p>
+                                </div>
+                                <div className="space-y-1">
                                     <p className="text-sm text-muted-foreground">Completed</p>
                                     <p className="text-2xl font-bold text-green-500">
                                         {call_logs_stats.completed_calls}
+                                    </p>
+                                </div>
+                                <div className="space-y-1">
+                                    <p className="text-sm text-muted-foreground">Missed</p>
+                                    <p className="text-2xl font-bold text-yellow-500">
+                                        {call_logs_stats.missed_calls}
+                                    </p>
+                                </div>
+                                <div className="space-y-1">
+                                    <p className="text-sm text-muted-foreground">Failed</p>
+                                    <p className="text-2xl font-bold text-red-500">
+                                        {call_logs_stats.failed_calls}
                                     </p>
                                 </div>
                             </div>

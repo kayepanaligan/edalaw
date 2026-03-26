@@ -45,11 +45,16 @@
             <p class="text-sm text-gray-600 mt-2">Redirecting to session...</p>
         </div>
         
+        <div id="error-message" class="hidden mb-6">
+            <p class="text-sm text-red-600">Unable to join session. Please try again.</p>
+        </div>
+        
         <button 
-            onclick="window.location.reload()"
+            onclick="handleRetry()"
+            id="retry-button"
             class="inline-flex items-center justify-center px-6 py-2 border border-transparent text-base font-medium rounded-md text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
         >
-            Refresh Page
+            Try Joining Again
         </button>
     </div>
     
@@ -58,6 +63,49 @@
         const tunnelToken = '{{ $tunnel_token ?? "" }}'; // Get the tunnel token from the view data
         const checkInterval = 30000; // Check every 30 seconds
         let countdownInterval;
+        let isLoading = false;
+        
+        // Handle retry button click
+        async function handleRetry() {
+            if (isLoading) return;
+            isLoading = true;
+            
+            const button = document.getElementById('retry-button');
+            const errorMessage = document.getElementById('error-message');
+            const spinner = document.getElementById('loading-spinner');
+            
+            button.disabled = true;
+            button.classList.add('opacity-50');
+            button.textContent = 'Checking...';
+            errorMessage.classList.add('hidden');
+            spinner.classList.remove('hidden');
+            
+            try {
+                // Check session status first
+                const response = await fetch(`/visit-session/${sessionId}/status`);
+                const data = await response.json();
+                
+                if (data.ready) {
+                    // Session is ready - reload current page instead of redirecting to tunnel URL
+                    // This avoids the "already used" error since we're in the same request context
+                    window.location.reload();
+                } else {
+                    // Session not ready yet - continue waiting
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                }
+            } catch (error) {
+                console.error('Error checking session status:', error);
+                errorMessage.textContent = 'Unable to connect to session. Please check your connection and try again.';
+                errorMessage.classList.remove('hidden');
+                button.disabled = false;
+                button.classList.remove('opacity-50');
+                button.textContent = 'Try Joining Again';
+                spinner.classList.add('hidden');
+                isLoading = false;
+            }
+        }
         
         // Function to check if session is ready
         async function checkSessionStatus() {
@@ -66,13 +114,15 @@
                 const data = await response.json();
                 
                 if (data.ready) {
-                    // Session is ready - redirect to video room using tunnel token
+                    // Session is ready - reload the page to proceed to video room
+                    // Don't use tunnel token redirect as it will show "already used" error
                     document.getElementById('loading-spinner').classList.remove('hidden');
                     document.getElementById('waiting-message').classList.add('hidden');
                     document.getElementById('countdown-container').classList.add('hidden');
                     
                     setTimeout(() => {
-                        window.location.href = `/inmate/join/${tunnelToken}`;
+                        // Reload the current page - the backend will now show video room since schedule check passes
+                        window.location.reload();
                     }, 1000);
                 }
             } catch (error) {

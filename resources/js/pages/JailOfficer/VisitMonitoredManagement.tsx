@@ -210,13 +210,12 @@ export default function VisitMonitoredManagement({ monitoredLogs, stats, filters
                             <TableHeader>
                                 <TableRow>
                                     <TableHead className="w-[50px]"></TableHead>
-                                    <TableHead>Meeting ID</TableHead>
-                                    <TableHead>Session Initiated</TableHead>
+                                    <TableHead>ID</TableHead>
+                                    <TableHead>Date</TableHead>
+                                    <TableHead>Time</TableHead>
                                     <TableHead>Duration</TableHead>
-                                    <TableHead>Unique Participants</TableHead>
-                                    <TableHead>Visitor</TableHead>
-                                    <TableHead>Inmate</TableHead>
                                     <TableHead>Visit Type</TableHead>
+                                    <TableHead>Jail Officer</TableHead>
                                     <TableHead>Status</TableHead>
                                     <TableHead className="text-right">Actions</TableHead>
                                 </TableRow>
@@ -242,13 +241,17 @@ export default function VisitMonitoredManagement({ monitoredLogs, stats, filters
                                                 <ChevronRight className="h-4 w-4 text-muted-foreground" />
                                             </TableCell>
                                             <TableCell className="font-mono font-medium">
-                                                {log.meeting_id}
+                                                #{log.id}
                                             </TableCell>
                                             <TableCell>
                                                 <div className="flex items-center gap-2">
                                                     <Calendar className="h-4 w-4 text-muted-foreground" />
                                                     <span>{new Date(log.session_started_at).toLocaleDateString()}</span>
-                                                    <Clock className="h-4 w-4 text-muted-foreground ml-2" />
+                                                </div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="flex items-center gap-2">
+                                                    <Clock className="h-4 w-4 text-muted-foreground" />
                                                     <span className="text-sm">{new Date(log.session_started_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                                                 </div>
                                             </TableCell>
@@ -256,19 +259,10 @@ export default function VisitMonitoredManagement({ monitoredLogs, stats, filters
                                                 {log.duration}
                                             </TableCell>
                                             <TableCell>
-                                                <div className="flex items-center gap-2">
-                                                    <Users className="h-4 w-4 text-muted-foreground" />
-                                                    <span>{log.unique_participants_count}</span>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell className="max-w-[200px] truncate">
-                                                {log.visitor_name}
-                                            </TableCell>
-                                            <TableCell className="max-w-[200px] truncate">
-                                                {log.inmate_name}
+                                                {getVisitTypeBadge(log.visit_type)}
                                             </TableCell>
                                             <TableCell>
-                                                {getVisitTypeBadge(log.visit_type)}
+                                                {log.jail_officer_name || <span className="text-sm text-muted-foreground">Not assigned</span>}
                                             </TableCell>
                                             <TableCell>
                                                 {getStatusBadge(log.status)}

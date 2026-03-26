@@ -78,8 +78,8 @@ Route::get('inmate-tunnel', [\App\Http\Controllers\InmateTunnelController::class
 Route::post('inmate-tunnel', [\App\Http\Controllers\InmateTunnelController::class, 'verifyToken'])
     ->name('inmate.verify-token');
 
-// Inmate join (no auth - tunnel token validates access) - with rate limiting
-Route::middleware('throttle:10,1')->group(function () {
+// Inmate join (no auth - tunnel token validates access) - with rate limiting and duplicate prevention
+Route::middleware(['throttle:10,1', 'prevent_duplicate_inmate'])->group(function () {
     Route::get('inmate/join/{token}', [\App\Http\Controllers\InmateTunnelController::class, 'join'])
         ->name('inmate.join');
     Route::get('inmate/join/{token}/token', [\App\Http\Controllers\InmateTunnelController::class, 'getInmateToken'])
@@ -114,6 +114,16 @@ Route::get('concurrent-login-warning', function () {
         'loginUrl' => route('login'),
     ]);
 })->name('concurrent-login-warning')->middleware('guest');
+
+// Unblock OTP routes (no auth - for bypassing concurrent login block)
+Route::middleware('guest')->group(function () {
+    Route::get('auth/unblock-otp', [\App\Http\Controllers\Auth\UnblockOTPController::class, 'show'])
+        ->name('unblock-otp.show');
+    Route::post('auth/unblock-otp/send', [\App\Http\Controllers\Auth\UnblockOTPController::class, 'sendOTP'])
+        ->name('unblock-otp.send');
+    Route::post('auth/unblock-otp/verify', [\App\Http\Controllers\Auth\UnblockOTPController::class, 'verify'])
+        ->name('unblock-otp.verify');
+});
 
 // OTP Verification routes (no auth required)
 Route::middleware('guest')->group(function () {
@@ -166,6 +176,14 @@ Route::get('/video/chat/export/{sessionId}', [App\Http\Controllers\VideoChatCont
 // Note: For visit session chat flagging, use: /visit/session/{session}/chat/{chatLog}/flag
 Route::post('/video/chat/{session}/messages/{message}/flag', [App\Http\Controllers\ChatMessageFlagController::class, 'flag'])
     ->name('video.chat.messages.flag');
+
+// Document serving routes (authenticated users with proper authorization)
+Route::get('/documents/user/{path}', [App\Http\Controllers\DocumentController::class, 'serveUserIdDocument'])
+    ->where('path', '.*')
+    ->name('documents.user');
+Route::get('/documents/visit/{path}', [App\Http\Controllers\DocumentController::class, 'serveVisitDocument'])
+    ->where('path', '.*')
+    ->name('documents.visit');
 
 Route::post('/visit-session/save-session-id', [App\Http\Controllers\Visitor\VisitSessionController::class, 'saveSessionId'])->name('visit-session.save-session-id');
 Route::get('/visit-session/{session}/status', [App\Http\Controllers\Visitor\VisitSessionController::class, 'checkStatus'])->name('visit-session.status');

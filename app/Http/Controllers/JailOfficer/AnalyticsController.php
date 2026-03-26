@@ -24,7 +24,10 @@ class AnalyticsController extends Controller
         $groupBy = $request->input('group_by', 'day'); // day, week, month
         $visitType = $request->input('visit_type'); // null = all, visit, eburol
 
-        $baseSessionQuery = VisitSession::where('monitor_id', $user->id);
+        $baseSessionQuery = VisitSession::where('monitor_id', $user->id)
+            ->orWhereHas('visit', function ($q) use ($user) {
+                $q->where('jail_officer_id', $user->id);
+            });
         $this->applyDateFilter($baseSessionQuery, $dateFrom, $dateTo, 'scheduled_start');
 
         if ($visitType === 'visit') {

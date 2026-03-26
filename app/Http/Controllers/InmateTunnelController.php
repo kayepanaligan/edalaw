@@ -102,9 +102,15 @@ class InmateTunnelController extends Controller
                 abort(404, 'Invalid or expired link.');
             }
             
-            // Check if tunnel has already been used
+            // Middleware already checked these, but verify tunnel isn't used
             if ($tunnel->is_used) {
-                return redirect()->route('inmate.tunnel-already-used', ['token' => $tunnel->tunnel_token]);
+                // Allow access if OTP was just verified (redirect from OTP verification page)
+                if (session('otp_verified')) {
+                    session()->forget('otp_verified'); // Clear the flag
+                    // Continue to video room - OTP verification already validated access
+                } else {
+                    return redirect()->route('inmate.tunnel-already-used', ['token' => $tunnel->tunnel_token]);
+                }
             }
             
             if (!$tunnel->isValid()) {
@@ -116,36 +122,12 @@ class InmateTunnelController extends Controller
             // Refresh session data to get latest state
             $session->refresh();
             
-            // Use cache to prevent race conditions - atomic lock for 30 seconds
-            $cacheKey = "inmate_joining_session_{$session->id}";
-            $lockAcquired = cache()->add($cacheKey, true, 30); // 30 seconds lock
-            
-            if (!$lockAcquired) {
-                // Someone else is trying to join this session right now
-                // Mark tunnel as used to be safe
+            // Double-check: if session is already active, block immediately
+            if ($session->inmate_joined_at || $session->visitor_joined_at) {
                 $tunnel->update(['is_used' => true]);
                 return redirect()->route('inmate.tunnel-already-used', ['token' => $tunnel->tunnel_token]);
             }
-            
-            // Check if inmate has already joined this session (prevent duplicate entries)
-            // If inmate_joined_at is set, someone is already in the call using this tunnel
-            if ($session->inmate_joined_at) {
-                // Mark tunnel as used to prevent further attempts
-                $tunnel->update(['is_used' => true]);
-                return redirect()->route('inmate.tunnel-already-used', ['token' => $tunnel->tunnel_token]);
-            }
-            
-            // Additional check: verify if visitor is already in the room
-            // If visitor has joined but inmate hasn't, this is the first inmate
-            // If both visitor and inmate have joined, block this attempt
-            if ($session->visitor_joined_at && $session->inmate_joined_at) {
-                $tunnel->update(['is_used' => true]);
-                return redirect()->route('inmate.tunnel-already-used', ['token' => $tunnel->tunnel_token]);
-            }
-            
-            // Don't mark as used yet - only mark when inmate actually joins the call
-            // This prevents the issue where tunnel shows as used even if inmate hasn't entered
-            
+
             // For virtual visits with assigned jail officer, require OTP verification FIRST
             if ($session->visit_type === 'virtual' && $session->jail_officer_id) {
                 // Generate OTP and send to jail officer
@@ -153,6 +135,10 @@ class InmateTunnelController extends Controller
                 $jailOfficer = $session->jailOfficer;
                 
                 if ($jailOfficer && $jailOfficer->contact_number) {
+                    // CRITICAL: Mark tunnel as used IMMEDIATELY when OTP is sent
+                    // This prevents another browser from accessing while waiting for OTP verification
+                    $tunnel->update(['is_used' => true]);
+                    
                     // Store tunnel token in session for later use
                     session(['inmate_tunnel_token' => $token]);
                     
@@ -173,17 +159,14 @@ class InmateTunnelController extends Controller
                             ],
                         ]);
                         
-                        // Release lock and redirect to OTP verification page
-                        cache()->forget($cacheKey);
+                        // Redirect to OTP verification page
                         return redirect()->route('inmate.tunnel-otp-verify.show', ['token' => $token]);
                     } else {
-                        // OTP sending failed - release lock and show error
-                        cache()->forget($cacheKey);
+                        // OTP sending failed - show error
                         abort(500, 'Failed to send OTP to jail officer. Please try again or contact support.');
                     }
                 } else {
                     // No jail officer contact available
-                    cache()->forget($cacheKey);
                     abort(400, 'Jail officer contact information not available. Cannot proceed with verification.');
                 }
             }
@@ -191,9 +174,6 @@ class InmateTunnelController extends Controller
             // If NOT a virtual visit with JO (e.g., eBürol or no JO assigned), proceed based on schedule
             // Check if session is within schedule
             if (!$session->isWithinSchedule()) {
-                // Release the lock since we're not letting them join
-                cache()->forget($cacheKey);
-                
                 $tz = config('app.timezone');
                 $now = now($tz);
                 $start = $session->scheduled_start->copy()->setTimezone($tz);
@@ -220,21 +200,24 @@ class InmateTunnelController extends Controller
                     'title' => 'Session not started yet',
                     'schedule_window' => $scheduleWindow,
                     'time_until_active' => $timeUntilActive,
-                    'tunnel_token' => $tunnel->tunnel_token, // Pass the tunnel token for redirect
+                    'tunnel_token' => $tunnel->tunnel_token,
                     'session_id' => $session->id,
-                    'session' => $session, // Pass the session object for the countdown timer
+                    'session' => $session,
                 ]);
             }
             
             if ($session->isCompleted()) {
-                // Release the lock
-                cache()->forget($cacheKey);
-                
                 return view('visitor.video-room-ended', [
                     'title' => 'Session ended',
                     'message' => 'This session has ended.',
                     'session_id' => $session->id,
                 ]);
+            }
+
+            // CRITICAL: For non-OTP visits, mark tunnel as used immediately on first access
+            // This prevents another browser from accessing the same link
+            if (!$tunnel->is_used) {
+                $tunnel->update(['is_used' => true]);
             }
 
             // Use the same Blade video-room view as visitors and jail officers
@@ -245,7 +228,7 @@ class InmateTunnelController extends Controller
                 'participant_id' => 'inmate-'.$session->id.'-'.uniqid(),
                 'is_observer' => false,
                 'scheduled_end' => $session->scheduled_end?->format('Y-m-d H:i:s'),
-                'tunnel' => $tunnel, // Pass tunnel so we can mark it used after joining
+                'tunnel' => $tunnel,
             ]);
         });
     }
@@ -304,14 +287,22 @@ class InmateTunnelController extends Controller
             return back()->withErrors(['otp' => 'Invalid or expired OTP. Please contact the assigned jail officer.']);
         }
 
-        // OTP verified - mark tunnel as used and redirect to join page
-        $tunnel->update(['is_used' => true]);
-        
+        // OTP verified - redirect to join page (tunnel will be marked used when actually joining)
         // Clear the session data
         session()->forget('inmate_tunnel_token');
 
-        // Redirect to video room (this will handle lobby/waiting logic)
-        return redirect()->route('inmate.join', ['token' => $token]);
+        // Terminate any existing session for this inmate tunnel (enforce one-session-only)
+        // This ensures if someone was already in the call, they get kicked out
+        if ($session->inmate_joined_at) {
+            // Delete all other sessions except current one from cache/database
+            // This will force the other browser to show "Tunnel Already Used" on next action
+            cache()->forget("inmate_session_{$session->id}");
+        }
+
+        // Redirect to video room with a flag indicating OTP was verified
+        // This allows re-entry even though tunnel shows as used
+        return redirect()->route('inmate.join', ['token' => $token])
+            ->with('otp_verified', true);
     }
 
     /**

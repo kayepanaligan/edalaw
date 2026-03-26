@@ -127,8 +127,8 @@ class OtpService
      */
     public function generateAndSend(User $user, string $type = 'login'): array
     {
-        // For login, require contact number before creating or sending anything
-        if ($type === 'login') {
+        // For login and unblock, require contact number before creating or sending anything
+        if ($type === 'login' || $type === 'unblock') {
             if (empty($user->contact_number) || ! trim((string) $user->contact_number)) {
                 return ['success' => false, 'error' => 'No contact number on file. Please contact support to add your mobile number before logging in.'];
             }
@@ -184,7 +184,7 @@ class OtpService
                 return ['success' => false, 'error' => 'User does not have required contact information'];
             }
         } else {
-            // For login or password_reset OTP, send via Semaphore SMS
+            // For login, unblock, or password_reset OTP, send via Semaphore SMS
             if (! $user->contact_number) {
                 return ['success' => false, 'error' => 'No contact number on file. Please contact support to add your mobile number.'];
             }

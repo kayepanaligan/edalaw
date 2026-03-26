@@ -653,7 +653,6 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
         fetchRescheduleSlotCapacities();
     }, [rescheduleDate, selectedVisitForReschedule]);
 
-    // Define columns for the data table: ID, Date/Time, Visit Type, Access Key, Monitoring Officer, Status, Rejection Reasons, Icon, Actions
     const columns: ColumnDef<Visit>[] = useMemo(() => [
         {
             accessorKey: 'id',
@@ -664,7 +663,7 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
         },
         {
             accessorKey: 'scheduled_date',
-            header: 'Date / Time',
+            header: 'Date / Time', 
             cell: ({ row }) => {
                 const visit = row.original;
                 const { dateLabel, timeLabel } = formatVisitSchedule(
@@ -811,7 +810,6 @@ export default function ScheduleManagement({ visits, bookedTimeSlots = [] }: Pro
                                     onClick={() => {
                                         if (!session) return;
                                         
-                                        // Check if session has started
                                         const now = Date.now();
                                         const scheduledStart = session.scheduled_start ? new Date(session.scheduled_start).getTime() : now;
                                         

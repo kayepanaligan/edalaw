@@ -1,5 +1,5 @@
 import { Link, usePage } from '@inertiajs/react';
-import { AlertTriangle, BarChart3, Bell, Calendar, CalendarCheck, FileText, LayoutGrid, Link2, MessageSquare, Phone, Scale, Shield, Users, Heart, Monitor, Video, Camera, Flag, Settings, Sliders, Film, MessageCircle, Building, Clock } from 'lucide-react';
+import { AlertTriangle, BarChart3, Bell, Calendar, CalendarCheck, FileText, LayoutGrid, Link2, MessageSquare, Phone, Scale, Shield, Users, Heart, Monitor, Video, Camera, Flag, Settings, Sliders, Film, MessageCircle, Building, Clock, Archive } from 'lucide-react';
 
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
@@ -376,11 +376,11 @@ export function AppSidebar() {
                         href: '/jail-officer/eburols',
                         icon: Heart,
                     },
-                    {
-                        title: 'Appeals',
-                        href: '/jail-officer/appeals',
-                        icon: Scale,
-                    },
+                    // {
+                    //     title: 'Appeals',
+                    //     href: '/jail-officer/appeals',
+                    //     icon: Scale,
+                    // },
                 ],
             },
             {
@@ -406,11 +406,11 @@ export function AppSidebar() {
                     //     href: '/jail-officer/session-monitoring',
                     //     icon: Shield,
                     // },
-                    {
-                        title: 'Visit Monitored',
-                        href: '/jail-officer/visits-monitored',
-                        icon: BarChart3,
-                    },
+                    // {
+                    //     title: 'Visit Monitored',
+                    //     href: '/jail-officer/visits-monitored',
+                    //     icon: BarChart3,
+                    // },
                 ],
             },
             {
@@ -424,7 +424,7 @@ export function AppSidebar() {
                     {
                         title: 'Chat Archive',
                         href: '/jail-officer/chat-recordings',
-                        icon: MessageCircle,
+                        icon: Archive,
                     }, 
                     {
                         title: 'Chat Logs',
@@ -432,10 +432,15 @@ export function AppSidebar() {
                         icon: MessageCircle,
                     },
                     {
-                        title: 'History',
-                        href: '/jail-officer/history',
+                        title: 'Audit Logs',
+                        href: '/jail-officer/audit-logs',
                         icon: FileText,
                     },
+                    // {
+                    //     title: 'History',
+                    //     href: '/jail-officer/history',
+                    //     icon: FileText,
+                    // },
                 ],
             },
             {
@@ -460,22 +465,6 @@ export function AppSidebar() {
                         title: 'Inmate Tunnels',
                         href: '/jail-officer/inmate-tunnels',
                         icon: Link2,
-                    },
-                ],
-            },
-            {
-                label: 'Security & Reports',
-                items: [
-                    {
-                        title: 'Incident',
-                        href: '/jail-officer/incidents',
-                        icon: Flag,
-                    },
-                    
-                    {
-                        title: 'Audit Logs',
-                        href: '/jail-officer/audit-logs',
-                        icon: FileText,
                     },
                 ],
             },

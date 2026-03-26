@@ -140,6 +140,14 @@ class VisitSession extends Model
     }
 
     /**
+     * @return HasMany<CallLog>
+     */
+    public function callLogs(): HasMany
+    {
+        return $this->hasMany(CallLog::class);
+    }
+
+    /**
      * @return HasMany<ChatExport>
      */
     public function chatExports(): HasMany

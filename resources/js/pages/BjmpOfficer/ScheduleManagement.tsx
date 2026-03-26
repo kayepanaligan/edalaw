@@ -1,6 +1,6 @@
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 import type { ColumnDef } from '@tanstack/react-table';
-import { Calendar, Video, MoreVertical, Eye, Check, X, RefreshCw, CalendarClock, FileOutput } from 'lucide-react';
+import { Calendar, Video, MoreVertical, Eye, Check, X, RefreshCw, CalendarClock, FileOutput, FileText } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -72,6 +72,8 @@ type Visit = {
     schedule_started?: boolean;
     schedule_ended?: boolean;
     visit_session_id?: number | null;
+    relationship_proof_path: string | null;
+    additional_proof_path: string | null;
 };
 
 type MonitoringOfficer = {
@@ -414,6 +416,60 @@ export default function ScheduleManagement({ visits, stats, monitoringOfficers }
             },
         },
         {
+            id: 'documents',
+            header: 'Supporting Docs',
+            cell: ({ row }) => {
+                const visit = row.original;
+                const hasRelationshipProof = !!visit.relationship_proof_path;
+                const hasAdditionalProof = !!visit.additional_proof_path;
+                
+                if (!hasRelationshipProof && !hasAdditionalProof) {
+                    return <span className="text-sm text-muted-foreground">—</span>;
+                }
+                
+                return (
+                    <div className="flex gap-2">
+                        {hasRelationshipProof && (
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                asChild
+                                title="View Proof of Relationship"
+                            >
+                                <a
+                                    href={`/documents/visit/${visit.relationship_proof_path}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1"
+                                >
+                                    <FileText className="h-3 w-3" />
+                                    <span className="hidden lg:inline">Relationship</span>
+                                </a>
+                            </Button>
+                        )}
+                        {hasAdditionalProof && (
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                asChild
+                                title="View Additional Supporting Document"
+                            >
+                                <a
+                                    href={`/documents/visit/${visit.additional_proof_path}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1"
+                                >
+                                    <FileText className="h-3 w-3" />
+                                    <span className="hidden lg:inline">Additional</span>
+                                </a>
+                            </Button>
+                        )}
+                    </div>
+                );
+            },
+        },
+        {
             id: 'icon',
             header: '',
             cell: ({ row }) => {
@@ -735,6 +791,59 @@ export default function ScheduleManagement({ visits, stats, monitoringOfficers }
                             </DialogDescription>
                         </DialogHeader>
                         <div className="space-y-4">
+                            {/* Uploaded Documents Section */}
+                            {selectedVisit && (selectedVisit.relationship_proof_path || selectedVisit.additional_proof_path) && (
+                                <div className="space-y-3 p-4 border rounded-lg bg-muted/50">
+                                    <h4 className="font-semibold text-sm">Uploaded Supporting Documents</h4>
+                                    
+                                    {selectedVisit.relationship_proof_path && (
+                                        <div className="flex items-center gap-2 p-2 border rounded bg-background">
+                                            <FileText className="h-4 w-4 text-blue-600" />
+                                            <div className="flex-1">
+                                                <p className="text-xs font-medium">Proof of Relationship</p>
+                                            </div>
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                asChild
+                                            >
+                                                <a
+                                                    href={`/documents/visit/${selectedVisit.relationship_proof_path}`}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                >
+                                                    <Eye className="h-3 w-3 mr-1" />
+                                                    View
+                                                </a>
+                                            </Button>
+                                        </div>
+                                    )}
+                                    
+                                    {selectedVisit.additional_proof_path && (
+                                        <div className="flex items-center gap-2 p-2 border rounded bg-background">
+                                            <FileText className="h-4 w-4 text-blue-600" />
+                                            <div className="flex-1">
+                                                <p className="text-xs font-medium">Additional Supporting Document</p>
+                                            </div>
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                asChild
+                                            >
+                                                <a
+                                                    href={`/documents/visit/${selectedVisit.additional_proof_path}`}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                >
+                                                    <Eye className="h-3 w-3 mr-1" />
+                                                    View
+                                                </a>
+                                            </Button>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                            
                             {selectedVisit && selectedVisit.visit_type === 'virtual' && (
                                 <div className="space-y-2">
                                     <Label htmlFor="approve_jail_officer_id">

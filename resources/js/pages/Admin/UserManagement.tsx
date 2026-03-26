@@ -1,6 +1,6 @@
 import { Head, router, useForm } from '@inertiajs/react';
 import type { ColumnDef } from '@tanstack/react-table';
-import { Plus, MoreVertical, Eye, Edit, Trash2, RefreshCw, Circle, X, Check, LogOut } from 'lucide-react';
+import { Plus, MoreVertical, Eye, Edit, Trash2, RefreshCw, Circle, X, Check, LogOut, FileText } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -70,6 +70,8 @@ type User = {
     email_verified_at: string | null;
     created_at: string;
     is_active: boolean;
+    id_document_1_path: string | null;
+    id_document_2_path: string | null;
 };
 
 type Role = {
@@ -497,6 +499,60 @@ export default function UserManagement({ users = [], roles: rolesProp = [] }: Pr
                 cell: ({ row }) => <div>{row.original.postal_code || 'N/A'}</div>,
             },
             {
+                id: 'documents',
+                header: 'ID Documents',
+                cell: ({ row }) => {
+                    const user = row.original;
+                    const hasDoc1 = !!user.id_document_1_path;
+                    const hasDoc2 = !!user.id_document_2_path;
+                    
+                    if (!hasDoc1 && !hasDoc2) {
+                        return <span className="text-sm text-muted-foreground">—</span>;
+                    }
+                    
+                    return (
+                        <div className="flex gap-2">
+                            {hasDoc1 && (
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    asChild
+                                    title="View Proof of Identity 1"
+                                >
+                                    <a
+                                        href={`/documents/user/${user.id_document_1_path}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-1"
+                                    >
+                                        <FileText className="h-3 w-3" />
+                                        <span className="hidden lg:inline">Proof 1</span>
+                                    </a>
+                                </Button>
+                            )}
+                            {hasDoc2 && (
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    asChild
+                                    title="View Proof of Identity 2"
+                                >
+                                    <a
+                                        href={`/documents/user/${user.id_document_2_path}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-1"
+                                    >
+                                        <FileText className="h-3 w-3" />
+                                        <span className="hidden lg:inline">Proof 2</span>
+                                    </a>
+                                </Button>
+                            )}
+                        </div>
+                    );
+                },
+            },
+            {
                 accessorKey: 'email',
                 header: 'Email',
                 cell: ({ row }) => <div className="font-medium">{row.original.email}</div>,
@@ -748,6 +804,69 @@ export default function UserManagement({ users = [], roles: rolesProp = [] }: Pr
                                         readOnly
                                         value={selectedUser.email_verified_at ? new Date(selectedUser.email_verified_at).toLocaleString() : 'N/A'}
                                     />
+                                </div>
+                                
+                                {/* ID Documents Section */}
+                                <div className="space-y-4 pt-4 border-t">
+                                    <h4 className="font-semibold text-base">Uploaded ID Documents</h4>
+                                    
+                                    {selectedUser.id_document_1_path && (
+                                        <div className="space-y-2">
+                                            <Label>Proof of Identity 1</Label>
+                                            <div className="flex items-center gap-2 p-3 border rounded-lg bg-gray-50">
+                                                <FileText className="h-5 w-5 text-blue-600" />
+                                                <div className="flex-1">
+                                                    <p className="text-sm font-medium">Document 1</p>
+                                                    <p className="text-xs text-muted-foreground">Click to view or download</p>
+                                                </div>
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    asChild
+                                                >
+                                                    <a
+                                                        href={`/documents/user/${selectedUser.id_document_1_path}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                    >
+                                                        <Eye className="h-4 w-4 mr-2" />
+                                                        View
+                                                    </a>
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    )}
+                                    
+                                    {selectedUser.id_document_2_path && (
+                                        <div className="space-y-2">
+                                            <Label>Proof of Identity 2</Label>
+                                            <div className="flex items-center gap-2 p-3 border rounded-lg bg-gray-50">
+                                                <FileText className="h-5 w-5 text-blue-600" />
+                                                <div className="flex-1">
+                                                    <p className="text-sm font-medium">Document 2</p>
+                                                    <p className="text-xs text-muted-foreground">Click to view or download</p>
+                                                </div>
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    asChild
+                                                >
+                                                    <a
+                                                        href={`/documents/user/${selectedUser.id_document_2_path}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                    >
+                                                        <Eye className="h-4 w-4 mr-2" />
+                                                        View
+                                                    </a>
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    )}
+                                    
+                                    {!selectedUser.id_document_1_path && !selectedUser.id_document_2_path && (
+                                        <p className="text-sm text-muted-foreground">No documents uploaded</p>
+                                    )}
                                 </div>
                             </div>
                         )}

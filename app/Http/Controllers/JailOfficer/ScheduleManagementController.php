@@ -63,6 +63,8 @@ class ScheduleManagementController extends Controller
                     'schedule_ended' => $scheduleEnded,
                     'visit_session_id' => $latestSession?->id,
                     'scheduled_start' => $latestSession?->scheduled_start?->toIso8601String(),
+                    'relationship_proof_path' => $visit->relationship_proof_path,
+                    'additional_proof_path' => $visit->additional_proof_path,
                 ];
             });
 
@@ -106,7 +108,6 @@ class ScheduleManagementController extends Controller
         \Illuminate\Support\Facades\Log::debug('Jail Officer approve - request data', [
             'visit_id' => $visit->id,
             'visit_type' => $visit->visit_type->value,
-            'request_jail_officer_id' => $request->jail_officer_id,
             'all_request_data' => $request->all(),
         ]);
 
@@ -120,22 +121,17 @@ class ScheduleManagementController extends Controller
                 ->withErrors(['approve' => 'This schedule has passed and could not be approved. The application has been marked as not reviewed. Please ask the visitor to submit a new schedule.']);
         }
 
-        $rules = [
-            'jail_officer_id' => ['nullable', 'exists:users,id'],
-        ];
-        if ($visit->visit_type === VisitType::Virtual) {
-            $rules['jail_officer_id'] = ['required', 'exists:users,id'];
-        }
-        $validated = $request->validate($rules);
+        // Auto-assign the logged-in jail officer as the monitor
+        $jailOfficerId = auth()->id();
 
         \Illuminate\Support\Facades\Log::debug('Jail Officer approve - validation passed', [
-            'validated_data' => $validated,
+            'assigned_jail_officer_id' => $jailOfficerId,
         ]);
 
         $oldJailOfficerId = $visit->jail_officer_id;
         $updateData = [
             'status' => VisitStatus::Approved,
-            'jail_officer_id' => $request->jail_officer_id,
+            'jail_officer_id' => $jailOfficerId,
         ];
 
         $roomId = null;
@@ -255,20 +251,10 @@ class ScheduleManagementController extends Controller
      */
     public function updateStatus(Request $request, Visit $visit): RedirectResponse
     {
-        // Normalize empty or invalid jail_officer_id so validation and update work when changing to pending/rejected
-        $moId = $request->input('jail_officer_id');
-        if ($moId === '' || $moId === null || (is_string($moId) && trim($moId) === '')) {
-            $request->merge(['jail_officer_id' => null]);
-        }
-
         $rules = [
             'status' => 'required|in:pending,approved,rejected,completed,missed,cancelled',
             'rejection_reason' => ['required_if:status,rejected', 'string', 'min:10', 'max:1000'],
-            'jail_officer_id' => ['nullable', 'exists:users,id'],
         ];
-        if ($request->status === 'approved' && $visit->visit_type === VisitType::Virtual) {
-            $rules['jail_officer_id'] = ['required', 'exists:users,id'];
-        }
         $request->validate($rules);
 
         $oldJailOfficerId = $visit->jail_officer_id;
@@ -280,8 +266,9 @@ class ScheduleManagementController extends Controller
             $updateData['rejection_reason'] = null;
         }
 
-        if ($request->status === 'approved' && $request->filled('jail_officer_id')) {
-            $updateData['jail_officer_id'] = $request->jail_officer_id;
+        // Auto-assign the logged-in jail officer when approving
+        if ($request->status === 'approved') {
+            $updateData['jail_officer_id'] = auth()->id();
         } elseif (in_array($request->status, ['rejected', 'pending'], true)) {
             $updateData['jail_officer_id'] = null;
         }

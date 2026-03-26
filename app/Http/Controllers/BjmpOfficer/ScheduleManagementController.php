@@ -62,6 +62,8 @@ class ScheduleManagementController extends Controller
                     'schedule_started' => $scheduleStarted,
                     'schedule_ended' => $scheduleEnded,
                     'visit_session_id' => $latestSession?->id,
+                    'relationship_proof_path' => $visit->relationship_proof_path,
+                    'additional_proof_path' => $visit->additional_proof_path,
                 ];
             });
 

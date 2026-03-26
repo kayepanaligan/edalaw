@@ -165,10 +165,13 @@ class TunnelBypassController extends Controller
             // Clear session data
             session()->forget('tunnel_bypass_token');
 
-            // Redirect back to tunnel already used page with success message and token as query param
-            // The PDL can now click bypass again or try joining normally
-            return redirect()->route('inmate.tunnel-already-used', ['token' => $token])
-                ->with('success', 'Tunnel code has been reset successfully. You may now rejoin the session.');
+            // Set session flag to allow re-entry through middleware
+            session(['otp_verified' => true]);
+
+            // Redirect to inmate join page (NOT to tunnel-already-used page)
+            // This allows the PDL to directly access the video room
+            return redirect()->route('inmate.join', ['token' => $token])
+                ->with('success', 'Identity verified. You may now join the session.');
         });
     }
 

@@ -1,5 +1,5 @@
 import { Head, Link } from '@inertiajs/react';
-import { AlertTriangle, ShieldAlert } from 'lucide-react';
+import { AlertTriangle, ShieldAlert, Unlock } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -40,6 +40,24 @@ export default function ConcurrentLoginWarning({ email, loginUrl = '/login' }: P
                         <p className="text-sm text-muted-foreground">
                             To log in from this device, first log out from the other device or wait for the other session to expire. If you did not try to log in, secure your account and contact support.
                         </p>
+                        
+                        {/* Owner Bypass Section */}
+                        <div className="rounded-lg border border-blue-500/30 bg-blue-500/5 p-4 space-y-3">
+                            <div className="flex items-center gap-2 text-blue-700 dark:text-blue-400">
+                                <Unlock className="h-5 w-5" />
+                                <h3 className="font-semibold">Are you the account owner?</h3>
+                            </div>
+                            <p className="text-sm text-muted-foreground">
+                                Verify your identity via OTP to bypass this block and log in from this device.
+                            </p>
+                            <Button asChild variant="outline" className="w-full border-blue-500/50 text-blue-700 hover:bg-blue-50 dark:border-blue-500/30 dark:text-blue-400 dark:hover:bg-blue-950/30">
+                                <Link href={`/auth/unblock-otp${email ? `?email=${encodeURIComponent(email)}` : ''}`}>
+                                    <Unlock className="mr-2 h-4 w-4" />
+                                    Verify with OTP (Owner Bypass)
+                                </Link>
+                            </Button>
+                        </div>
+                        
                         <Button asChild className="w-full">
                             <Link href={loginUrl}>Back to login</Link>
                         </Button>

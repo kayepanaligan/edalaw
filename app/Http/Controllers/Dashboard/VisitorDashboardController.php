@@ -102,11 +102,14 @@ class VisitorDashboardController extends Controller
         $outgoingCalls = CallLog::where('user_id', $userId)
             ->where('call_type', 'outgoing')
             ->count();
+        $videoCalls = CallLog::where('user_id', $userId)
+            ->where('call_type', 'video')
+            ->count();
         $completedCalls = CallLog::where('user_id', $userId)
-            ->where('status', 'completed')
+            ->whereIn('status', ['completed'])
             ->count();
         $missedCalls = CallLog::where('user_id', $userId)
-            ->where('status', 'missed')
+            ->whereIn('status', ['missed'])
             ->count();
         $failedCalls = CallLog::where('user_id', $userId)
             ->whereIn('status', ['failed', 'rejected'])
@@ -219,6 +222,7 @@ class VisitorDashboardController extends Controller
                 'total_calls' => $totalCalls,
                 'incoming_calls' => $incomingCalls,
                 'outgoing_calls' => $outgoingCalls,
+                'video_calls' => $videoCalls,
                 'completed_calls' => $completedCalls,
                 'missed_calls' => $missedCalls,
                 'failed_calls' => $failedCalls,

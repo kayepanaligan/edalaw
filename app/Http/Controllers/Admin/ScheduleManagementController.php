@@ -64,7 +64,6 @@ class ScheduleManagementController extends Controller
                 ];
             });
 
-        // Get all visitors for the create schedule form
         $visitors = User::whereHas('role', function ($query) {
             $query->where('slug', 'visitor');
         })

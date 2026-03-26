@@ -51,6 +51,8 @@ class UserManagementController extends Controller
                     'email_verified_at' => $user->email_verified_at?->format('Y-m-d H:i:s'),
                     'created_at' => $user->created_at->format('Y-m-d H:i:s'),
                     'is_active' => $hasActiveSession,
+                    'id_document_1_path' => $user->id_document_1_path,
+                    'id_document_2_path' => $user->id_document_2_path,
                 ];
             });
 

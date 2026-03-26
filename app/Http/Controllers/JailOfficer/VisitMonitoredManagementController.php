@@ -149,6 +149,25 @@ class VisitMonitoredManagementController extends Controller
             'last_message_at' => $session->chatLogs->max('sent_at'),
         ];
 
+        // Visit-specific data
+        $visitData = null;
+        if ($session->visit) {
+            $visitData = [
+                'id' => $session->visit->id,
+                'visit_type' => $session->visit->visit_type->value,
+                'status' => $session->visit->status->value,
+                'access_key' => $session->visit->access_key,
+                'rejection_reason' => $session->visit->rejection_reason,
+                'relationship_proof_path' => $session->visit->relationship_proof_path,
+                'additional_proof_path' => $session->visit->additional_proof_path,
+                'meeting_link' => $session->visit->meeting_link,
+                'daily_co_room_id' => $session->visit->daily_co_room_id,
+                'inmate_token' => $session->visit->inmate_token,
+                'notes' => $session->visit->notes,
+                'jail_officer_name' => $session->visit->jailOfficer?->name ?? null,
+            ];
+        }
+
         $sessionData = [
             'id' => $session->id,
             'meeting_id' => $session->room_id,
@@ -173,6 +192,7 @@ class VisitMonitoredManagementController extends Controller
             'timeline' => $this->buildParticipantTimeline($session),
             'has_chat_logs' => $session->chatLogs->count() > 0,
             'has_recording' => $session->videoRecordings->count() > 0,
+            'visit' => $visitData,
         ];
 
         return Inertia::render('JailOfficer/VisitMonitoredSessionDetails', [

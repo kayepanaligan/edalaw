@@ -231,7 +231,7 @@ export default function Analytics({
                 </div>
 
                 {/* (1) Overview Cards */}
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                             <CardTitle className="text-sm font-medium">Active Sessions</CardTitle>
@@ -262,94 +262,9 @@ export default function Analytics({
                             <p className="text-xs text-muted-foreground">Inmate links generated</p>
                         </CardContent>
                     </Card>
-                    <Card>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium">Recording Now</CardTitle>
-                            <Radio className="h-4 w-4 text-muted-foreground" />
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold">{overviewCards.currently_recording}</div>
-                            <p className="text-xs text-muted-foreground">Sessions recording</p>
-                        </CardContent>
-                    </Card>
                 </div>
 
-                {/* (10) Compliance Summary */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Compliance Summary</CardTitle>
-                        <CardDescription>% of completed sessions with at least one recording</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="flex items-baseline gap-2">
-                            <span className="text-3xl font-bold">{compliance.percent}%</span>
-                            <span className="text-muted-foreground">
-                                ({compliance.sessions_with_recording} of {compliance.completed_total} completed)
-                            </span>
-                        </div>
-                    </CardContent>
-                </Card>
 
-                <div className="grid gap-6 lg:grid-cols-2">
-                    {/* (2) Visit Volume Over Time */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
-                                <BarChart3 className="h-5 w-5" />
-                                Visit Volume Over Time
-                            </CardTitle>
-                            <CardDescription>By type (visit vs e-burol)</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="h-72">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <LineChart data={volumeChartData}>
-                                        <XAxis dataKey="period" tick={{ fontSize: 11 }} />
-                                        <YAxis tick={{ fontSize: 11 }} />
-                                        <Tooltip />
-                                        <Legend />
-                                        <Line type="monotone" dataKey="Visit" stroke="#3b82f6" strokeWidth={2} dot={false} />
-                                        <Line type="monotone" dataKey="E-Burol" stroke="#22c55e" strokeWidth={2} dot={false} />
-                                    </LineChart>
-                                </ResponsiveContainer>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    {/* (3) Session Status Distribution */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
-                                <PieChartIcon className="h-5 w-5" />
-                                Session Status Distribution
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="h-72">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <PieChart>
-                                        <Pie
-                                            data={statusPieData}
-                                            dataKey="value"
-                                            nameKey="name"
-                                            cx="50%"
-                                            cy="50%"
-                                            innerRadius={60}
-                                            outerRadius={90}
-                                            paddingAngle={2}
-                                            label={({ name, value }) => `${name}: ${value}`}
-                                        >
-                                            {statusPieData.map((entry, i) => (
-                                                <Cell key={i} fill={entry.color} />
-                                            ))}
-                                        </Pie>
-                                        <Tooltip />
-                                    </PieChart>
-                                </ResponsiveContainer>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
 
                 <div className="grid gap-6 lg:grid-cols-2">
                     {/* (4) Call Duration Analysis */}
@@ -375,56 +290,36 @@ export default function Analytics({
                         </CardContent>
                     </Card>
 
-                    {/* (5) Flagged Messages Trend */}
+                    {/* (5) Call Duration by Type */}
                     <Card>
                         <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
-                                <MessageSquare className="h-5 w-5" />
-                                Flagged Messages Trend
-                            </CardTitle>
-                            <CardDescription>Auto vs manual flags</CardDescription>
+                            <CardTitle>Call Duration (minutes) by Type</CardTitle>
+                            <CardDescription>Avg, min, max per type</CardDescription>
                         </CardHeader>
                         <CardContent>
                             <div className="h-72">
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <LineChart data={flaggedTrend}>
-                                        <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+                                    <BarChart data={durationByType.map((d) => ({
+                                        typ: d.typ,
+                                        'Avg (min)': Math.round(d.avg_sec / 60),
+                                        'Min (min)': Math.round(d.min_sec / 60),
+                                        'Max (min)': Math.round(d.max_sec / 60),
+                                    }))}>
+                                        <XAxis dataKey="typ" tick={{ fontSize: 10 }} />
                                         <YAxis tick={{ fontSize: 11 }} />
                                         <Tooltip />
                                         <Legend />
-                                        <Line type="monotone" dataKey="auto" name="Auto" stroke="#ef4444" strokeWidth={2} dot={false} />
-                                        <Line type="monotone" dataKey="manual" name="Manual" stroke="#eab308" strokeWidth={2} dot={false} />
-                                    </LineChart>
+                                        <Bar dataKey="Avg (min)" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                                        <Bar dataKey="Min (min)" fill="#94a3b8" radius={[4, 4, 0, 0]} />
+                                        <Bar dataKey="Max (min)" fill="#eab308" radius={[4, 4, 0, 0]} />
+                                    </BarChart>
                                 </ResponsiveContainer>
                             </div>
                         </CardContent>
                     </Card>
                 </div>
 
-                {/* (7) Recording Storage Summary */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <Video className="h-5 w-5" />
-                            Recording Storage Summary
-                        </CardTitle>
-                        <CardDescription>Total recordings and cumulative duration in date range</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="flex gap-8">
-                            <div>
-                                <p className="text-sm text-muted-foreground">Total recordings</p>
-                                <p className="text-2xl font-bold">{recordingSummary.total_count}</p>
-                            </div>
-                            <div>
-                                <p className="text-sm text-muted-foreground">Cumulative duration</p>
-                                <p className="text-2xl font-bold">{recordingSummary.total_duration_hours} hours</p>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                {/* (8) Chat Activity Heatmap */}
+                {/* (6) Chat Activity Heatmap */}
                 <Card>
                     <CardHeader>
                         <CardTitle>Chat Activity by Hour</CardTitle>
@@ -453,7 +348,7 @@ export default function Analytics({
                     </CardContent>
                 </Card>
 
-                {/* (6) Violations & Terminations Table */}
+                {/* (7) Violations & Terminations Table */}
                 <Card>
                     <CardHeader>
                         <CardTitle>Violations & Terminations</CardTitle>
@@ -464,7 +359,7 @@ export default function Analytics({
                     </CardContent>
                 </Card>
 
-                {/* (9) Monitor Enforcement Activity Log */}
+                {/* (8) Monitor Enforcement Activity Log */}
                 <Card>
                     <CardHeader>
                         <CardTitle>Enforcement Activity Log</CardTitle>

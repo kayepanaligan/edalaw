@@ -1,6 +1,6 @@
-import { Head, router, useForm, usePage } from '@inertiajs/react';
+﻿import { Head, router, useForm, usePage } from '@inertiajs/react';
 import type { ColumnDef } from '@tanstack/react-table';
-import { Calendar, Video, MoreVertical, Eye, Check, X, RefreshCw, CalendarClock, FileOutput } from 'lucide-react';
+import { Calendar, Video, MoreVertical, Eye, Check, X, RefreshCw, CalendarClock, FileOutput, FileText } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -72,6 +72,11 @@ type Visit = {
     schedule_started?: boolean;
     schedule_ended?: boolean;
     visit_session_id?: number | null;
+    scheduled_start?: string | null;
+    relationship_proof_path: string | null;
+    additional_proof_path: string | null;
+    inmate_token?: string | null;
+    daily_co_room_id?: string | null;
 };
 
 type MonitoringOfficer = {
@@ -237,24 +242,14 @@ export default function ScheduleManagement({ visits, stats, monitoringOfficers }
             return;
         }
 
-        if (selectedVisit.visit_type === 'virtual' && !approveForm.data.jail_officer_id) {
-            toast.error('Please select a jail officer for this virtual visit.');
-            return;
-        }
-
+        // No need to validate jail_officer_id - backend will auto-assign the logged-in user
         const payload: { jail_officer_id?: string } = {};
-        // Always send jail_officer_id if selected (required for virtual, optional for physical)
-        if (approveForm.data.jail_officer_id) {
-            payload.jail_officer_id = approveForm.data.jail_officer_id;
-        }
         
         // Debug logging
         console.log('Approving visit:', {
             visitId: selectedVisit.id,
             visitType: selectedVisit.visit_type,
-            jailOfficerId: approveForm.data.jail_officer_id,
             payload: payload,
-            monitoringOfficers: monitoringOfficers,
         });
         router.post(`/jail-officer/schedules/${selectedVisit.id}/approve`, payload, {
             preserveScroll: true,
@@ -306,12 +301,7 @@ export default function ScheduleManagement({ visits, stats, monitoringOfficers }
             }
         }
 
-        if (statusForm.data.status === 'approved' && selectedVisit.visit_type === 'virtual') {
-            if (!statusForm.data.jail_officer_id) {
-                toast.error('Please select the jail officer responsible for this virtual visit.');
-                return;
-            }
-        }
+        // No need to validate jail_officer_id - backend will auto-assign the logged-in user when approving
 
         statusForm.post(`/jail-officer/schedules/${selectedVisit.id}/update-status`, {
             preserveScroll: true,
@@ -370,7 +360,7 @@ export default function ScheduleManagement({ visits, stats, monitoringOfficers }
         {
             accessorKey: 'scheduled_date',
             header: 'Date / Time',
-            cell: ({ row }) => {
+            cell: ({ row }) => { 
                 const visit = row.original;
                 const { dateLabel, timeLabel } = formatVisitSchedule(
                     visit.scheduled_date,
@@ -378,7 +368,7 @@ export default function ScheduleManagement({ visits, stats, monitoringOfficers }
                     visit.visit_type
                 );
                 return (
-                    <div className="space-y-1">
+                    <div className="space-y-1 w-[150px]">
                         <div className="font-medium">{dateLabel}</div>
                         <div className="text-sm text-muted-foreground">{timeLabel}</div>
                     </div>
@@ -402,7 +392,7 @@ export default function ScheduleManagement({ visits, stats, monitoringOfficers }
             accessorKey: 'inmate_name',
             header: 'Inmate',
             cell: ({ row }) => (
-                <div className="font-medium">{row.original.inmate_name}</div>
+                <div className="font-medium w-[200px]">{row.original.inmate_name}</div>
             ),
         },
         {
@@ -425,7 +415,7 @@ export default function ScheduleManagement({ visits, stats, monitoringOfficers }
                         </code>
                     );
                 }
-                return <span className="text-sm text-muted-foreground">—</span>;
+                return <span className="text-sm text-muted-foreground">â€”</span>;
             },
         },
         {
@@ -434,12 +424,12 @@ export default function ScheduleManagement({ visits, stats, monitoringOfficers }
             cell: ({ row }) => {
                 const visit = row.original;
                 if (visit.visit_type === 'physical') {
-                    return <span className="text-sm text-muted-foreground">Not applicable</span>;
+                    return <div className="text-sm text-muted-foreground w-[200px]">Not applicable</div>;
                 }
                 if (visit.jail_officer_name) {
-                    return <span className="text-sm">{visit.jail_officer_name}</span>;
+                    return <div className="text-sm w-[200px]">{visit.jail_officer_name}</div>;
                 }
-                return <span className="text-sm text-muted-foreground">Not assigned</span>;
+                return <div className="text-sm text-muted-foreground w-[200px]">Not assigned</div>;
             },
         },
         {
@@ -447,101 +437,146 @@ export default function ScheduleManagement({ visits, stats, monitoringOfficers }
             header: 'Status',
             cell: ({ row }) => getStatusBadge(row.original.status),
         },
+        // {
+        //     id: 'rejection_reason',
+        //     header: 'Rejection Reasons',
+        //     cell: ({ row }) => {
+        //         const visit = row.original;
+        //         if (visit.status === 'approved') {
+        //             return <span className="text-sm text-muted-foreground">Application was approved</span>;
+        //         }
+        //         if (visit.status === 'pending') {
+        //             return <span className="text-sm text-muted-foreground">Application was pending</span>;
+        //         }
+        //         if (visit.status === 'rejected' && visit.rejection_reason) {
+        //             return (
+        //                 <p className="max-w-xs text-sm text-destructive">{visit.rejection_reason}</p>
+        //             );
+        //         }
+        //         return <span className="text-sm text-muted-foreground">â€”</span>;
+        //     },
+        // },
         {
-            id: 'rejection_reason',
-            header: 'Rejection Reasons',
+            id: 'documents',
+            header: 'Supporting Docs',
             cell: ({ row }) => {
                 const visit = row.original;
-                if (visit.status === 'approved') {
-                    return <span className="text-sm text-muted-foreground">Application was approved</span>;
-                }
-                if (visit.status === 'pending') {
-                    return <span className="text-sm text-muted-foreground">Application was pending</span>;
-                }
-                if (visit.status === 'rejected' && visit.rejection_reason) {
-                    return (
-                        <p className="max-w-xs text-sm text-destructive">{visit.rejection_reason}</p>
-                    );
-                }
-                return <span className="text-sm text-muted-foreground">—</span>;
-            },
-        },
-        {
-            id: 'icon',
-            header: '',
-            cell: ({ row }) => {
-                const visit = row.original;
-                // Check if schedule has ended
-                const isScheduleEnded = visit.schedule_ended === true;
+                const hasRelationshipProof = !!visit.relationship_proof_path;
+                const hasAdditionalProof = !!visit.additional_proof_path;
                 
-                // Join video call button for approved virtual visits with active sessions
-                if (visit.visit_type === 'virtual' && visit.status === 'approved' && visit.visit_session_id) {
-                    if (isScheduleEnded) {
-                        return (
-                            <Button 
-                                size="sm" 
-                                variant="outline" 
-                                disabled
-                                className="bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
-                                title="Schedule has ended - cannot join"
+                if (!hasRelationshipProof && !hasAdditionalProof) {
+                    return <span className="text-sm text-muted-foreground">â€”</span>;
+                }
+                
+                return (
+                    <div className="flex gap-2">
+                        {hasRelationshipProof && (
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                asChild
+                                title="View Proof of Relationship"
                             >
-                                <Video className="mr-1 h-4 w-4" />
-                                Ended
+                                <a
+                                    href={`/documents/visit/${visit.relationship_proof_path}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1"
+                                >
+                                    <FileText className="h-3 w-3" />
+                                    <span className="hidden lg:inline">Relationship</span>
+                                </a>
                             </Button>
-                        );
-                    }
-                    return (
-                        <Button 
-                            size="sm" 
-                            variant="outline" 
-                            className="bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
-                            onClick={() => {
-                                if (!visit.visit_session_id) return;
-                                
-                                // Check if session has started using backend-calculated flag
-                                if (!visit.schedule_started) {
-                                    setBeforeScheduleVisit(visit);
-                                    return;
-                                }
-                                
-                                // Open video call in new tab
-                                window.open(`/jail-officer/assigned-sessions/${visit.visit_session_id}/join`, '_blank');
-                            }}
-                            title="Join video call in new tab"
-                        >
-                            <Video className="mr-1 h-4 w-4" />
-                            Join
-                        </Button>
-                    );
-                }
-                if (visit.visit_type === 'physical' && visit.status === 'approved') {
-                    return (
-                        <Button size="sm" variant="outline" asChild>
-                            <a
-                                href={`/visits/${visit.id}/proof`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex gap-2"
-                                title="Proof of appointment"
+                        )}
+                        {hasAdditionalProof && (
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                asChild
+                                title="View Additional Supporting Document"
                             >
-                                <FileOutput className="h-4 w-4" />
-                                PDF
-                            </a>
-                        </Button>
-                    );
-                }
-                return <span className="text-sm text-muted-foreground">—</span>;
+                                <a
+                                    href={`/documents/visit/${visit.additional_proof_path}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1"
+                                >
+                                    <FileText className="h-3 w-3" />
+                                    <span className="hidden lg:inline">Additional</span>
+                                </a>
+                            </Button>
+                        )}
+                    </div>
+                );
             },
         },
-        {
-            accessorKey: 'created_at',
-            header: 'Created',
-            cell: ({ row }) => (
-                <div className="text-sm text-muted-foreground">
-                    {new Date(row.original.created_at).toLocaleDateString()}
-                </div>
-            ),
-        },
+        // {
+        //     id: 'icon',
+        //     header: '',
+        //     cell: ({ row }) => {
+        //         const visit = row.original;
+        //         // Check if schedule has ended
+        //         const isScheduleEnded = visit.schedule_ended === true;
+                
+        //         // Join video call button for approved virtual visits with active sessions
+        //         if (visit.visit_type === 'virtual' && visit.status === 'approved' && visit.visit_session_id) {
+        //             if (isScheduleEnded) {
+        //                 return (
+        //                     <Button 
+        //                         size="sm" 
+        //                         variant="outline" 
+        //                         disabled
+        //                         className="bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
+        //                         title="Schedule has ended - cannot join"
+        //                     >
+        //                         <Video className="mr-1 h-4 w-4" />
+        //                         Ended
+        //                     </Button>
+        //                 );
+        //             }
+        //             return (
+        //                 <Button 
+        //                     size="sm" 
+        //                     variant="outline" 
+        //                     className="bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
+        //                     onClick={() => {
+        //                         if (!visit.visit_session_id) return;
+                                
+        //                         // Check if session has started using backend-calculated flag
+        //                         if (!visit.schedule_started) {
+        //                             setBeforeScheduleVisit(visit);
+        //                             return;
+        //                         }
+                                
+        //                         // Open video call in new tab
+        //                         window.open(`/jail-officer/assigned-sessions/${visit.visit_session_id}/join`, '_blank');
+        //                     }}
+        //                     title="Join video call in new tab"
+        //                 >
+        //                     <Video className="mr-1 h-4 w-4" />
+        //                     Join
+        //                 </Button>
+        //             );
+        //         }
+        //         if (visit.visit_type === 'physical' && visit.status === 'approved') {
+        //             return (
+        //                 <Button size="sm" variant="outline" asChild>
+        //                     <a
+        //                         href={`/visits/${visit.id}/proof`}
+        //                         target="_blank"
+        //                         rel="noopener noreferrer"
+        //                         className="inline-flex gap-2"
+        //                         title="Proof of appointment"
+        //                     >
+        //                         <FileOutput className="h-4 w-4" />
+        //                         PDF
+        //                     </a>
+        //                 </Button>
+        //             );
+        //         }
+        //         return <span className="text-sm text-muted-foreground">â€”</span>;
+        //     },
+        // },
         {
             id: 'actions',
             header: 'Actions',
@@ -588,9 +623,6 @@ export default function ScheduleManagement({ visits, stats, monitoringOfficers }
                                         onClick={() => {
                                             setSelectedVisit(visit);
                                             approveForm.reset();
-                                            if (visit.visit_type === 'virtual') {
-                                                approveForm.setData('jail_officer_id', visit.jail_officer_id?.toString() ?? '');
-                                            }
                                             setIsApproveModalOpen(true);
                                         }}
                                     >
@@ -751,11 +783,11 @@ export default function ScheduleManagement({ visits, stats, monitoringOfficers }
                             <div className="flex flex-col gap-3">
                                 <div className="space-y-1">
                                     <Label className="text-muted-foreground">Visitor</Label>
-                                    <Input readOnly value={selectedVisit.visitor_name ?? '—'} className="bg-muted" />
+                                    <Input readOnly value={selectedVisit.visitor_name ?? 'â€”'} className="bg-muted" />
                                 </div>
                                 <div className="space-y-1">
                                     <Label className="text-muted-foreground">Visitor email</Label>
-                                    <Input readOnly value={selectedVisit.visitor_email ?? '—'} className="bg-muted" />
+                                    <Input readOnly value={selectedVisit.visitor_email ?? 'â€”'} className="bg-muted" />
                                 </div>
                                 <div className="space-y-1">
                                     <Label className="text-muted-foreground">Status</Label>
@@ -763,7 +795,7 @@ export default function ScheduleManagement({ visits, stats, monitoringOfficers }
                                 </div>
                                 <div className="space-y-1">
                                     <Label className="text-muted-foreground">Inmate name</Label>
-                                    <Input readOnly value={selectedVisit.inmate_name ?? '—'} className="bg-muted" />
+                                    <Input readOnly value={selectedVisit.inmate_name ?? 'â€”'} className="bg-muted" />
                                 </div>
                                 <div className="space-y-1">
                                     <Label className="text-muted-foreground">Visit type</Label>
@@ -775,11 +807,11 @@ export default function ScheduleManagement({ visits, stats, monitoringOfficers }
                                 </div>
                                 <div className="space-y-1">
                                     <Label className="text-muted-foreground">Scheduled time</Label>
-                                    <Input readOnly value={selectedVisit.scheduled_time ?? '—'} className="bg-muted" />
+                                    <Input readOnly value={selectedVisit.scheduled_time ?? 'â€”'} className="bg-muted" />
                                 </div>
                                 <div className="space-y-1">
                                     <Label className="text-muted-foreground">Notes</Label>
-                                    <Input readOnly value={selectedVisit.notes ?? '—'} className="bg-muted" />
+                                    <Input readOnly value={selectedVisit.notes ?? 'â€”'} className="bg-muted" />
                                 </div>
                                 {selectedVisit.rejection_reason && (
                                     <div className="space-y-1">
@@ -809,36 +841,69 @@ export default function ScheduleManagement({ visits, stats, monitoringOfficers }
                         <DialogHeader>
                             <DialogTitle>Approve Visit Schedule</DialogTitle>
                             <DialogDescription>
-                                Approve this visit schedule. For virtual visits, assign a monitoring officer. The meeting link will be generated automatically.
+                                Review the uploaded documents. When you approve, you will automatically be assigned as the monitoring officer for this session.
                             </DialogDescription>
                         </DialogHeader>
                         <div className="space-y-4">
-                            {selectedVisit && (
-                                <div className="space-y-2">
-                                    <Label htmlFor="jail_officer_id">
-                                        Jail Officer {selectedVisit.visit_type === 'virtual' && <span className="text-destructive">*</span>}
-                                    </Label>
-                                    <Select
-                                        value={approveForm.data.jail_officer_id}
-                                        onValueChange={(value) => approveForm.setData('jail_officer_id', value)}
-                                    >
-                                        <SelectTrigger id="jail_officer_id">
-                                            <SelectValue placeholder="Select jail officer" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {monitoringOfficers.map((officer) => (
-                                                <SelectItem key={officer.id} value={officer.id.toString()}>
-                                                    {officer.name}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                    <InputError message={approveForm.errors.jail_officer_id} />
-                                    <p className="text-xs text-muted-foreground">
-                                        {selectedVisit.visit_type === 'virtual' 
-                                            ? 'The selected officer will oversee this virtual visit and will be notified. A video meeting link is created automatically.'
-                                            : 'The selected officer will be associated with this physical visit for record-keeping purposes.'}
-                                    </p>
+                            {/* Uploaded Documents Section */}
+                            {selectedVisit && (selectedVisit.relationship_proof_path || selectedVisit.additional_proof_path) && (
+                                <div className="space-y-3 p-4 border rounded-lg bg-muted/50">
+                                    <h4 className="font-semibold text-sm">Uploaded Supporting Documents</h4>
+                                    
+                                    {selectedVisit.relationship_proof_path && (
+                                        <div className="flex items-center gap-2 p-2 border rounded bg-background">
+                                            <FileText className="h-4 w-4 text-blue-600" />
+                                            <div className="flex-1">
+                                                <p className="text-xs font-medium">Proof of Relationship</p>
+                                            </div>
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                asChild
+                                            >
+                                                <a
+                                                    href={`/documents/visit/${selectedVisit.relationship_proof_path}`}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                >
+                                                    <Eye className="h-3 w-3 mr-1" />
+                                                    View
+                                                </a>
+                                            </Button>
+                                        </div>
+                                    )}
+                                    
+                                    {selectedVisit.additional_proof_path && (
+                                        <div className="flex items-center gap-2 p-2 border rounded bg-background">
+                                            <FileText className="h-4 w-4 text-blue-600" />
+                                            <div className="flex-1">
+                                                <p className="text-xs font-medium">Additional Supporting Document</p>
+                                            </div>
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                asChild
+                                            >
+                                                <a
+                                                    href={`/documents/visit/${selectedVisit.additional_proof_path}`}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                >
+                                                    <Eye className="h-3 w-3 mr-1" />
+                                                    View
+                                                </a>
+                                            </Button>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                            
+                            {/* No documents message */}
+                            {selectedVisit && !selectedVisit.relationship_proof_path && !selectedVisit.additional_proof_path && (
+                                <div className="text-center py-8 text-muted-foreground">
+                                    <FileText className="h-12 w-12 mx-auto mb-3 opacity-30" />
+                                    <p>No supporting documents uploaded.</p>
+                                    <p className="text-sm mt-1">You may still approve this visit without documents.</p>
                                 </div>
                             )}
                         </div>
@@ -966,32 +1031,6 @@ export default function ScheduleManagement({ visits, stats, monitoringOfficers }
                                     </p>
                                 </div>
                             )}
-                            {statusForm.data.status === 'approved' && selectedVisit?.visit_type === 'virtual' && monitoringOfficers && monitoringOfficers.length > 0 && (
-                                <div className="space-y-2">
-                                    <Label htmlFor="status_jail_officer_id">
-                                        Jail Officer <span className="text-destructive">*</span>
-                                    </Label>
-                                    <Select
-                                        value={statusForm.data.jail_officer_id}
-                                        onValueChange={(value) => statusForm.setData('jail_officer_id', value)}
-                                    >
-                                        <SelectTrigger id="status_jail_officer_id">
-                                            <SelectValue placeholder="Select jail officer" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {monitoringOfficers.map((officer) => (
-                                                <SelectItem key={officer.id} value={officer.id.toString()}>
-                                                    {officer.name}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                    <InputError message={statusForm.errors.jail_officer_id} />
-                                    <p className="text-xs text-muted-foreground">
-                                        Required when approving. A meeting link is generated automatically if not already set.
-                                    </p>
-                                </div>
-                            )}
                         </div>
                         <DialogFooter>
                             <Button
@@ -1011,7 +1050,7 @@ export default function ScheduleManagement({ visits, stats, monitoringOfficers }
                     </DialogContent>
                 </Dialog>
 
-                {/* Reschedule Modal — 10-min slots (virtual) / 1-hour (physical); past times disabled when date is today */}
+                {/* Reschedule Modal â€” 10-min slots (virtual) / 1-hour (physical); past times disabled when date is today */}
                 <Dialog open={isRescheduleModalOpen} onOpenChange={setIsRescheduleModalOpen}>
                     <DialogContent className="max-h-[90vh] overflow-y-auto">
                         <DialogHeader>
@@ -1118,4 +1157,6 @@ export default function ScheduleManagement({ visits, stats, monitoringOfficers }
         </AppLayout>
     );
 }
+
+
 
