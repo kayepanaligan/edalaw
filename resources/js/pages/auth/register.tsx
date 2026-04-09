@@ -18,11 +18,16 @@ import AuthLayout from '@/layouts/auth-layout';
 import { login } from '@/routes';
 import { store } from '@/routes/register';
 
+import ConsentModal from '@/components/consent-modal';
+import { useState } from 'react';
+
 type Props = {
     visitor_role_id: number;
 };
 
 export default function Register({ visitor_role_id }: Props) {
+    const [showConsent, setShowConsent] = useState(true);
+
     const form = useForm({
         role_id: String(visitor_role_id),
         first_name: '',
@@ -59,6 +64,14 @@ export default function Register({ visitor_role_id }: Props) {
             description="Enter your details below to create your account"
         >
             <Head title="Register" />
+
+            <ConsentModal
+                open={showConsent}
+                onAgree={() => {
+                    setShowConsent(false);
+                }}
+            />
+
             <form
                 ref={formRef}
                 onSubmit={handleSubmit}
@@ -67,7 +80,7 @@ export default function Register({ visitor_role_id }: Props) {
                 <div className="grid gap-6 rounded-lg border p-6">
                     <div className="space-y-4">
                         <h3 className="text-lg font-semibold">Personal Information</h3>
-                        
+
                         <div className="grid grid-cols-2 gap-4">
                             <div className="grid gap-2">
                                 <Label htmlFor="first_name">First Name</Label>
@@ -155,7 +168,7 @@ export default function Register({ visitor_role_id }: Props) {
 
                     <div className="space-y-4">
                         <h3 className="text-lg font-semibold">Contact Information</h3>
-                        
+
                         <div className="grid grid-cols-2 gap-4">
                             <div className="grid gap-2">
                                 <Label htmlFor="email">Email address</Label>
@@ -192,7 +205,7 @@ export default function Register({ visitor_role_id }: Props) {
 
                     <div className="space-y-4">
                         <h3 className="text-lg font-semibold">Address</h3>
-                        
+
                         <div className="grid grid-cols-2 gap-4">
                             <div className="grid gap-2">
                                 <Label htmlFor="street">Street</Label>
@@ -308,7 +321,7 @@ export default function Register({ visitor_role_id }: Props) {
 
                     <div className="space-y-4">
                         <h3 className="text-lg font-semibold">Account Security</h3>
-                        
+
                         <div className="grid grid-cols-2 gap-4">
                             <div className="grid gap-2">
                                 <Label htmlFor="password">Password</Label>
